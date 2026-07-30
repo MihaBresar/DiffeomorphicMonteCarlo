@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the accompanying paper."
+title: "REPLACE: Projection sampler heavy-tailed benchmarks"
+version: "0.1.0"
+date-released: "REPLACE: YYYY-MM-DD"
+authors:
+  - family-names: "REPLACE"
+    given-names: "REPLACE"
+repository-code: "REPLACE: https://github.com/OWNER/REPOSITORY"
+preferred-citation:
+  type: article
+  title: "REPLACE: Paper title"
+  authors:
+    - family-names: "REPLACE"
+      given-names: "REPLACE"
+  year: "REPLACE"
+  doi: "REPLACE: 10.xxxx/xxxxx"

@@ -1,0 +1,9 @@
+# CPU-oriented reproducibility baseline.  Install in a clean Python 3.11
+# environment; record `python -m pip freeze` with every final paper run.
+numpy>=1.26,<3
+scipy>=1.11,<2
+matplotlib>=3.8,<4
+jax[cpu]>=0.4.28,<0.5
+numpyro>=0.15,<0.16
+blackjax>=1.1,<2
+arviz>=0.18,<0.20
