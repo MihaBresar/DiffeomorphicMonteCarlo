@@ -78,6 +78,39 @@ def fingerprint(config, hashes):
     return hashlib.sha256(json.dumps([config, scientific], sort_keys=True).encode()).hexdigest()
 
 
+def resume_source_update(saved_config, config, manifest, hashes):
+    """Accept only explicitly registered source-only checkpoint migrations.
+
+    Each registry transition gives the exact before/after SHA256 for every
+    changed source file. The original configuration and cohort fingerprint
+    remain unchanged; production provenance is recorded separately. This is
+    deliberately not a general ``ignore source changes`` resume option.
+    """
+    error = 'Configuration or scientific source changed. Use a new output directory.'
+    previous = manifest['source_hashes']
+    if saved_config != config or manifest['fingerprint'] != fingerprint(config, previous):
+        raise ValueError(error)
+    current_digest = fingerprint(config, hashes)
+    if current_digest == manifest['fingerprint']:
+        return None
+    changes = {path: {'before': previous.get(path), 'after': hashes.get(path)}
+               for path in previous.keys() | hashes.keys()
+               if path != 'dcs_bench/plotting.py' and previous.get(path) != hashes.get(path)}
+    registry_path = ROOT/'validation/resume_compatibility.json'
+    if registry_path.exists():
+        registry = json.loads(registry_path.read_text(encoding='utf-8'))
+        if registry.get('schema_version') != 1:
+            raise ValueError('Unsupported resume compatibility registry schema')
+        for transition in registry.get('transitions', []):
+            if (transition.get('source_changes') == changes
+                    and isinstance(transition.get('id'), str) and transition['id']
+                    and isinstance(transition.get('reason'), str) and transition['reason']):
+                return {'transition_id': transition['id'], 'reason': transition['reason'],
+                        'source_changes': changes, 'producing_source_fingerprint': current_digest,
+                        'producing_source_hashes': hashes}
+    raise ValueError(error)
+
+
 def environment():
     packages = {p.metadata['Name']: p.version for p in importlib.metadata.distributions()}
     import jax
@@ -123,17 +156,25 @@ def run(config, output, resume=False, reference_dir=None):
     plan = execution_plan(config['workers'], config['runs'])
     hashes = source_hashes()
     digest = fingerprint(config, hashes)
+    producing_digest = digest
     existing = output/'manifest.json'
     if existing.exists():
         if not resume:
             raise FileExistsError(f'{output} already contains a run; use --resume or choose another directory')
         manifest = json.loads(existing.read_text())
-        if manifest['fingerprint'] != digest:
-            raise ValueError('Configuration or scientific source changed. Use a new output directory.')
+        saved_config = json.loads((output/'configuration.json').read_text())
+        source_update = resume_source_update(saved_config, config, manifest, hashes)
         current_environment = environment()
         for key in ('python', 'platform', 'processor', 'cpu_count', 'cpu_allocation', 'jax_backend', 'jax_devices', 'packages', 'threads'):
             if manifest['environment'].get(key) != current_environment.get(key):
                 raise ValueError(f'Resume environment changed ({key}); use a new output directory to avoid mixing benchmark conditions')
+        # Keep all checkpoints in the original cohort, while recording the
+        # exact source that produced each resumed invocation and new chain.
+        digest = manifest['fingerprint']
+        if source_update is not None:
+            updates = manifest.setdefault('resume_source_updates', [])
+            if not any(item.get('producing_source_fingerprint') == producing_digest for item in updates):
+                updates.append({'accepted_utc': datetime.now(timezone.utc).isoformat(), **source_update})
     else:
         if resume:
             raise FileNotFoundError('--resume requires an existing manifest')
@@ -183,7 +224,9 @@ def run(config, output, resume=False, reference_dir=None):
                 seconds = None if config['mode'] == 'iterations' else (matched_seconds if config['mode'] == 'nuts_matched_time' else config['time_budget'])
                 print(f'Scenario {s}, {algorithm}: {len(pending)} pending chains, up to {plan["max_concurrent_chains"]} workers', flush=True)
                 launch_chains({'target': spec, 'config': config, 'algorithm': algorithm, 'maps': maps,
-                               'seconds': seconds, 'fingerprint': digest, 'scenario': s},
+                               'seconds': seconds, 'fingerprint': digest, 'scenario': s,
+                               'producing_source_fingerprint': producing_digest,
+                               'producing_source_hashes': hashes},
                               pending, directory/'execution', plan)
                 if algorithm == 'NUTS':
                     write_json(directory/'nuts_compilation.json', compilation_summary(directory/'execution'))
@@ -205,6 +248,7 @@ def run(config, output, resume=False, reference_dir=None):
         raise
     finally:
         manifest.setdefault('invocations', []).append({'ended_utc': datetime.now(timezone.utc).isoformat(),
-            'wall_seconds': time.perf_counter()-invocation_started, 'resume': resume, 'status': manifest['status']})
+            'wall_seconds': time.perf_counter()-invocation_started, 'resume': resume, 'status': manifest['status'],
+            'producing_source_fingerprint': producing_digest, 'producing_source_hashes': hashes})
         write_json(existing, manifest)
     return output

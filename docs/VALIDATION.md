@@ -1,5 +1,15 @@
 # Validation of the corrected implementation
 
+The Windows queue follow-up passed **39 tests**, including eight competing
+processes claiming 219 jobs exactly once across three synchronized rounds.
+A 200D DCS-versus-NUTS smaller reproduction was deliberately stopped after
+the previous release saved eight DCS chains. The updated code reused all
+eight files byte-for-byte, completed eight NUTS chains, and resumed again with
+all 16 checkpoints unchanged. The integration ran on macOS; native Windows
+and Linux checks run in GitHub Actions. See
+[`validation/windows_queue_checks.json`](../validation/windows_queue_checks.json)
+and [the recovery instructions](WINDOWS_QUEUE_FIX.md).
+
 The local verification record is [validation/local_checks.json](../validation/local_checks.json), including platform, source hashes, experiment fingerprints and full-length tuning checks.
 
 - **15 numerical/API tests passed** under Python 3.12.14: NumPy/JAX density agreement and finite gradients; GARCH agreement with an independent physical-coordinate likelihood and Jacobian; centered/non-centered Eight Schools equivalence; inverse maps and finite-difference volume/surface Jacobians; near-boundary stability; exact radial expectations; independent skew-t generation versus quadrature; invariant-transition checks for all three ball kernels and SCS; correct independent-chain RMSE; honest unavailable diagnostics; reference order; checkpoint validation; and the standalone API.

@@ -21,12 +21,18 @@ def pending_chains(job):
         return
     queue = Path(job['queue_directory'])
     for path in sorted(queue.glob('*.pending.json')):
-        claimed = path.with_name(path.name.replace('.pending.', f'.worker-{job["worker_slot"]}.'))
+        # Every contender must create the SAME claim directory. Keep the input
+        # immutable: a successful rename is not an exclusive ownership primitive
+        # on all platforms, and a competing move can remove its destination.
+        claim = path.with_name(path.name.removesuffix('.pending.json')+'.claim')
         try:
-            path.rename(claimed)
-        except FileNotFoundError:
+            claim.mkdir()
+        except FileExistsError:
             continue  # Another worker claimed this chain.
-        yield json.loads(claimed.read_text(encoding='utf-8'))
+        chain = json.loads(path.read_text(encoding='utf-8'))
+        (claim/'owner.json').write_text(json.dumps({
+            'worker_slot': job['worker_slot'], 'chain': chain['index']})+'\n', encoding='utf-8')
+        yield chain
 
 
 def main():
@@ -72,6 +78,9 @@ def main():
                           'started_utc': started, 'sampling_finished_utc': datetime.now(timezone.utc).isoformat(),
                           'requested_workers': config['workers'],
                           'threads': {key: os.environ.get(key) for key in (*THREAD_VARIABLES, 'XLA_FLAGS')}})
+        for field in ('producing_source_fingerprint', 'producing_source_hashes'):
+            if field in job:
+                record[field] = job[field]
         save_chain(Path(chain['path']), draws, record)
         print(f'Worker {job["worker_slot"]+1}: {algorithm}, chain {chain["index"]+1} saved', flush=True)
 

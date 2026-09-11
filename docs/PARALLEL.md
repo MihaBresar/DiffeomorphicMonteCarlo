@@ -31,8 +31,10 @@ production experiments. Worker counts above the detected capacity are rejected.
 ## What runs concurrently
 
 Each chain runs in a separate Python process. Workers claim the next pending
-chain from a shared queue as soon as they finish. Atomic claims prevent duplicate
-execution, and faster workers can process more chains. Seeds depend on experiment seed,
+chain from a shared queue as soon as they finish. An exclusively created
+directory grants ownership of each chain; its job JSON stays immutable.
+This prevents competing workers from moving one another's job files on Windows.
+Faster workers can process more chains. Seeds depend on experiment seed,
 scenario, method index and chain index; worker count does not alter them.
 Fixed-iteration Metropolis chains have been checked against direct sequential
 execution for identical saved draws. Timed chains can retain different numbers
@@ -104,5 +106,9 @@ It checks the original code, configuration and execution environment. To change
 worker count, start a new run. After updating from an earlier execution or kernel
 implementation, start a **new results folder**; existing results can still be replotted,
 but cannot be resumed with changed scientific source files.
+
+The September 11 Windows queue fix has a narrowly registered compatibility
+exception, with exact before/after source hashes, so completed production chains
+can be retained. See [the update and resume instructions](WINDOWS_QUEUE_FIX.md).
 
 Do not update the code or move the project while an experiment is running.

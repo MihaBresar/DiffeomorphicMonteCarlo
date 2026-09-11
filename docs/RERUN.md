@@ -1,5 +1,10 @@
 # What must be rerun
 
+**Windows queue failure (`*.worker-*.json` missing):** install the queue fix and
+resume the interrupted run. The exact approved update preserves completed
+chains; see [the no-command recovery steps](WINDOWS_QUEUE_FIX.md). Completed
+runs need no new sampling for this queue-only fix.
+
 **For the restored plot layouts and exact-number tables, no new sampling is
 needed.** In the launcher select a completed saved run, click **Rebuild figures**,
 then **Show figures and tables**. All original plot families are available again;
