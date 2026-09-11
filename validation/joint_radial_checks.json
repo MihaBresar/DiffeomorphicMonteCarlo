@@ -46,17 +46,23 @@
     "probe outcome partitions",
     "tail-only MSE contrasts"
   ],
-  "local_unit_tests": 76,
-  "quick_end_to_end": "passed",
+  "local_unit_tests": 77,
+  "quick_end_to_end": {
+    "status": "passed",
+    "production_chains": 32,
+    "pilot_seconds_per_chain": 0.1,
+    "summary_sha256": "dd6fdcbd07061a86f12ef2be75d2aba5be4487aeeb53dc7f1133b05db46e9049"
+  },
   "preserved_canonical_kernel_decisions": "DCS-BW and SCS checked transition by transition, including RNG state",
   "github_ci": "Windows and Linux checks run on each main-branch push",
   "full_run_source_commit": "e0164cfd6904ab8a7e9a34d580c5164f2c7d4856",
-  "subsequent_runner_change": "Only reproduce.pilot_seconds increased from 0.15 to 0.5; paper and quick settings and sampling algorithms unchanged.",
+  "subsequent_runner_change": "Smaller pilot duration 0.15 -> 0.5 seconds; execution-only quick pilot 0.02 -> 0.1 seconds; abort shared barriers on worker errors and preserve the root exception. Full-paper settings and successful sampling transitions unchanged.",
   "smaller_reproduction_end_to_end": {
     "status": "passed",
     "production_chains": 128,
     "pilot_chains": 1024,
     "pilot_seconds_per_chain": 0.5,
     "summary_sha256": "5c907925845ace2dbb88be42bff283abc92ecda87102d1092f3d757d2a374289"
-  }
+  },
+  "windows_barrier_regression": "A failed worker releases its barrier-waiting peer promptly and retains its original error; local regression test passed."
 }

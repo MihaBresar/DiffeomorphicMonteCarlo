@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import sys
 import time
+from threading import BrokenBarrierError
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -37,7 +38,7 @@ TARGETS = {
 CONTROLS = ('joint', 'unit', 'vi', 'sqrt-d-plus-one')
 PRESETS = {
     'quick': dict(runs=2, time_budget=1., warmup=100, thin=1, pilot_chains=2,
-        pilot_seconds=.02, pilot_burn=50, optimizer_steps=20, optimizer_samples=128,
+        pilot_seconds=.1, pilot_burn=50, optimizer_steps=20, optimizer_samples=128,
         probe_chains=2, probe_steps=100),
     'reproduce': dict(runs=8, time_budget=5., warmup=1000, thin=10, pilot_chains=4,
         pilot_seconds=.5, pilot_burn=1000, optimizer_steps=400, optimizer_samples=500,
@@ -164,6 +165,22 @@ def initialize_worker(slots, barrier):
 
 
 def chain_job(job):
+    try:
+        return _chain_job(job)
+    except BaseException as error:
+        # A failed worker must release peers waiting at either timing barrier.
+        # Otherwise a short-pilot error can be hidden by a 180-second timeout.
+        if _BARRIER is not None:
+            try:
+                _BARRIER.abort()
+            except Exception:
+                pass
+        error.add_note('Joint audit worker: '+', '.join(f'{key}={job.get(key)}'
+                       for key in ('phase', 'target_id', 'case', 'chain', 'R', 'scale')))
+        raise
+
+
+def _chain_job(job):
     if _ALLOCATION_ERROR:
         raise RuntimeError(_ALLOCATION_ERROR)
     if job['phase'] not in ('pilot', 'production', 'probe'):
@@ -230,7 +247,15 @@ def run_waves(jobs, workers, hardware, waves=None):
                     initializer=initialize_worker, initargs=(slots, context.Barrier(count)))
                 previous_count = count
             futures = [executor.submit(chain_job, job) for job in wave]
-            records.extend(future.result() for future in futures)
+            errors = []
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    records.append(future.result())
+                except BaseException as error:
+                    errors.append(error)
+            if errors:
+                # Report the cause, not a peer's consequence of barrier abort.
+                raise next((e for e in errors if not isinstance(e, BrokenBarrierError)), errors[0])
             completed += count
             if total > workers and (wave_index % 8 == 0 or completed == total):
                 print(f'{completed}/{total} {wave[0]["phase"]} chains saved', flush=True)

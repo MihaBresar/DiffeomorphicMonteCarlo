@@ -4,6 +4,8 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier, BrokenBarrierError
 import numpy as np
 from scripts import audit_joint_radial as audit
 from dcs_bench import samplers
@@ -13,6 +15,23 @@ from dcs_bench.transforms import BallMap, SphereMap
 
 
 class JointRadialTests(unittest.TestCase):
+    def test_worker_failure_releases_a_peer_and_preserves_original_error(self):
+        barrier = Barrier(2)
+        def simulated(job):
+            barrier.wait(timeout=2)
+            if job['fail']:
+                raise RuntimeError('Too few retained values')
+            barrier.wait(timeout=2)
+        with patch.object(audit, '_BARRIER', barrier), patch.object(audit, '_chain_job', side_effect=simulated):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                peer = pool.submit(audit.chain_job, {'fail': False})
+                failed = pool.submit(audit.chain_job, {'fail': True})
+                with self.assertRaisesRegex(RuntimeError, 'Too few retained'):
+                    failed.result(timeout=1)
+                with self.assertRaises(BrokenBarrierError):
+                    peer.result(timeout=1)
+        self.assertTrue(barrier.broken)
+
     def test_independent_phase_seed_blocks_do_not_overlap(self):
         blocks = []
         for phase in audit.SEED_BASES:

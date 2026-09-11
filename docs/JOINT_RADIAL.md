@@ -80,7 +80,7 @@ the same worker allocation, including the last partial wave.
 
 | Preset | Pilot chains per (R, step) | Discarded steps per chain | Timed pilot sampling per chain |
 |---|---:|---:|---:|
-| Quick check | 2 | 50 | 0.02 s |
+| Quick check | 2 | 50 | 0.1 s |
 | Smaller reproduction | 4 | 1,000 | 0.5 s |
 | Full paper settings | 4 | 2,000 | 0.5 s |
 
@@ -228,4 +228,4 @@ R=√101 performed poorly for both methods. In the symmetric DCS probes it reduc
 
 At ν=2, the mean-norm squared-error column is descriptive because the target norm has infinite variance. These results do not establish a universal ranking, and equal-time counts depend on the recorded hardware. All prior audit results remain separate and unchanged.
 
-The full run used [source revision e0164cf](https://github.com/MihaBresar/DiffeomorphicMonteCarlo/commit/e0164cfd6904ab8a7e9a34d580c5164f2c7d4856). The subsequent numerical-runner change only increased the smaller preset’s pilot time from 0.15 to 0.5 seconds; full-paper settings and sampling algorithms are unchanged. The recorded source fingerprints continue to identify the exact generating code.
+The full run used [source revision e0164cf](https://github.com/MihaBresar/DiffeomorphicMonteCarlo/commit/e0164cfd6904ab8a7e9a34d580c5164f2c7d4856). Later runner changes increased the smaller preset’s pilot time from 0.15 to 0.5 seconds, increased the execution-only quick pilot from 0.02 to 0.1 seconds, and made a failed worker release barrier-waiting peers immediately while preserving the original error. Full-paper settings and sampling transitions are unchanged. The recorded source fingerprints identify the exact generating code.
