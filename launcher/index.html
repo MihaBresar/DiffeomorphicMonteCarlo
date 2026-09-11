@@ -8,19 +8,86 @@
 <header><div class="eyebrow">Research experiments · Runs on this computer</div><h1>Diffeomorphic Monte Carlo</h1><p>Set up once, choose an experiment, and run it with a click.</p></header>
 <section id="direct-open"><strong>Open Start.bat (Windows), Start.command (macOS), or run START_HERE.py in IDLE.</strong><p>This HTML file is the launcher’s interface. Opening it directly does not start the experiment runner.</p></section>
 <section><div class="row" style="justify-content:space-between"><h2>1. Set up</h2><span id="ready" class="tag">Checking environment…</span></div><p>The setup button creates a separate Python environment and installs the required packages. Internet access is needed for this step.</p><div class="row"><button id="setup" onclick="action('setup')">Set up environment</button><a href="https://www.python.org/downloads/release/python-31210/" target="_blank" rel="noreferrer">Install Python 3.12 if needed ↗</a></div><p class="muted">Use the 64-bit installer. On Windows, select “Add python.exe to PATH”. After installing, click Set up again.</p></section>
-<section><h2>2. Run experiments</h2><div class="split"><div><label for="experiment">Experiment</label><select id="experiment" onchange="describe()"><option value="all">All seven experiments + posterior table</option><option value="skew-t-200d-nuts">200D skew-t: DCS versus NUTS</option><option value="skew-t-200d-baselines">200D skew-t: random-walk baselines</option><option value="skew-t-100d-fixed">100D skew-t: fixed-step SCS comparison</option><option value="skew-t-50d-nu-0.5">50D t: infinite first moment</option><option value="eight-schools">Eight Schools</option><option value="garch11">GARCH(1,1)</option><option value="logistic-regression">Logistic regression: both priors</option></select></div><div><label for="preset">Run size</label><select id="preset" onchange="describe()"><option value="quick">Quick check — start here</option><option value="reproduce">Smaller reproduction</option><option value="paper">Full paper settings</option></select></div></div><p id="description" class="muted"></p><label for="workers">CPU workers (parallel chains)</label><select id="workers" onchange="describe()"><option value="1">1 — sequential</option></select><button id="all-threads" style="margin-top:10px" onclick="useAllThreads()">Use all CPU threads</button><p id="cpu-note" class="muted"></p><p class="muted">Workers take the next waiting chain as soon as they finish. More workers use more RAM; keep the same setting across methods. Fitting, plotting and four-chain logistic reference preparation may use fewer cores.</p><p id="concurrency-note" class="muted"></p><label for="ball-scale-policy">DCS map scale</label><select id="ball-scale-policy"><option value="fit">Fit R, centre and Möbius parameters by VI (default)</option><option value="sqrt-d">Compare fixed R = √d; fit centre and Möbius parameters</option></select><p class="muted">The fixed-scale option changes the experiment. It does not apply to the identity maps in Eight Schools or GARCH. Results always record the choice.</p><div class="row"><button class="primary" id="run" onclick="action('run',{preset:val('preset'),experiment:val('experiment'),workers:Number(val('workers')),ball_scale_policy:val('ball-scale-policy')})">Start new run</button><button class="danger" id="stop" onclick="action('stop')" disabled>Stop</button></div><p class="muted">Keep this launcher open and prevent the computer from sleeping during a run. Completed chains are saved automatically.</p></section>
-<section><h2>3. Resume or view results</h2><label for="saved">Saved launcher runs</label><select id="saved"><option value="">No saved runs yet</option></select><div class="row" style="margin-top:14px"><button id="resume" onclick="savedAction('resume')">Resume selected run</button><button id="replot" onclick="savedAction('replot')">Rebuild figures</button><button id="show" onclick="savedAction('show')">Show figures and tables</button></div><div id="artifacts"></div><p class="muted">Files are saved in this project’s results/click-runs folder. New runs get separate folders.</p></section>
-<section aria-live="polite"><div class="row" style="justify-content:space-between"><h2>Progress</h2><span id="status">Starting…</span></div><p id="error"></p><pre id="log">The experiment log will appear here.</pre></section>
+<section><h2>2. Run experiments</h2><div class="split"><div><label for="experiment">Experiment</label><select id="experiment" onchange="describe()"><option value="all">All seven experiments + posterior table</option><option value="skew-t-200d-nuts">200D skew-t: DCS versus NUTS</option><option value="skew-t-200d-baselines">200D skew-t: random-walk baselines</option><option value="skew-t-100d-fixed">100D skew-t: fixed-step SCS comparison</option><option value="skew-t-50d-nu-0.5">50D t: infinite first moment</option><option value="eight-schools">Eight Schools</option><option value="garch11">GARCH(1,1)</option><option value="logistic-regression">Logistic regression: both priors</option></select></div><div><label for="preset">Run size</label><select id="preset" onchange="describe()"><option value="quick">Quick check — start here</option><option value="reproduce">Smaller reproduction</option><option value="paper">Full paper settings</option></select></div></div><p id="description" class="muted"></p><label for="workers">CPU workers (parallel chains)</label><select id="workers" onchange="describe()"><option value="1">1 — sequential</option></select><button id="all-threads" style="margin-top:10px" onclick="useAllThreads()">Use all CPU threads</button><p id="cpu-note" class="muted"></p><p class="muted">Workers take the next waiting chain as soon as they finish. More workers use more RAM; keep the same setting across methods. Fitting, plotting and four-chain logistic reference preparation may use fewer cores.</p><p id="concurrency-note" class="muted"></p><label for="ball-scale-policy">DCS map scale</label><select id="ball-scale-policy"><option value="fit">Fit R, centre and Möbius parameters by VI (default)</option><option value="sqrt-d">Compare fixed R = √d; fit centre and Möbius parameters</option></select><p class="muted">The fixed-scale option changes the experiment. It does not apply to the identity maps in Eight Schools or GARCH. Results always record the choice.</p><div class="row"><button class="primary" id="run" onclick="action('run',{preset:val('preset'),experiment:val('experiment'),workers:Number(val('workers')),ball_scale_policy:val('ball-scale-policy')})">Start run</button><button class="danger" id="stop" onclick="action('stop')" disabled>Stop</button></div><p class="muted">Keep this launcher open and prevent the computer from sleeping during a run. Completed chains are saved automatically.</p></section>
+<section aria-live="polite"><div class="row" style="justify-content:space-between"><h2>Progress</h2><span id="status">Starting…</span></div><p id="error"></p><pre id="log">The experiment log will appear here.</pre><div id="result-links" hidden><h3>Figures and tables</h3><p id="result-location" class="muted"></p><div id="artifacts"></div></div></section>
 <footer><span id="folder"></span><br><button style="margin-top:12px" onclick="action('quit').then(()=>{document.getElementById('status').textContent='Launcher closed';clearInterval(timer)})">Close launcher</button></footer>
 </main>
 <script>
-const token=location.protocol==='file:'?null:__TOKEN__; if(token)document.getElementById('direct-open').hidden=true; const val=id=>document.getElementById(id).value; let lastRuns='',lastActive=false,cpuInitialized=false,cpuCapacity=1;
+const token=location.protocol==='file:'?null:__TOKEN__; if(token)document.getElementById('direct-open').hidden=true; const val=id=>document.getElementById(id).value; let lastResultRun=null,lastActive=false,cpuInitialized=false,cpuCapacity=1;
 function useAllThreads(){document.getElementById('workers').value=cpuCapacity;describe()}
 function describe(){const chains=val('preset')==='quick'?2:val('preset')==='reproduce'?8:['skew-t-100d-fixed','logistic-regression'].includes(val('experiment'))?20:50;document.getElementById('concurrency-note').textContent='This selection runs up to '+Math.min(Number(val('workers')),chains)+' production chains at once. '+(val('experiment')==='all'&&val('preset')==='paper'?'The fixed-step and logistic experiments have 20 chains; the others have 50. ':'')+'CPU use falls during setup and when only the final chains remain.';document.getElementById('description').textContent={quick:'A short execution check. These figures are not publication results.',reproduce:'Fewer chains and smaller budgets for an affordable reproduction. These are not the paper settings.',paper:'The exact manuscript configurations. All experiments can take several hours and several gigabytes. Logistic runs first prepare an independent reference.'}[val('preset')]}
 async function request(path,body){const options={headers:{'X-Launcher-Token':token}};if(body!==undefined){options.method='POST';options.headers['Content-Type']='application/json';options.body=JSON.stringify(body)}const response=await fetch('/'+path,options);const result=await response.json();if(!response.ok)throw Error(result.error||'Request failed');return result}
-async function action(path,data={}){document.getElementById('error').textContent='';try{if(path==='run'||path==='resume')document.getElementById('artifacts').replaceChildren();await request(path,data);if(path!=='quit')await refresh();if(path==='show'||path==='replot')await artifacts()}catch(e){document.getElementById('error').textContent=e.message}}
-async function savedAction(path){if(!val('saved'))return;await action(path,{id:val('saved')})}
-async function artifacts(){try{const items=await request('artifacts');const div=document.getElementById('artifacts');div.replaceChildren();for(const group of ['Original figures and sample counts','Exact numbers and tables','Supplementary diagnostics']){const subset=items.filter(item=>item.group===group);if(!subset.length)continue;const block=document.createElement(group==='Supplementary diagnostics'?'details':'div');const heading=document.createElement(group==='Supplementary diagnostics'?'summary':'h3');heading.textContent=group;block.appendChild(heading);for(const item of subset){const a=document.createElement('a');a.href=item.url;a.target='_blank';a.rel='noreferrer';a.textContent=item.name;block.appendChild(a)}div.appendChild(block)}}catch(e){document.getElementById('error').textContent=e.message}}
-async function refresh(){try{const s=await request('state');document.getElementById('ready').textContent=s.ready?'Environment ready':'Setup needed';document.getElementById('status').textContent=s.status;document.getElementById('folder').textContent=s.folder;if(!cpuInitialized){cpuCapacity=s.cpu.capacity;const select=document.getElementById('workers');select.replaceChildren();for(let i=1;i<=s.cpu.capacity;i++){const o=document.createElement('option');o.value=i;o.textContent=i===1?'1 — sequential':i+' — up to '+i+' chains at once'+(i===s.cpu.capacity?' (all CPU threads)':i===s.cpu.physical_cores?' (one per physical core)':'');select.appendChild(o)}select.value=Math.max(1,Math.min(4,s.cpu.capacity-1));document.getElementById('cpu-note').textContent=(s.cpu.physical_cores?s.cpu.physical_cores+' physical cores; ':'')+s.cpu.capacity+' usable CPU threads. '+(['linux','windows'].includes(s.cpu.pinning)?'One thread per core is used first, then the remaining hardware threads.':'The operating system assigns cores; strict CPU pinning is unavailable.');cpuInitialized=true;describe()}if(s.active){const active=s.runs.find(r=>r.id===s.current_run);if(active){document.getElementById('workers').value=active.workers||1;document.getElementById('preset').value=active.preset;document.getElementById('experiment').value=active.experiment;document.getElementById('ball-scale-policy').value=active.ball_scale_policy||'fit';describe()}}const log=document.getElementById('log');const atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<45;if(log.textContent!==s.log){log.textContent=s.log||'The experiment log will appear here.';if(atBottom)log.scrollTop=log.scrollHeight}document.getElementById('setup').disabled=s.active;document.getElementById('run').disabled=s.active||!s.ready;document.getElementById('stop').disabled=!s.active;for(const id of ['workers','experiment','preset','all-threads','ball-scale-policy'])document.getElementById(id).disabled=s.active;for(const id of ['resume','replot'])document.getElementById(id).disabled=s.active||!s.ready||!s.runs.length;document.getElementById('show').disabled=!s.runs.length;const key=JSON.stringify(s.runs);if(key!==lastRuns){const selected=val('saved');const select=document.getElementById('saved');select.replaceChildren();for(const run of s.runs){const o=document.createElement('option');o.value=run.id;o.textContent=run.id+' · '+run.experiment+' · '+(run.workers||1)+' workers';select.appendChild(o)}if(!s.runs.length){const o=document.createElement('option');o.value='';o.textContent='No saved runs yet';select.appendChild(o)}else if(s.runs.some(r=>r.id===s.current_run)){select.value=s.current_run}else if(s.runs.some(r=>r.id===selected)){select.value=selected}lastRuns=key}if(lastActive&&!s.active)await artifacts();lastActive=s.active}catch(e){document.getElementById('status').textContent='Launcher connection closed'}}
+async function action(path,data={}){
+  document.getElementById('error').textContent='';
+  try{
+    await request(path,data);
+    if(path==='run'){
+      document.getElementById('artifacts').replaceChildren();
+      document.getElementById('result-links').hidden=true;
+      lastResultRun=null;
+    }
+    if(path!=='quit')await refresh();
+  }catch(e){document.getElementById('error').textContent=e.message}
+}
+async function artifacts(runId){
+  try{
+    const items=await request('artifacts');
+    const div=document.getElementById('artifacts');
+    div.replaceChildren();
+    for(const group of ['Original figures and sample counts','Exact numbers and tables','Supplementary diagnostics']){
+      const subset=items.filter(item=>item.group===group);
+      if(!subset.length)continue;
+      const block=document.createElement(group==='Supplementary diagnostics'?'details':'div');
+      const heading=document.createElement(group==='Supplementary diagnostics'?'summary':'h4');
+      heading.textContent=group;block.appendChild(heading);
+      for(const item of subset){
+        const a=document.createElement('a');a.href=item.url;a.target='_blank';a.rel='noreferrer';a.textContent=item.name;block.appendChild(a);
+      }
+      div.appendChild(block);
+    }
+    document.getElementById('result-location').textContent='Saved in this project: results/click-runs/'+runId;
+    document.getElementById('result-links').hidden=!items.length;
+    lastResultRun=runId;
+  }catch(e){document.getElementById('error').textContent=e.message}
+}
+async function refresh(){
+  try{
+    const s=await request('state');
+    document.getElementById('ready').textContent=s.ready?'Environment ready':'Setup needed';
+    document.getElementById('status').textContent=s.status;
+    document.getElementById('folder').textContent=s.folder;
+    if(!cpuInitialized){
+      cpuCapacity=s.cpu.capacity;
+      const select=document.getElementById('workers');select.replaceChildren();
+      for(let i=1;i<=s.cpu.capacity;i++){
+        const o=document.createElement('option');o.value=i;
+        o.textContent=i===1?'1 — sequential':i+' — up to '+i+' chains at once'+(i===s.cpu.capacity?' (all CPU threads)':i===s.cpu.physical_cores?' (one per physical core)':'');
+        select.appendChild(o);
+      }
+      select.value=Math.max(1,Math.min(4,s.cpu.capacity-1));
+      document.getElementById('cpu-note').textContent=(s.cpu.physical_cores?s.cpu.physical_cores+' physical cores; ':'')+s.cpu.capacity+' usable CPU threads. '+(['linux','windows'].includes(s.cpu.pinning)?'One thread per core is used first, then the remaining hardware threads.':'The operating system assigns cores; strict CPU pinning is unavailable.');
+      cpuInitialized=true;describe();
+    }
+    if(s.active){
+      const active=s.runs.find(r=>r.id===s.current_run);
+      if(active){
+        document.getElementById('workers').value=active.workers||1;
+        document.getElementById('preset').value=active.preset;
+        document.getElementById('experiment').value=active.experiment;
+        document.getElementById('ball-scale-policy').value=active.ball_scale_policy||'fit';
+        describe();
+      }
+    }
+    const log=document.getElementById('log');
+    const atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<45;
+    if(log.textContent!==s.log){log.textContent=s.log||'The experiment log will appear here.';if(atBottom)log.scrollTop=log.scrollHeight}
+    document.getElementById('setup').disabled=s.active;
+    document.getElementById('run').disabled=s.active||!s.ready;
+    document.getElementById('stop').disabled=!s.active;
+    for(const id of ['workers','experiment','preset','all-threads','ball-scale-policy'])document.getElementById(id).disabled=s.active;
+    if(!s.active&&s.current_run&&(lastActive||lastResultRun!==s.current_run))await artifacts(s.current_run);
+    lastActive=s.active;
+  }catch(e){document.getElementById('status').textContent='Launcher connection closed'}
+}
 let timer;if(token){describe();refresh();timer=setInterval(refresh,1500)}else{document.querySelectorAll('button,select').forEach(el=>el.disabled=true);document.getElementById('ready').textContent='Open the launcher first';document.getElementById('status').textContent='Runner is not started'}
 </script></html>

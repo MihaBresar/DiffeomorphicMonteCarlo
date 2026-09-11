@@ -11,13 +11,13 @@ Download this repository using **Code → Download ZIP**, extract it, and instal
 **Start.command**. Alternatively, open **START_HERE.py** in Python's IDLE editor
 and choose **Run → Run Module** (F5).
 
-In the browser, click **Set up environment**, then **Start new run** with
+In the browser, click **Set up environment**, then **Start run** with
 **Quick check** selected. Choose **CPU workers** to run independent chains in
 parallel (start with 2–4, or click **Use all CPU threads** for the maximum).
 The Ryzen 9 9950X3D can use 32 workers when all its threads are available.
 Once that succeeds, choose **Full paper settings**
-for the publication runs. Buttons also resume saved runs, rebuild figures,
-and open results. See the [step-by-step click-to-run guide](docs/CLICK_TO_RUN.md)
+for the publication runs. Links to the figures and tables appear automatically
+when the run finishes. See the [step-by-step click-to-run guide](docs/CLICK_TO_RUN.md)
 for installation, moving to another computer, and troubleshooting. These
 experiments run locally on your computer.
 

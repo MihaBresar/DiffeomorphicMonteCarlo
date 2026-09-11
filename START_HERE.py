@@ -151,10 +151,10 @@ class Controller:
             try:
                 work()
                 with self.lock:
-                    self.status = 'Stopped — completed chains can be resumed' if self.cancelled else 'Finished successfully'
+                    self.status = 'Stopped — start a fresh run when ready' if self.cancelled else 'Finished successfully'
             except Exception as error:
                 with self.lock:
-                    self.status = 'Stopped — completed chains can be resumed' if self.cancelled else 'Needs attention — see the log'
+                    self.status = 'Stopped — start a fresh run when ready' if self.cancelled else 'Needs attention — see the log'
                 self.log(str(error))
             finally:
                 with self.lock:

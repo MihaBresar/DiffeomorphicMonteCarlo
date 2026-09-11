@@ -95,20 +95,17 @@ including resumed launches. That sum is an amortized resource cost, not elapsed
 parallel wall time. Use the manifest's invocation wall time to assess total
 turnaround, which also includes setup, process startup, saving and plotting.
 
-## Stop, resume and update
+## Stop and update
 
 The **Stop** button interrupts the coordinator and workers. A failed worker
 stops its siblings and fails the experiment. Completed checkpoint files remain
-valid; interrupted chains restart from their recorded seed.
+valid. The launcher's **Start run** button starts from scratch in a new dated
+results folder, including after a stopped or failed run. Download updates into
+a fresh project folder before starting again; see [the Windows queue fix](WINDOWS_QUEUE_FIX.md).
 
-Resume uses the **original saved worker count**, even if you change the selector.
-It checks the original code, configuration and execution environment. To change
-worker count, start a new run. After updating from an earlier execution or kernel
-implementation, start a **new results folder**; existing results can still be replotted,
-but cannot be resumed with changed scientific source files.
-
-The September 11 Windows queue fix has a narrowly registered compatibility
-exception, with exact before/after source hashes, so completed production chains
-can be retained. See [the update and resume instructions](WINDOWS_QUEUE_FIX.md).
+Advanced command-line workflows still support `--resume` and `--plot-only`.
+Resume checks the original code, configuration, worker count and execution
+environment. To change worker count or scientific implementation, use a new
+results folder. See [the command-line rerun guide](RERUN.md).
 
 Do not update the code or move the project while an experiment is running.

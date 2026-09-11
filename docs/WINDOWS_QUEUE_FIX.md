@@ -1,4 +1,4 @@
-# Recovering the Windows worker queue failure
+# Windows worker queue fix
 
 The September 11 queue fix addresses `FileNotFoundError` while a worker reads
 `000000.worker-3.json` (or another worker's claimed job filename). This happens
@@ -14,21 +14,20 @@ never moved, and each resumed launch creates a fresh queue from missing chain
 checkpoints. The sampling kernels, tuning, seeds, budgets and CPU assignments
 are unchanged by this fix.
 
-## Update and resume without commands
+## Update and start fresh without commands
 
-1. Close the launcher with **Quit launcher** and wait for its terminal to close.
+1. Click **Close launcher**, then close its console window if it remains open.
 2. Open the [GitHub repository](https://github.com/MihaBresar/DiffeomorphicMonteCarlo),
-   choose **Code → Download ZIP**, and extract it into a temporary folder.
-3. Copy the extracted **dcs_bench** and **validation** folders into your existing
-   project folder, alongside `START_HERE.py`. Choose **Replace the files in the
-   destination**. Keep your existing `results` and `.venv` folders in place.
-4. Double-click **Start.bat** in the existing project. Under **Saved launcher
-   runs**, select the interrupted run and click **Resume selected run**.
+   choose **Code → Download ZIP**, and extract it into a new folder.
+3. Double-click **Start.bat** in the extracted project and click
+   **Set up environment**. Wait for **Environment ready**.
+4. Choose the experiment, run size and CPU workers, then click **Start run**.
+   The experiment starts from scratch, and figure links appear when it finishes.
 
-For the reported 200D DCS-versus-NUTS run, the eight completed DCS checkpoints
-are reused; missing NUTS chains start again with their original seeds. Saved
-NUTS checkpoints, if any completed before the failure, are also reused. The
-launcher restores the original worker count and experiment settings.
+Keep the old project folder if you want to retain its output files. There is
+no need to copy its environment or interrupted run into the new project.
+
+## Advanced command-line compatibility
 
 The compatibility exception applies only to the exact registered queue fix
 from release `0a87f3d20045c19d6cd866a2b4de1dc37dc6764b`. Resume still checks the
@@ -42,5 +41,6 @@ each invocation; new production checkpoints record their producing source.
 The exact allowed before/after file hashes are in
 [`validation/resume_compatibility.json`](../validation/resume_compatibility.json).
 
-New sampling is needed only for unfinished chains. Figures are rebuilt when
-the experiment finishes. Completed runs do not need to be rerun for this fix.
+Command-line resume requires new sampling only for unfinished chains. Figures
+are rebuilt when the experiment finishes. Completed runs do not need to be
+rerun for this fix.

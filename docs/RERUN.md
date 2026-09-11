@@ -1,18 +1,17 @@
 # What must be rerun
 
-**Windows queue failure (`*.worker-*.json` missing):** install the queue fix and
-resume the interrupted run. The exact approved update preserves completed
-chains; see [the no-command recovery steps](WINDOWS_QUEUE_FIX.md). Completed
-runs need no new sampling for this queue-only fix.
+**Windows queue failure (`*.worker-*.json` missing):** download the updated
+repository and start a fresh run; see [the no-command update steps](WINDOWS_QUEUE_FIX.md).
+Completed runs need no new sampling for this queue-only fix.
 
 **For the restored plot layouts and exact-number tables, no new sampling is
-needed.** In the launcher select a completed saved run, click **Rebuild figures**,
-then **Show figures and tables**. All original plot families are available again;
-see [the figure guide](FIGURES.md).
+needed.** The command-line `--plot-only` option below rebuilds completed results.
+Fresh launcher runs generate all original plot families and exact-number tables
+automatically; see [the figure guide](FIGURES.md).
 
 **To measure the faster kernels, new CPU scheduling, a different worker count,
 or fixed-R tuning, start a new run.** Select **Full paper settings**, the desired
-worker count, and **Start new run**. Keep old results folders for comparison.
+worker count, and **Start run**. Keep old results folders for comparison.
 Do not resume an old run with these changed execution conditions. Full paper
 figures have not been precomputed on your Ryzen; they must come from that run.
 

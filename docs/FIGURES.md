@@ -60,11 +60,11 @@ Generated iterations include repeated states after rejected proposals. Retained
 samples exclude warmup and reflect thinning. Neither is an effective sample size.
 The separate posterior-table CSV retains full numerical precision as well.
 
-## Rebuild with clicks
+## Open the generated figures
 
-Open **Start.bat** on Windows or **Start.command** on macOS. Select a completed
-run under **Saved launcher runs**, click **Rebuild figures**, then
-**Show figures and tables**. Under **Exact numbers and tables**, open
-`paper_values.html` or download the CSV. Existing completed runs can be replotted
-with the updated code; changing the kernel or worker count needs new sampling
-to measure its performance. See [the rerun guide](RERUN.md).
+The launcher automatically shows figure and table links below the progress log
+when a run finishes. Under **Exact numbers and tables**, open `paper_values.html`
+or download the CSV. The files remain in `results/click-runs/<dated folder>`.
+Advanced command-line users can rebuild completed results with `--plot-only`;
+changing the kernel or worker count needs new sampling to measure its
+performance. See [the rerun guide](RERUN.md).

@@ -49,15 +49,16 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 1. Click **Set up environment** and wait for **Environment ready**. This installs
    the pinned packages inside this project and can take several minutes.
 2. Select **All seven experiments + posterior table**, leave **Quick check**
-   selected, choose **CPU workers** (start with 2–4), and click **Start new run**. This checks that the computer can run
+   selected, choose **CPU workers** (start with 2–4), and click **Start run**. This checks that the computer can run
    the complete pipeline. Quick-check graphs are not publication results.
 3. After the quick check succeeds, select **Full paper settings** and click
-   **Use all CPU threads**, then **Start new run** again. On the Ryzen 9 9950X3D
+   **Use all CPU threads**, then **Start run** again. On the Ryzen 9 9950X3D
    this allows up to 32 workers with SMT enabled. This regenerates all original
    figures, supplementary plots, and the combined Eight Schools/GARCH table. You can also
    select one experiment at a time.
-4. After completion, click **Show figures and tables**. Click a PNG or PDF link
-   to view a graph. All files remain in **results → click-runs → dated folder**.
+4. After completion, links to figures and tables appear automatically below the
+   progress log. Click a PNG or PDF link to view a graph. All files remain in
+   **results → click-runs → dated folder**.
    Under **Exact numbers and tables**, open `paper_values.html` to read or copy
    the full-precision MSE and sample-count values. Supplementary diagnostics
    appear in a separate collapsed section.
@@ -79,17 +80,10 @@ macOS assigns cores through its scheduler. See [parallel execution](PARALLEL.md)
 GPU acceleration is not part of this reproduction configuration. Timing-based
 graphs will differ across machines and worker settings.
 
-## Stop, resume, or redraw
+## Stop or finish
 
-- Click **Stop** to interrupt a run. Completed chains are retained; the chain
-  interrupted before its checkpoint will be repeated.
-- To continue later, reopen the launcher, choose the dated folder under
-  **Saved launcher runs**, and click **Resume selected run**. This also works
-  after a restart. Resume with the same code, Python environment and computer;
-  the launcher restores the original saved worker count.
-  If you change computers, start a new run for comparable timings.
-- Click **Rebuild figures** to redraw an existing completed run without
-  sampling again. It requires all the relevant saved results.
+- Click **Stop** to interrupt a run. Click **Start run** when you are ready to
+  start again from scratch; every launch uses a new dated results folder.
 - Use **Close launcher** when finished. Closing only the browser tab does not
   terminate the process. Closing the console/IDLE can interrupt running work.
 
