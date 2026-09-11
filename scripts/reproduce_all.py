@@ -44,7 +44,7 @@ def main():
                 if name == 'skew-t-100d-fixed':
                     import json
                     manifest = json.loads((directory/'manifest.json').read_text(encoding='utf-8'))
-                    if manifest.get('protocol') == 'original-dcs-author-scs-v1' and manifest.get('status') == 'complete':
+                    if manifest.get('protocol') in ('original-dcs-author-scs-v1', 'timed-dcs-author-scs-v2') and manifest.get('status') == 'complete':
                         continue
                     raise ValueError('The single SCS comparison requires a fresh output folder after an interrupted run.')
                 command.append('--resume')

@@ -15,18 +15,26 @@ import run_experiment
 from scripts import reproduce_scs_100d as experiment
 
 
-def record(chain, means, seconds=1., iterations=10, acceptance=.2):
+def record(chain, means, seconds=1., iterations=300, acceptance=.2):
+    discarded = iterations // 3
+    used = iterations - discarded
     return {'chain': chain, 'iterations': iterations, 'mean_all_iterations': means,
+            'discarded_iterations': discarded, 'estimation_iterations': used,
             'seconds': seconds, 'acceptance': acceptance, 'final_scale': .1,
-            'tail_count': round(iterations * means[0]), 'norm_sum': iterations * means[1]}
+            'tail_count': round(used * means[0]), 'norm_sum': used * means[1]}
 
 
 class SCS100DRunnerTests(unittest.TestCase):
-    def test_paper_prescribes_fifty_chains_original_warmup_and_one_target(self):
+    def test_paper_prescribes_fifty_timed_chains_separate_tuning_and_one_target(self):
         config = experiment.configuration('paper', workers=1)
         self.assertEqual(config['runs'], 50)
-        self.assertEqual(config['iterations'], 500000)
-        self.assertEqual(config['warmup'], 100)
+        self.assertNotIn('iterations', config)
+        self.assertEqual(config['time_budget'], 20.)
+        self.assertEqual(config['warmup'], 1500)
+        self.assertEqual(config['mode'], 'time')
+        self.assertEqual(config['protocol'], 'timed-dcs-author-scs-v2')
+        self.assertEqual(config['burnin_fraction'], 1/3)
+        self.assertEqual(config['dcs_step_policy'], 'smoothed_tuning_0.234_then_frozen')
         self.assertEqual(config['thin'], 50)
         self.assertEqual(config['algorithms'], ['DCS-RWM', 'DCS-BW', 'SCS'])
         self.assertEqual(config['target']['dimension'], 100)
@@ -35,42 +43,61 @@ class SCS100DRunnerTests(unittest.TestCase):
         self.assertEqual(config['scs_step'], .1)
         self.assertEqual(config['scs_optimizer_samples'], 2000)
         self.assertEqual(config['scs_optimizer_steps'], 1000)
-        for preset in experiment.PRESETS:
-            self.assertEqual(experiment.configuration(preset, workers=1)['warmup'], 100)
-        for overrides in ({'runs': 0}, {'runs': True}, {'thin': 501, 'iterations': 500},
-                          {'warmup': -1}, {'time_budget': 5}):
+        for preset, warmup, seconds in [('quick', 100, .05), ('reproduce', 1000, 2.), ('paper', 1500, 20.)]:
+            selected = experiment.configuration(preset, workers=1)
+            self.assertEqual(selected['warmup'], warmup)
+            self.assertEqual(selected['time_budget'], seconds)
+        for overrides in ({'runs': 0}, {'runs': True}, {'thin': 3}, {'iterations': 500},
+                          {'warmup': -1}, {'time_budget': 0}, {'time_budget': np.inf}):
             with self.subTest(overrides=overrides), self.assertRaises(ValueError):
                 experiment.configuration('quick', workers=1, overrides=overrides)
 
-    def test_summary_mse_bias_variance_uses_all_iterations_including_rejections(self):
-        config = experiment.configuration('quick', workers=1, overrides={'runs': 3, 'iterations': 10})
+    def test_summary_uses_postburn_means_and_variable_actual_iteration_counts(self):
+        config = experiment.configuration('quick', workers=1, overrides={'runs': 3, 'time_budget': 1.})
         means = [[.3, 16.], [.1, 20.], [.2, 24.]]
-        rows = [record(i, value, seconds=i+1., acceptance=(i+1)/10.)
-                for i, value in enumerate(means)]
-        records = {method: [dict(row) for row in rows] for method in experiment.METHODS}
+        records = {method: [record(i, value, iterations=(i+1)*300*(method_index+1),
+                    acceptance=(i+1)/10.) for i, value in enumerate(means)]
+                   for method_index, method in enumerate(experiment.METHODS)}
         with patch.object(experiment, 'radial_truth', return_value=(None, np.array([.1, 20.]), None)):
             summary = experiment.summarize(config, {}, {}, records)
-        for method, result in summary['cases'].items():
+        for method_index, (method, result) in enumerate(summary['cases'].items()):
             with self.subTest(method=method):
                 np.testing.assert_allclose(result['mse'], [.05/3., 32./3.], atol=1e-14)
                 np.testing.assert_allclose(result['bias_squared'], [.01, 0.], atol=1e-14)
                 np.testing.assert_allclose(result['variance_ddof0'], [.02/3., 32./3.], atol=1e-14)
                 np.testing.assert_allclose(result['mse'], np.add(result['bias_squared'], result['variance_ddof0']), atol=1e-14)
                 self.assertEqual(result['chain_means'], means)
-                # Acceptance does not remove repeated states or change the
-                # sample denominator: ten iterations per chain, thirty total.
-                self.assertEqual(result['total_iterations'], 30)
+                # Time-matched chains and methods may produce unequal counts.
+                # Independent-chain errors have equal weight; rejected states
+                # stay in the post-burn sample denominator.
+                factor = method_index+1
+                self.assertEqual(result['total_iterations'], 1800*factor)
+                self.assertEqual(result['mean_iterations'], 600*factor)
+                self.assertEqual(result['total_estimation_iterations'], 1200*factor)
+                self.assertEqual(result['mean_estimation_iterations'], 400*factor)
                 self.assertAlmostEqual(result['mean_acceptance'], .2)
-                self.assertEqual(sum(row['tail_count'] for row in result['records']), 6)
-                self.assertEqual(result['mean_seconds'], 2.)
-                self.assertEqual(result['iterations_per_second'], 5.)
+                self.assertEqual(sum(row['tail_count'] for row in result['records']), 220*factor)
+                self.assertEqual(result['mean_seconds'], 1.)
+                self.assertEqual(result['iterations_per_second'], 600*factor)
 
     def test_incomplete_runs_cannot_be_reported_as_complete(self):
         config = experiment.configuration('quick', workers=1)
-        records = {method: [record(0, [0., 10.], iterations=500)]
+        records = {method: [record(0, [0., 10.], iterations=300)]
                    for method in experiment.METHODS}
         with self.assertRaisesRegex(ValueError, 'Incomplete chains'):
             experiment.summarize(config, {}, {}, records)
+
+    def test_summary_rejects_inconsistent_burn_counts_and_short_timed_runs(self):
+        config = experiment.configuration('quick', workers=1)
+        for changes, message in [({'iterations': 301}, 'burn-in counts'),
+                                 ({'discarded_iterations': 99}, 'burn-in counts'),
+                                 ({'estimation_iterations': 199}, 'burn-in counts'),
+                                 ({'seconds': .049}, 'sampling budget')]:
+            records = {method: [record(i, [.1, 20.]) for i in range(2)]
+                       for method in experiment.METHODS}
+            records['DCS-BW'][0].update(changes)
+            with self.subTest(changes=changes), self.assertRaisesRegex(ValueError, message):
+                experiment.summarize(config, {}, {}, records)
 
     def test_nonempty_output_is_rejected_before_setup_or_sampling(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -90,21 +117,26 @@ class SCS100DRunnerTests(unittest.TestCase):
             output = Path(temporary) / 'path with spaces'
             with patch.object(experiment, 'main', return_value=73) as single, patch.object(run_experiment, 'run') as old:
                 status = run_experiment.main(['skew-t-100d-fixed', '--preset', 'paper', '--workers', '1',
-                    '--runs', '4', '--iterations', '321', '--warmup', '100', '--thin', '3',
+                    '--runs', '4', '--time-budget', '1.25', '--warmup', '1000', '--thin', '10',
                     '--seed', '91', '--optimizer-steps', '17', '--optimizer-samples', '42',
                     '--output-dir', str(output), '--dry-run'])
             self.assertEqual(status, 73)
             old.assert_not_called()
             self.assertEqual(single.call_args.args[0], [
                 '--preset', 'paper', '--workers', '1', '--output-dir', str(output), '--dry-run',
-                '--runs', '4', '--iterations', '321', '--warmup', '100', '--thin', '3',
+                '--runs', '4', '--time-budget', '1.25', '--warmup', '1000', '--thin', '10',
                 '--optimizer-steps', '17', '--optimizer-samples', '42', '--seed', '91'])
-        for options in (['--resume'], ['--ball-map-policy', 'vanilla'], ['--time-budget', '1']):
+        for options in (['--resume'], ['--ball-map-policy', 'vanilla'], ['--iterations', '1000'],
+                        ['--nuts-samples', '500'], ['--reference-samples', '500']):
             with self.subTest(options=options), redirect_stderr(StringIO()), patch.object(experiment, 'main') as single:
                 with self.assertRaises(SystemExit) as caught:
                     run_experiment.main(['skew-t-100d-fixed'] + options)
                 self.assertEqual(caught.exception.code, 2)
                 single.assert_not_called()
+
+    def test_user_configuration_cannot_skip_step_tuning(self):
+        with self.assertRaisesRegex(ValueError, 'warmup must be a positive integer'):
+            experiment.configuration('quick', overrides={'warmup': 0})
 
     def test_single_runner_dry_run_has_no_files_or_fitting(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -117,20 +149,22 @@ class SCS100DRunnerTests(unittest.TestCase):
             self.assertFalse(output.exists())
             payload = json.loads(stdout.getvalue())
             self.assertEqual(payload['configuration']['runs'], 50)
-            self.assertEqual(payload['configuration']['warmup'], 100)
+            self.assertEqual(payload['configuration']['warmup'], 1500)
+            self.assertEqual(payload['configuration']['time_budget'], 20.)
+            self.assertNotIn('iterations', payload['configuration'])
 
     def test_worker_failure_aborts_barrier_and_releases_waiting_peer(self):
-        from dcs_bench import scs_paper
+        from dcs_bench import timed_radial
         barrier = Barrier(2)
 
-        def fail_before_sampling(mapping, config, seed, before_sampling):
+        def fail_before_sampling(mapping, config, seed, before_sampling, after_sampling=None):
             # Simulate compilation or warmup failure before reaching the
             # production barrier. A healthy peer must not wait for its timeout.
             raise ValueError('simulated invalid map')
 
         job = {'algorithm': 'SCS', 'chain': 2, 'wave': 0, 'barrier': barrier,
                'mapping': {}, 'config': {}, 'seed': 123}
-        with patch.object(scs_paper, 'run_chain', side_effect=fail_before_sampling):
+        with patch.object(timed_radial, 'run_timed', side_effect=fail_before_sampling):
             with ThreadPoolExecutor(max_workers=1) as pool:
                 peer = pool.submit(barrier.wait, 2.)
                 with self.assertRaisesRegex(ValueError, 'simulated invalid map') as caught:

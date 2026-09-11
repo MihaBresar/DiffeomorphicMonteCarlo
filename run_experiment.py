@@ -52,7 +52,7 @@ def main(argv=None):
         summary_path = args.plot_only/'summary.json'
         if summary_path.exists():
             summary = json.loads(summary_path.read_text(encoding='utf-8'))
-            if summary.get('config', {}).get('protocol') == 'original-dcs-author-scs-v1':
+            if summary.get('config', {}).get('protocol') in ('original-dcs-author-scs-v1', 'timed-dcs-author-scs-v2'):
                 from scripts.scs_100d_figures import render_report
                 render_report(args.plot_only, summary)
                 print(args.plot_only.resolve())
@@ -71,12 +71,12 @@ def main(argv=None):
             command += ['--output-dir', str(args.output_dir)]
         if args.dry_run:
             command.append('--dry-run')
-        for name in ('runs', 'iterations', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples', 'seed'):
+        for name in ('runs', 'time_budget', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples', 'seed'):
             value = getattr(args, name)
             if value is not None:
                 command += ['--'+name.replace('_', '-'), str(value)]
-        if args.ball_map_policy == 'vanilla' or args.ball_scale_policy is not None or args.time_budget is not None:
-            p.error('This comparison uses the original fitted DCS map and fixed iterations; map variants and time budgets are not supported.')
+        if args.ball_map_policy == 'vanilla' or args.ball_scale_policy is not None or args.iterations is not None:
+            p.error('This comparison uses the original fitted DCS map and equal sampling time; map variants and fixed iteration counts are not supported.')
         unused = [name for name in ('nuts_samples', 'nuts_max_depth', 'nuts_batch_size', 'nuts_target_accept',
                                      'reference_samples', 'reference_batch_size') if getattr(args, name) is not None]
         if unused:

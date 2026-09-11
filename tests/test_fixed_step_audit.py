@@ -13,7 +13,7 @@ from unittest.mock import patch
 import numpy as np
 from scripts import audit_fixed_steps as audit
 from scripts.legacy_fixed_step_loader import LEGACY
-from dcs_bench.samplers import MetropolisKernel, run_metropolis
+from dcs_bench.samplers import MetropolisKernel, run_numpy_metropolis
 from dcs_bench.targets import Target
 from dcs_bench.transforms import BallMap, SphereMap
 
@@ -80,7 +80,7 @@ class FixedStepAuditTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/'chain.npz'
             job = self.make_job(path, 'raw_frozen')
-            draws, expected = run_metropolis(Target(job['target']), 'DCS-BW', BallMap(**job['map']), job, job['seed'])
+            draws, expected = run_numpy_metropolis(Target(job['target']), 'DCS-BW', BallMap(**job['map']), job, job['seed'])
             audit.chain_job(job)
             with np.load(path, allow_pickle=False) as result:
                 np.testing.assert_allclose(result['functionals'], self.expected_functionals(draws), rtol=1e-14, atol=1e-14)

@@ -62,8 +62,8 @@ def launch_chains(job, chains, directory, plan):
                 process.wait()
 
 
-def compilation_summary(directory):
+def compilation_summary(directory, algorithm='NUTS'):
     entries = [json.loads(path.read_text(encoding='utf-8'))
-               for path in sorted(Path(directory).glob('NUTS-*.compilation.json'))]
+               for path in sorted(Path(directory).glob(algorithm+'-*.compilation.json'))]
     return {'seconds': sum(entry['seconds'] for entry in entries), 'workers': entries,
             'accounting': 'Sum of worker compilation durations, including resumed launches; not elapsed wall time'}

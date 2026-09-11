@@ -1,7 +1,7 @@
 """One 100D skewed Student-t(3) comparison: original DCS-RWM/BW and author SCS.
 
-Fresh runs only. Exact radial estimates use every production iteration, including
-rejections. Each method runs alone in synchronized waves at the same concurrency.
+Fresh runs only. Exact radial estimates use every post-burn-in iteration, including
+rejections. The first third of each timed sampling run is discarded. Each method runs alone in synchronized waves at the same concurrency.
 """
 import argparse
 import concurrent.futures
@@ -27,27 +27,29 @@ from dcs_bench.transforms import BallMap
 METHODS = ('DCS-RWM', 'DCS-BW', 'SCS')
 TARGET = {'kind': 'skew_t', 'dimension': 100, 'nu': 3., 'alpha': {'0': 100., '1': -100.}}
 PRESETS = {
-    'quick': dict(runs=2, iterations=500, thin=1, optimizer_steps=20, optimizer_samples=128,
+    'quick': dict(runs=2, time_budget=.05, warmup=100, thin=1, optimizer_steps=20, optimizer_samples=128,
                   scs_optimizer_steps=20, scs_optimizer_samples=128),
-    'reproduce': dict(runs=20, iterations=25000, thin=10, optimizer_steps=400, optimizer_samples=500,
+    'reproduce': dict(runs=20, time_budget=2., warmup=1000, thin=10, optimizer_steps=400, optimizer_samples=500,
                       scs_optimizer_steps=400, scs_optimizer_samples=500),
-    'paper': dict(runs=50, iterations=500000, thin=50, optimizer_steps=1500, optimizer_samples=2000,
+    'paper': dict(runs=50, time_budget=20., warmup=1500, thin=50, optimizer_steps=1500, optimizer_samples=2000,
                   scs_optimizer_steps=1000, scs_optimizer_samples=2000),
 }
-TIME_SCOPE = ('Elapsed production time per chain includes proposals, acceptance, continued DCS step adaptation, '
-              'and all-iteration radial estimation. Excludes imports, compilation, map fitting, warmup, '
-              'barrier waiting, file writing and plots. Methods run separately at the same wave size; '
-              'method order rotates between waves. This is fixed iterations, not a fixed-time run.')
+TIME_SCOPE = ('Equal per-chain sampling time includes first-third burn-in and radial accumulation. '
+              'Fitting, compilation and step tuning are outside the clock. DCS steps are frozen after '
+              'separate smoothed 0.234 tuning; author SCS uses fixed step 0.1. Only post-burn-in '
+              'states contribute estimates. All methods use the same 300-transition timing batches, '
+              'with actual elapsed time and overshoot recorded. Methods run in equal-size synchronized waves.')
+
 _ALLOCATION = {}
 
 
 def configuration(preset='quick', workers=1, overrides=None):
-    config = dict(PRESETS[preset], preset=preset, workers=workers, warmup=100,
-                  experiment='skew-t-100d-fixed', protocol='original-dcs-author-scs-v1',
+    config = dict(PRESETS[preset], preset=preset, workers=workers, mode='time', burnin_fraction=1/3,
+                  experiment='skew-t-100d-fixed', protocol='timed-dcs-author-scs-v2',
                   dimension=100, nu=3., alpha=TARGET['alpha'], target=TARGET,
                   beta=2., latitude=1.1, threshold=50., seed=901001, algorithms=list(METHODS),
-                  dcs_step_policy='original_smoothed_continuing_0.234', scs_step=.1)
-    allowed = {'runs', 'iterations', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples',
+                  dcs_step_policy='smoothed_tuning_0.234_then_frozen', scs_step=.1)
+    allowed = {'runs', 'time_budget', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples',
                'scs_optimizer_steps', 'scs_optimizer_samples', 'seed', 'workers'}
     for key, value in (overrides or {}).items():
         if value is None:
@@ -55,15 +57,17 @@ def configuration(preset='quick', workers=1, overrides=None):
         if key not in allowed:
             raise ValueError(f'{key} is not an override for the single SCS comparison')
         config[key] = value
-    for key in allowed-{'seed', 'warmup'}:
+    for key in allowed-{'seed', 'time_budget'}:
         value = config[key]
         if isinstance(value, bool) or not isinstance(value, int) or value < 1:
             raise ValueError(f'{key} must be a positive integer')
-    for key in ('seed', 'warmup'):
+    for key in ('seed',):
         if isinstance(config[key], bool) or not isinstance(config[key], int) or config[key] < 0:
             raise ValueError(f'{key} must be a nonnegative integer')
-    if config['thin'] > config['iterations']:
-        raise ValueError('thin cannot exceed iterations')
+    if not np.isfinite(config['time_budget']) or config['time_budget'] <= 0:
+        raise ValueError('time_budget must be finite and positive')
+    if 100 % config['thin']:
+        raise ValueError('thin must divide 100 for exact timed burn-in boundaries')
     validate_workers(config['workers'])
     return config
 
@@ -103,13 +107,11 @@ def chain_job(job):
     barrier = job['barrier']
     try:
         algorithm = job['algorithm']
-        if algorithm == 'SCS':
-            from dcs_bench.scs_paper import run_chain
-        else:
-            from dcs_bench.fast_dcs import run_chain
+        from dcs_bench.timed_radial import run_timed
         print(f'{algorithm}, chain {job["chain"]+1} starting', flush=True)
-        traces, record = run_chain(job['mapping'], {**job['config'], 'algorithm': algorithm}, job['seed'],
-                                   before_sampling=lambda: barrier.wait(timeout=900))
+        traces, record = run_timed(job['mapping'], {**job['config'], 'algorithm': algorithm}, job['seed'],
+                                   before_sampling=lambda: barrier.wait(timeout=900),
+                                   after_sampling=lambda: barrier.wait(timeout=900))
         # File compression by an earlier finisher must not compete with peers
         # whose production clocks are still running.
         barrier.wait(timeout=900)
@@ -124,7 +126,7 @@ def chain_job(job):
         with output.open('xb') as stream:
             np.savez_compressed(stream, functionals=traces,
                                 metadata=np.array(json.dumps(record, allow_nan=False)))
-        print(f'{algorithm}, chain {job["chain"]+1} saved ({record["seconds"]:.3f} sampling seconds)', flush=True)
+        print(f'{algorithm}, chain {job["chain"]+1} saved ({record["seconds"]:.2f} sampling seconds)', flush=True)
         return record
     except BaseException as error:
         try:
@@ -174,9 +176,18 @@ def summarize(config, maps, fitting, records):
     cases = {}
     for name in METHODS:
         rows = records[name]
-        if len(rows) != config['runs'] or any(r['iterations'] != config['iterations'] for r in rows):
+        if len(rows) != config['runs'] or any(r['iterations'] <= 0 for r in rows):
             raise ValueError('Incomplete chains cannot be summarized as a completed comparison')
+        for row in rows:
+            count = row['iterations']
+            discarded = row.get('burnin_iterations', row.get('discarded_iterations'))
+            if count % 300 or discarded != count//3 or row['estimation_iterations'] != count-discarded:
+                raise ValueError('Inconsistent first-third burn-in counts')
+            if row['seconds'] < config['time_budget']:
+                raise ValueError('A chain stopped before its requested sampling budget')
         means = np.asarray([r['mean_all_iterations'] for r in rows])
+        if means.shape != (config['runs'], 2) or not np.all(np.isfinite(means)):
+            raise ValueError('Nonfinite or malformed chain estimates')
         mse = np.mean((means-truth)**2, axis=0)
         bias_squared = (means.mean(axis=0)-truth)**2
         variance = np.mean((means-means.mean(axis=0))**2, axis=0)
@@ -187,15 +198,18 @@ def summarize(config, maps, fitting, records):
         cases[name] = dict(chains=len(rows), chain_means=means.tolist(), mse=mse.tolist(),
             bias_squared=bias_squared.tolist(), variance_ddof0=variance.tolist(),
             mean_seconds=float(seconds.mean()), median_seconds=float(np.median(seconds)),
-            iterations_per_second=float(config['iterations']/seconds.mean()),
-            total_iterations=config['iterations']*len(rows),
+            iterations_per_second=float(sum(r['iterations'] for r in rows)/seconds.sum()),
+            total_iterations=sum(r['iterations'] for r in rows),
+            mean_iterations=float(np.mean([r['iterations'] for r in rows])),
+            total_estimation_iterations=sum(r['estimation_iterations'] for r in rows),
+            mean_estimation_iterations=float(np.mean([r['estimation_iterations'] for r in rows])),
             mean_acceptance=float(np.mean([r['acceptance'] for r in rows])),
             final_scales=[r['final_scale'] for r in rows], records=rows)
     return dict(config=config, truth=truth.tolist(), functionals=['tail_probability', 'mean_norm'],
                 maps=maps, fitting=fitting, cases=cases, time_scope=TIME_SCOPE,
                 target_note='Shared normal-CDF-skewed t target from the DCS experiment. The SCS paper uses a '
                             'Student-t CDF and nu=1 or2; this applies its author algorithm/settings to our nu=3 target.',
-                mse_note='All production iterations, including repeats after rejections; exact radial truth. '
+                mse_note='All post-burn-in iterations, including repeats after rejections; exact radial truth. '
                          'Empirical bias squared plus between-chain variance with divisor number of chains equals MSE. '
                          'More chains estimate error more precisely but cannot repair insufficient chain mixing.')
 
@@ -236,7 +250,8 @@ def main(argv=None):
     parser.add_argument('--workers', type=int, default=1)
     parser.add_argument('--output-dir', type=Path)
     parser.add_argument('--dry-run', action='store_true')
-    for name in ('runs', 'iterations', 'warmup', 'thin', 'optimizer-steps', 'optimizer-samples',
+    parser.add_argument('--time-budget', type=float)
+    for name in ('runs', 'warmup', 'thin', 'optimizer-steps', 'optimizer-samples',
                  'scs-optimizer-steps', 'scs-optimizer-samples', 'seed'):
         parser.add_argument('--'+name, type=int)
     args = parser.parse_args(argv)

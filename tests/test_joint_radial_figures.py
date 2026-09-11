@@ -138,7 +138,8 @@ class JointRadialFigureTests(unittest.TestCase):
             self.assertIn('Quick execution check only', report)
             self.assertIn('raw norm has infinite variance', report)
             self.assertIn('must not be added as a partition', report)
-            self.assertIn('10.04987562112089', report)
+            self.assertIn('10.05', report)
+            self.assertNotIn('10.04987562112089', report)
 
 
 if __name__ == '__main__':

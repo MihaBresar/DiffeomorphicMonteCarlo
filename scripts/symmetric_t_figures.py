@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+from dcs_bench.display import number, cell, figure_ticks
 
 
 FUNCTIONS = ['tail_probability', 'mean_norm', 'radial_95',
@@ -48,7 +49,7 @@ def _table(rows, columns=None):
         return '<p>No values are available.</p>'
     columns = list(rows[0]) if columns is None else columns
     heading = ''.join('<th>'+html.escape(key.replace('_', ' '))+'</th>' for key in columns)
-    body = ''.join('<tr>'+''.join('<td>'+html.escape(_text(row.get(key)))+'</td>'
+    body = ''.join('<tr>'+''.join('<td>'+html.escape(cell(row.get(key), key))+'</td>'
                                for key in columns)+'</tr>' for row in rows)
     return ('<div class="table-wrap"><table><thead><tr>'+heading+
             '</tr></thead><tbody>'+body+'</tbody></table></div>')
@@ -68,7 +69,7 @@ def _csv(path, rows):
 
 
 def render_report(root, summary):
-    """Write three figure pairs and all numerical values without rounding."""
+    """Write readable figures and tables with full-precision CSV exports."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -100,6 +101,7 @@ def render_report(root, summary):
                                                     for function in case.get('bulk_ess', {})]))
 
     def save(fig, name):
+        figure_ticks(fig)
         if smoke:
             fig.text(.5, .015, 'Short execution check only — not evidence of sampler performance',
                      ha='center', fontsize=10, color='#8c510a')
@@ -117,9 +119,9 @@ def render_report(root, summary):
                 if cases[names[index]]['map_kind'] == 'vi_scale':
                     bar.set_hatch('//')
                     bar.set_edgecolor('#ffffff')
-                ax.text(value, index, ' '+repr(value), va='center', fontsize=8)
+                ax.text(value, index, ' '+number(value, scientific='mse' in metric), va='center', fontsize=8)
             else:
-                label = 'unavailable' if value is None else repr(value)
+                label = number(value, scientific='mse' in metric)
                 ax.text(left, index, label, va='center', fontsize=8)
         ax.set_yticks(range(len(names)), labels, fontsize=9)
         # Text for an unavailable diagnostic does not expand Matplotlib's data
@@ -138,7 +140,7 @@ def render_report(root, summary):
     bars(axes[0], 'mse', 'tail_probability', 'MSE of P(‖X‖ ≥ 50)', log=True)
     bars(axes[1], 'mse', 'mean_norm', 'Mean-norm MSE', log=True)
     for ax in axes:
-        ax.set_xlabel('MSE (log scale); labels give full numerical values')
+        ax.set_xlabel('MSE (log scale); two-decimal scientific labels')
     fig.suptitle(title+' — radial estimation\n'+budget, fontsize=14)
     fig.tight_layout(rect=(0, .055, 1, .93))
     save(fig, 'symmetric_t_comparison')
@@ -146,7 +148,7 @@ def render_report(root, summary):
     fig, axes = plt.subplots(1, 2, figsize=(21, max(8, .77*len(names))))
     bars(axes[0], 'mse', 'asinh_x1', 'MSE of the mean of asinh(x₁); exact mean = 0', log=True)
     bars(axes[1], 'bulk_ess', 'asinh_x1', 'Bulk ESS for asinh(x₁) on retained values')
-    axes[0].set_xlabel('MSE (log scale); labels give full numerical values')
+    axes[0].set_xlabel('MSE (log scale); two-decimal scientific labels')
     axes[1].set_xlabel(f"Bulk ESS; nominal total = {config['runs']*retained} retained values")
     fig.suptitle(title+' — coordinate estimation\n'+budget, fontsize=14)
     fig.tight_layout(rect=(0, .055, 1, .93))
@@ -190,7 +192,7 @@ def render_report(root, summary):
         bars(axes[0], 'mse_all_iterations', 'tail_probability', 'MSE of P(‖X‖ ≥ 50)', log=True)
         bars(axes[1], 'mse_all_iterations', 'mean_norm', 'Mean-norm MSE', log=True)
         for ax in axes:
-            ax.set_xlabel('MSE using every production iteration (log scale); exact labels')
+            ax.set_xlabel('MSE using every production iteration (log scale); two-decimal scientific labels')
         fig.suptitle(title+' — estimates using every production iteration\n'+all_budget, fontsize=14)
         fig.tight_layout(rect=(0, .055, 1, .93))
         save(fig, 'symmetric_t_all_iterations')
@@ -328,7 +330,7 @@ def render_report(root, summary):
         page += _table(all_iteration_contrasts)
     page += '<h2>Radial estimation: every production case</h2><img src="figures/symmetric_t_comparison.png" alt="Radial MSE for every map and step policy">'
     page += '<h2>Exact MSE values and sample counts</h2>'+_table(mse_rows)
-    page += '<p>Values are exported at full floating-point precision. The number of iterations includes rejected proposals; retained values include repeated states.</p>'
+    page += '<p>Plots and tables use two decimals, with scientific notation for MSE and small values. Integer counts remain exact; CSV and JSON retain full precision. Iteration counts include rejected proposals.</p>'
     if summary.get('truth'):
         page += '<details><summary>Exact reference values</summary>'+_table([
             {'function': function, 'reference_value': value}
@@ -340,7 +342,7 @@ def render_report(root, summary):
     page += '<h2>Map parameters</h2>'+_table(map_rows)
     if summary.get('maps'):
         saved_maps = {'maps': summary['maps'], 'fit_metadata': summary.get('fit_metadata', {})}
-        page += '<details><summary>Full saved map parameters and fitting metadata</summary><pre>'+html.escape(json.dumps(saved_maps, indent=2, ensure_ascii=False, allow_nan=False))+'</pre></details>'
+        page += '<details><summary>Map parameters and fitting metadata (full precision in summary.json)</summary><pre>'+html.escape(cell(saved_maps))+'</pre></details>'
     page += ('<h2>Paired MSE differences and uncertainty</h2><p>These descriptive paired-chain bootstrap intervals are conditional on the map fits and selected steps, '
              'with no multiplicity correction. Differences are MSE(case A) minus MSE(case B); negative values favour A. '
              'An interval containing zero does not resolve a ranking. Map-fitting and pilot-selection uncertainty are not included.</p>')

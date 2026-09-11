@@ -4,7 +4,7 @@ import tempfile
 import unittest
 import numpy as np
 from scripts import audit_symmetric_t as audit
-from dcs_bench.samplers import MetropolisKernel, run_metropolis
+from dcs_bench.samplers import MetropolisKernel, run_numpy_metropolis
 from dcs_bench.transforms import BallMap, SphereMap
 from dcs_bench.targets import Target
 
@@ -49,7 +49,7 @@ class SymmetricAuditTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             job = self.job(Path(directory)/'chain.npz', 'DCS-BW', 'warmup_frozen')
             job['map'] = BallMap(100, scale=1.6).parameters()
-            draws, metadata = run_metropolis(Target(audit.TARGET), 'DCS-BW',
+            draws, metadata = run_numpy_metropolis(Target(audit.TARGET), 'DCS-BW',
                 BallMap(**job['map']), job, job['seed'])
             result = audit.chain_job(job)
             with np.load(job['output'], allow_pickle=False) as saved:

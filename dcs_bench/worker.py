@@ -45,7 +45,7 @@ def main():
     from .engine import save_chain, write_json
     from .targets import Target
     from .transforms import BallMap, SphereMap
-    from .samplers import BlackJAXRunner, NumPyroRunner, run_metropolis
+    from .samplers import BlackJAXRunner, NumPyroRunner, run_metropolis, make_metropolis_runner
     target, config = Target(job['target']), job['config']
     algorithm = job['algorithm']
     runner = None
@@ -57,6 +57,11 @@ def main():
     family = 'sphere' if algorithm == 'SCS' else 'ball'
     params = job.get('maps', {}).get(family) if algorithm == 'SCS' or algorithm.startswith('DCS') else None
     mapping = (SphereMap if family == 'sphere' else BallMap)(**params) if params else None
+    if algorithm != 'NUTS':
+        runner = make_metropolis_runner(target, algorithm, mapping, config)
+        if runner is not None:
+            write_json(path.with_suffix('.compilation.json'), {'seconds': runner.compile_seconds,
+                       'worker_slot': job['worker_slot'], 'pid': os.getpid(), **allocation})
     if 'queue_directory' in job:
         queue = Path(job['queue_directory'])
         (queue/f'worker-{job["worker_slot"]}.ready').touch()
@@ -66,12 +71,14 @@ def main():
         started = datetime.now(timezone.utc).isoformat()
         print(f'Worker {job["worker_slot"]+1}: {algorithm}, chain {chain["index"]+1} starting', flush=True)
         if runner is not None:
-            if job.get('reference') or config['mode'] == 'nuts_matched_time':
+            if algorithm == 'NUTS' and (job.get('reference') or config['mode'] == 'nuts_matched_time'):
                 draws, record = runner.run(chain['seed'])
             else:
                 draws, record = runner.run(chain['seed'], seconds=job['seconds'])
         else:
             draws, record = run_metropolis(target, algorithm, mapping, config, chain['seed'], job['seconds'])
+        from .burnin import discard_burnin
+        draws, record = discard_burnin(draws, record, config)
         record.update(fingerprint=job['fingerprint'], scenario=job['scenario'], chain=chain['index'],
                       parameter_names=target.names, execution={
                           'worker_slot': job['worker_slot'], 'pid': os.getpid(), **allocation,

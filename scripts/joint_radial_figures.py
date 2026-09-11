@@ -14,6 +14,7 @@ import re
 import textwrap
 
 import numpy as np
+from dcs_bench.display import number, cell, figure_ticks
 
 from scripts.skew_t_timed_figures import render_report as render_timed_report
 
@@ -69,7 +70,7 @@ def _table(rows):
         return '<p>No values are available.</p>'
     columns = list(dict.fromkeys(key for row in rows for key in row))
     head = ''.join('<th>'+html.escape(key.replace('_', ' '))+'</th>' for key in columns)
-    body = ''.join('<tr>'+''.join('<td>'+html.escape(str(_cell(row.get(key))))+'</td>'
+    body = ''.join('<tr>'+''.join('<td>'+html.escape(cell(row.get(key), key))+'</td>'
                                 for key in columns)+'</tr>' for row in rows)
     return '<div class="table-wrap"><table><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'
 
@@ -195,6 +196,7 @@ def render_report(root, summary):
     target_reports, figure_files, target_sections = {}, [], []
 
     def save(fig, name):
+        figure_ticks(fig)
         if smoke:
             fig.text(.5, .012, 'Short execution check only — not evidence of sampler performance',
                      ha='center', fontsize=10, color='#8c510a')
@@ -275,8 +277,8 @@ def render_report(root, summary):
                                marker=CONTROL_MARKERS.get(control, 'o'), s=180 if control == 'joint' else 100,
                                facecolors='none' if control != 'joint' else '#ffdb6e',
                                edgecolors='white' if control != 'joint' else '#17283a', linewidths=1.5)
-                ax.set_xticks(range(len(scales)), [f'{value:g}' for value in scales], rotation=35, ha='right')
-                ax.set_yticks(range(len(radii)), [f'{value:.6g}' for value in radii])
+                ax.set_xticks(range(len(scales)), [number(value) for value in scales], rotation=35, ha='right')
+                ax.set_yticks(range(len(radii)), [number(value) for value in radii])
                 ax.set_xlabel('Proposal step: '+('ball radius' if algorithm == 'DCS-BW' else 'tangent coordinate SD'))
                 ax.set_ylabel('Map scale R')
                 ax.set_title(algorithm)
@@ -385,7 +387,7 @@ body{font:15px/1.55 system-ui,sans-serif;color:#203147;background:#f6f8fb;max-wi
     report += ''.join(target_sections)
     report += '<h2>Complete independent pilot grid</h2><details><summary>Show every candidate, score, validity flag and selected control</summary>'+_table(all_candidates)+'</details>'
     report += '<h2>How to interpret this comparison</h2><ul>'+''.join('<li>'+html.escape(str(note))+'</li>' for note in notes)+'</ul>'
-    report += '<p>CSV and HTML tables preserve full stored numerical precision. Boundary plot annotations include exact counts; rounded percentages are only a visual aid.</p></body></html>'
+    report += '<p>Plots and tables use two decimals, with scientific notation for small values. Boundary and sample counts remain exact integers. CSV and JSON retain full numerical precision.</p></body></html>'
     (root/'paper_values.html').write_text(report, encoding='utf-8')
     return {'figures': figure_files, 'csv_files': list(csvs), 'html': 'paper_values.html',
             'target_reports': target_reports}

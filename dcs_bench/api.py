@@ -11,7 +11,10 @@ def sample(log_density, initial, draws=10000, warmup=1500, seed=0, beta=2.,
     The callable accepts one finite vector and returns an unnormalized log
     density. It must include any constraint-transform Jacobian the caller uses.
     Gradients are unnecessary. Warmup adapts only the proposal scale; map
-    parameters stay fixed throughout this call.
+    parameters stay fixed throughout this call. After tuning, the first third of
+    generated sampling iterations is discarded. ``draws`` is the requested
+    post-burn-in, thinned output count. Arbitrary Python callables use the
+    reference backend; canonical benchmark targets use native compiled loops.
     """
     initial_point = np.asarray(initial, dtype=float)
     if initial_point.ndim != 1 or not np.all(np.isfinite(initial_point)):
@@ -28,5 +31,5 @@ def sample(log_density, initial, draws=10000, warmup=1500, seed=0, beta=2.,
         def physical(self, x): return x
     target = CallableTarget()
     mapping = mapping or BallMap(target.d, beta=beta)
-    config = dict(warmup=warmup, iterations=draws*thin, thin=thin)
+    config = dict(warmup=warmup, iterations=(3*draws*thin+1)//2, thin=thin, burnin_fraction=1/3)
     return run_metropolis(target, algorithm, mapping, config, seed)

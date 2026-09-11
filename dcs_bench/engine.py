@@ -30,6 +30,7 @@ def load_config(name, preset='quick', overrides=None):
     elif preset != 'paper':
         raise ValueError(f'Unknown preset: {preset}')
     config['preset'] = preset
+    config['burnin_fraction'] = 1/3
     overrides = overrides or {}
     irrelevant = []
     if config['mode'] != 'iterations':
@@ -181,7 +182,7 @@ def run(config, output, resume=False, reference_dir=None):
         manifest = {'schema_version': 3, 'started_utc': datetime.now(timezone.utc).isoformat(),
             'fingerprint': digest, 'source_hashes': hashes, 'environment': environment(),
             'execution_plan': plan,
-            'timing_policy': 'Independent chains in bounded CPU processes, one method at a time. Per-chain production wall time includes retained-draw collection. Fitting, worker compilation, warmup and total invocation wall time are separately reported. Pinning is recorded; macOS scheduling is OS-managed.',
+            'timing_policy': 'Independent chains in bounded CPU processes, one method at a time. Per-chain sampling wall time includes generated-draw collection. After separate tuning, the first third of actual generated sampling iterations is discarded for every method; thinning uses the original iteration grid. Fitting, worker compilation, warmup and total invocation wall time are separately reported. Pinning is recorded; macOS scheduling is OS-managed.',
             'status': 'running'}
         write_json(output/'configuration.json', config)
         write_json(existing, manifest)
@@ -227,8 +228,9 @@ def run(config, output, resume=False, reference_dir=None):
                                'producing_source_fingerprint': producing_digest,
                                'producing_source_hashes': hashes},
                               pending, directory/'execution', plan)
-                if algorithm == 'NUTS':
-                    write_json(directory/'nuts_compilation.json', compilation_summary(directory/'execution'))
+                compilation = compilation_summary(directory/'execution', algorithm)
+                if compilation['workers']:
+                    write_json(directory/(('nuts' if algorithm == 'NUTS' else algorithm)+'_compilation.json'), compilation)
                 if algorithm == 'NUTS' and config['mode'] == 'nuts_matched_time':
                     records = [read_chain(directory/'chains'/f'NUTS-{i:03d}.npz', digest)[1] for i in range(config['runs'])]
                     matched_seconds = float(np.mean([r['sampling_seconds'] for r in records]))

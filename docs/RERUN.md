@@ -1,107 +1,84 @@
-# Default 100D comparison update
+# Running the updated experiments
 
-To regenerate the current comparison, select **100D skewed t (ν=3): DCS-RWM, DCS-BW and SCS** in the launcher and start a fresh run. Run **Set up environment** first to install the new compiled-loop dependencies. This regenerates **VsSCS**, runtime, bias/variance and exact-value tables. The four diagnostic menus are retired; their old results remain intact. See [the single comparison protocol](SCS_100D.md).
+On Windows, download the updated repository ZIP, extract it into a new folder,
+then double-click **Start.bat**. On macOS, use **Start.command**. Click
+**Set up environment**, select the experiment and run size, select CPU workers,
+and click **Start run**. The launcher starts fresh runs automatically.
 
-# What must be rerun
+All seven experiments now discard the first third of their actual generated
+sampling iterations **after separate step-size tuning**. Tuning never counts
+inside that third. Sampling scales are frozen. Timed runs apply this rule to
+the final measured iteration count; thinning keeps its original iteration grid.
+For 500,000 iterations, discard 166,667 and use the remaining 333,333 before
+thinning. At thinning 10 this stores 33,334 post-burn-in states.
 
-**Skewed Student-t at equal time:** select **100D skewed t: equal-time DCS/SCS**
-and start a fresh run. Full settings use ν=2, β=2 and 20 seconds per chain,
-with eight fitted/untuned and frozen/adaptive cases. Existing fixed-count
-chains cannot be rescaled into this comparison. See [the protocol](SKEW_T_TIMED.md).
+## Which figures need new runs
 
-**Super-heavy tails at equal sample counts:** start a fresh **50D t: infinite
-first moment, equal samples** run. Full paper settings now give every method 500,000 production
-iterations per chain across 50 chains, after separate step-size warmup; each
-chain retains 50,000 draws at thinning 10. All proposal steps remain pretuned
-and frozen for production. The original `SuperInfiniteFirstTest` figure family
-and exact-number tables remain; the main figure's third panel now compares
-runtime. Tail probability, the finite mean log norm and marginal quantiles
-remain the estimands, because the untransformed mean norm does not exist at
-ν=0.5. Existing timed chains cannot supply this equal-count comparison through
-replotting. Keep them as the previous timed design and generate new chains.
+The compiled implementation and burn-in policy require fresh runs for **all
+seven experiments**, including the two posterior table rows. Old runs remain
+historical results. Changing labels to two decimals alone needs no sampling:
+figures can be rebuilt from saved results without changing their statistics.
+MSE labels use two decimal places in scientific notation, sample counts remain
+exact integers, and CSV/JSON retain full precision.
 
-**Symmetric Student-t control with both maps untuned:** select **100D symmetric
-t: untuned maps and step tuning** in the launcher and start a fresh run.
-It generates all 12 map/step controls automatically, including radial-focused
-pilot tuning. Use Full paper settings for the reported design; Quick check
-tests execution only. The original experiments and their saved plots are
-unchanged by this additional diagnostic.
-
-**Möbius versus fully untuned vanilla, and the fixed-step tuning audit:** start
-a fresh run with the desired **DCS map** choice, or select the separate
-**100D: DCS/SCS map and tuning audit** to run all diagnostic comparisons.
-These require new chains. The original figures and exact-number tables are
-still generated; see [the controlled audit findings](FIXED_STEP_AUDIT.md).
-
-**Windows queue failure (`*.worker-*.json` missing):** download the updated
-repository and start a fresh run; see [the no-command update steps](WINDOWS_QUEUE_FIX.md).
-Completed runs need no new sampling for this queue-only fix.
-
-**For the restored plot layouts and exact-number tables, no new sampling is
-needed.** The command-line `--plot-only` option below rebuilds completed results.
-Fresh launcher runs generate all original plot families and exact-number tables
-automatically; see [the figure guide](FIGURES.md).
-
-**To measure the faster kernels, new CPU scheduling, a different worker count,
-or a different DCS map, start a new run.** Select **Full paper settings**, the desired
-worker count, and **Start run**. Keep old results folders for comparison.
-Do not resume an old run with these changed execution conditions. Full paper
-figures have not been precomputed on your Ryzen; they must come from that run.
-
-To compare map fitting with a fully untuned map, select **DCS map → Möbius map**
-or **Vanilla map** and start a separate run for each. Keep the experiment, run
-size and worker count the same. The CLI equivalents are `--ball-map-policy mobius`
-and `--ball-map-policy vanilla`. Vanilla fixes R=1 and both centre and Möbius
-parameters to zero, preserving β and proposal-scale warmup. Fixed R=√d is no
-longer available for new runs; its saved figures remain readable with plot-only.
-
-## Earlier scientific corrections
-
-**Regenerate all five manuscript figures and both rows of the PosteriorDB table.** The previous aggregate-only outputs cannot repair changes to targets, adaptation, references, or timing. Original PNGs remain archival assets and are not updated results.
-
-From the repository root, activate the Python 3.12 environment and install `requirements-cpu.txt`. The command below runs everything in the correct order with the default single worker. Add `--workers 4` for four parallel chains, or choose CPU workers in the launcher. Keep the same worker setting when resuming. See [parallel execution](PARALLEL.md); updating from the sequential-only code requires a new run directory.
-
-```bash
-python scripts/reproduce_all.py --preset paper --output-root results/paper
-```
-
-It prepares independent logistic references, runs the seven experiments, generates all figures and creates `results/paper/posteriordb_rmse.tex` and `.csv`. To resume after interruption, repeat with `--resume`. A changed scientific configuration/source requires a fresh output root.
-
-## Individual experiments
-
-| Manuscript output | Corrected run | Why new sampling is required |
+| Launcher experiment | Current comparison | Outputs |
 |---|---|---|
-| `NUTS_PBW_vs.png` | `skew-t-200d-nuts` | Shared exact target/transform, frozen tuning, synchronized timing, exact radial reference |
-| `VsRWM_NUTS.png` | `skew-t-200d-baselines` | Dimension corrected from 100 to 200, plus shared corrections |
-| `VsSCS.png` | `skew-t-100d-fixed` | ν corrected from 2 to 3; warmup separated from 500,000 frozen production steps |
-| `SuperInfiniteFirstTest.png` | `skew-t-50d-nu-0.5` | Equal production iterations; target α=0 and symmetric map constraints preserved |
-| `QQ-regresssion.png` | `logistic-regression` | 30-second budget and a separate independent reference, replacing the pooled reference |
-| Table: Eight Schools | `eight-schools` | Common log-τ coordinates, pinned reference draws, correct chain-level RMSE and timing |
-| Table: GARCH | `garch11` | Unintended conditional-uniform prior removed; correct four-parameter target, references and RMSE |
+| 100D skewed t (ν=3): DCS-RWM, DCS-BW and SCS — equal time | 50 chains/method, 20 seconds/chain at Full paper settings | `VsSCS`, radial estimates, counts, runtime, bias/variance |
+| 50D t: infinite first moment, equal samples | 50 chains/method, 500,000 iterations/chain | `SuperInfiniteFirstTest`, tail/log-norm and quantiles |
+| 200D skew-t: DCS versus NUTS | Equal sampling time | `NUTS_PBW_vs` |
+| 200D skew-t: random-walk baselines | Equal sampling time | `VsRWM_NUTS` |
+| Eight Schools | HnR time matched to mean NUTS sampling time | Posterior table and diagnostics |
+| GARCH(1,1) | HnR time matched to mean NUTS sampling time | Posterior table and diagnostics |
+| Logistic regression: both priors | Equal sampling time, independent reference | `QQ-regresssion` |
+
+The 100D comparison uses 2 chains of 0.05 seconds for Quick check, 20 chains of
+2 seconds for Smaller reproduction, and 50 chains of 20 seconds for Full paper
+settings. DCS uses the original VI fit and smoothed step tuning toward 0.234,
+then freezes the step. SCS uses the authors' original VI and fixed step 0.1.
+See [the exact comparison protocol](SCS_100D.md). The identifier
+`skew-t-100d-fixed` is retained only for compatibility; it now launches this
+equal-time comparison.
+
+The super-heavy-tail experiment retains equal iteration counts. Its mean norm
+does not exist at ν=0.5, so use its tail probability, finite mean log norm and
+marginal quantiles. These plots cannot be reconstructed by rescaling timed MSE.
+
+**All seven experiments + posterior table** runs the complete sequence and
+prepares new independent logistic references. Quick check only verifies that
+execution works. Use Smaller reproduction first to estimate resource needs;
+use Full paper settings for manuscript results. Keep worker counts and other
+computer activity comparable across methods. The Ryzen 16-core/32-thread CPU
+can use 32 workers where enough independent chains are available. See
+[parallel execution](PARALLEL.md).
+
+To compare fitted and untuned maps in other experiments, choose **Möbius map**
+or **Vanilla map** and start a fresh run for each. Vanilla fixes R=1, centre=0
+and Möbius=0 while preserving β and separate proposal tuning. The default 100D
+comparison uses its specified fitting recipe automatically.
+
+## Optional command-line equivalents
 
 ```bash
-python run_experiment.py skew-t-200d-nuts --preset paper --output-dir results/paper/skew-t-200d-nuts
-python run_experiment.py skew-t-200d-baselines --preset paper --output-dir results/paper/skew-t-200d-baselines
-python run_experiment.py skew-t-100d-fixed --preset paper --output-dir results/paper/skew-t-100d-fixed
-python run_experiment.py skew-t-50d-nu-0.5 --preset paper --output-dir results/paper/skew-t-50d-nu-0.5
-python run_experiment.py eight-schools --preset paper --output-dir results/paper/eight-schools
-python run_experiment.py garch11 --preset paper --output-dir results/paper/garch11
-python prepare_reference.py --preset paper --output-dir results/paper/logistic-reference
-python run_experiment.py logistic-regression --preset paper --reference-dir results/paper/logistic-reference --output-dir results/paper/logistic-regression
-python scripts/collect_posterior_table.py results/paper
+python scripts/reproduce_all.py --preset paper --workers 32 --output-root results/paper-new
+python run_experiment.py skew-t-100d-fixed --preset paper --workers 32 --output-dir results/scs-time-new
+python run_experiment.py skew-t-50d-nu-0.5 --preset paper --workers 32 --output-dir results/superheavy-new
+python run_experiment.py --plot-only results/scs-time-new
 ```
 
-Each PNG and matching PDF is written to `results/paper/<experiment>/figures/`, retaining the exact manuscript image basename. Copy the five new PNGs into the manuscript folder only after inspecting the paper-run diagnostics. The table must replace the old numbers; do not retain conclusions about which sampler wins before seeing the rerun.
+The other experiment identifiers are `skew-t-200d-nuts`,
+`skew-t-200d-baselines`, `eight-schools`, `garch11` and `logistic-regression`.
+For an individual logistic run, prepare a reference first with
+`python prepare_reference.py --preset paper --output-dir results/reference-new`
+and pass `--reference-dir results/reference-new` to `run_experiment.py`.
+Reference chains also discard their first third after separate tuning. Static
+PosteriorDB reference draws retain their documented source processing.
 
-The logistic reference is generated with four independent NumPyro NUTS chains, each using 4,000 warmup and 100,000 production draws, target acceptance 0.95 and depth 12. Paper use requires recorded R-hat ≤1.01, bulk ESS ≥2,000, tail ESS ≥1,000, no divergences and no full-tree saturation in every parameter. Failure stops paper reference preparation; inspect the diagnostics and create a better reference in another directory. Thresholds are quality screens, not a proof of exactness.
+Independent logistic references must meet the existing paper-quality checks:
+R-hat ≤1.01, bulk ESS ≥2,000, tail ESS ≥1,000, no divergences or full-tree
+saturation in every parameter. A failed quality screen requires a better
+reference; the thresholds are not weakened by this update.
 
-## Replot or resume a single result
-
-```bash
-python run_experiment.py --plot-only results/paper/skew-t-100d-fixed
-python run_experiment.py skew-t-100d-fixed --preset paper --output-dir results/paper/skew-t-100d-fixed --resume
-```
-
-Plot-only reads saved references and draws and never calls a sampler. Resume is between completed chains; an interrupted chain restarts with its original seed. Do not edit code/configurations during a run. For a changed seed, budget, target or scientific implementation, choose a new directory.
-
-The `quick` profile is for execution checks; the `reproduce` profile is a smaller scientific run. Neither reproduces the paper design. See `configs/presets.json` for their explicit overrides.
+Original manuscript plot filenames are preserved in each run's `figures`
+folder. Inspect diagnostics before replacing manuscript figures and both rows
+of the posterior table. Earlier audit scripts and their saved reports preserve
+their historical protocols; they are not additional launcher experiments.

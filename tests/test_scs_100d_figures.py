@@ -100,6 +100,8 @@ class SCS100DFiguresTests(unittest.TestCase):
             self.assertIn('fixed proposal step h = 0.1', page)
             self.assertIn('not a literal reproduction of the SCS publication target', page)
             self.assertIn('equal production iteration counts', page)
+            self.assertIn(f"{summary['cases']['DCS-BW']['mse'][0]:.2e}", page)
+            self.assertNotIn(repr(summary['cases']['DCS-BW']['mse'][0]), page)
 
     def test_invalid_decomposition_is_rejected(self):
         summary = example_summary()
@@ -107,6 +109,35 @@ class SCS100DFiguresTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(ValueError, 'MSE must equal'):
                 render_report(directory, summary)
+
+    def test_timed_report_uses_actual_counts_and_post_burn_estimates(self):
+        summary = example_summary()
+        summary['config'].pop('iterations')
+        summary['config'].update(mode='time', time_budget=2., protocol='timed-dcs-author-scs-v2')
+        for case in summary['cases'].values():
+            for index, record in enumerate(case['records']):
+                record.update(iterations=1500+index*100, discarded_iterations=(1500+index*100)//3,
+                              retained_draws=100+index)
+                record['estimation_iterations'] = record['iterations']-record['discarded_iterations']
+            case['total_iterations'] = 4800
+            case['mean_iterations'] = 1600.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result = render_report(root, summary)
+            self.assertNotIn('scs_100d_prefix_mse', result['figures'])
+            with (root/'paper_values.csv').open(newline='', encoding='utf-8') as stream:
+                rows = list(csv.DictReader(stream))
+            for row in rows:
+                self.assertEqual(row['total_iterations'], '4800')
+                self.assertEqual(row['total_discarded_iterations'], '1599')
+                self.assertEqual(row['total_estimation_iterations'], '3201')
+                self.assertEqual(float(row['mean_norm_mse']), summary['cases'][row['method']]['mse'][1])
+            page = (root/'paper_values.html').read_text(encoding='utf-8')
+            self.assertIn('first third', page)
+            self.assertIn('held fixed during timed sampling', page)
+            self.assertIn('Author SCS keeps its fixed h = 0.10', page)
+            self.assertNotIn('DCS-RWM and DCS-BW use the original VI fitting and continuously adapt', page)
+            self.assertIn('two decimals', page)
 
 
 if __name__ == '__main__':

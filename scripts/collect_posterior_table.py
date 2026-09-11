@@ -14,7 +14,7 @@ def main():
         payload = json.loads((args.output_root/name/'summary.json').read_text())
         algorithms = payload['scenarios'][0]['algorithms']
         vals = [algorithms[method][f'{moment}_moment_rmse_across_chains_and_coordinates'] for moment in ['first', 'second'] for method in ['NUTS', 'DCS-HnR']]
-        rows.append(label+' & '+' & '.join(f'{v:.6g}' for v in vals)+r' \\')
+        rows.append(label+' & '+' & '.join(f'{v:.2e}' for v in vals)+r' \\')
         csv_rows.append([label]+vals)
     preamble = '% Generated from independent-chain errors relative to estimated PosteriorDB references.\n'
     table = '\\begin{tabular}{lrrrr}\nModel & NUTS first & DCS first & NUTS second & DCS second \\\\\n\\hline\n'+'\n'.join(rows)+'\n\\end{tabular}\n'

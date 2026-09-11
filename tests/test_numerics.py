@@ -109,7 +109,9 @@ class ScientificTests(unittest.TestCase):
         draws, info = sample(lambda x: -2.5*np.log1p(x@x/3), np.zeros(2), draws=200, warmup=100, seed=18)
         self.assertEqual(draws.shape, (200, 2))
         self.assertFalse(info['adaptation_during_sampling'])
-        self.assertEqual(info['iterations'], 200)
+        self.assertEqual(info['iterations'], 300)
+        self.assertEqual(info['burnin_iterations'], 100)
+        self.assertEqual(info['estimation_iterations'], 200)
         with self.assertRaises(ValueError):
             load_config('skew-t-100d-fixed', 'paper', {'time_budget': 10})
 

@@ -42,6 +42,10 @@ jobs:
       - run: python scripts/audit_skew_t_timed.py --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-skew-timed
       - run: python scripts/audit_joint_radial.py --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-joint-r-step
       - run: python run_experiment.py skew-t-50d-nu-0.5 --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-superheavy-counts
+      - run: python run_experiment.py skew-t-200d-baselines --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-baselines
+      - run: python run_experiment.py eight-schools --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-eight-schools
+      - run: python run_experiment.py garch11 --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-garch11
+      - run: python run_experiment.py logistic-regression --preset quick --workers ${{ env.BENCH_WORKERS }} --reference-dir results/ci-reference --output-dir results/ci-logistic
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -55,3 +59,7 @@ jobs:
             results/ci-joint-r-step
             results/ci-superheavy-counts
             results/ci-single-scs
+            results/ci-baselines
+            results/ci-eight-schools
+            results/ci-garch11
+            results/ci-logistic

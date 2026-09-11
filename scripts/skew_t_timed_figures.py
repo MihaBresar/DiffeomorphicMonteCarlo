@@ -12,6 +12,7 @@ from pathlib import Path
 import textwrap
 
 import numpy as np
+from dcs_bench.display import number, cell, figure_ticks
 
 METRICS = ('tail_probability', 'mean_norm')
 COLORS = {'DCS-BW': '#6f4bb0', 'SCS': '#d13d77'}
@@ -43,7 +44,7 @@ def _table(rows):
         return '<p>No values are available.</p>'
     columns = list(dict.fromkeys(key for row in rows for key in row))
     header = ''.join('<th>'+html.escape(key.replace('_', ' '))+'</th>' for key in columns)
-    body = ''.join('<tr>'+''.join('<td>'+html.escape(_text(row.get(key)))+'</td>'
+    body = ''.join('<tr>'+''.join('<td>'+html.escape(cell(row.get(key), key))+'</td>'
                                 for key in columns)+'</tr>' for row in rows)
     return '<div class="table-wrap"><table><thead><tr>'+header+'</tr></thead><tbody>'+body+'</tbody></table></div>'
 
@@ -98,6 +99,7 @@ def render_report(root, summary):
     figure_names = []
 
     def save(fig, name):
+        figure_ticks(fig)
         if smoke:
             fig.text(.5, .014, 'Short execution check only — not evidence of sampler performance',
                      ha='center', fontsize=10, color='#8c510a')
@@ -124,12 +126,12 @@ def render_report(root, summary):
             # Deterministic offsets avoid rendering RNGs and retain all chains.
             ax.scatter(index+np.linspace(-.11, .11, len(v)), v, color=color, s=18, alpha=.75, zorder=3)
         ax.axhline(truth[metric], color='#233344', linestyle='--', linewidth=1.3,
-                   label='Exact target value: '+repr(truth[metric]))
+                   label='Target value: '+number(truth[metric]))
         ticks = []
         for name, label in zip(names, labels):
             case = cases[name]
             ticks.append(label+'\n'+('Empirical MSE =\n' if metric == 'mean_norm' and nu <= 2 else 'MSE =\n')+
-                         repr(case['empirical_mse'][metric])+'\nMean N = '+repr(case['mean_iterations']))
+                         number(case['empirical_mse'][metric], scientific=True)+'\nMean N = '+number(case['mean_iterations'], integer=True))
         ax.set_xticks(range(1, len(names)+1), ticks, fontsize=8)
         ax.tick_params(axis='x', pad=10)
         ax.set_ylabel('Per-chain estimate of '+labels_by_metric[metric])
@@ -151,7 +153,7 @@ def render_report(root, summary):
         for index, value in enumerate(values):
             ax.barh(index, value, color=colors[index], height=.6,
                     hatch='//' if cases[names[index]].get('policy') == 'adaptive' else None)
-            ax.text(value, index, ' '+repr(float(value)), va='center', fontsize=9)
+            ax.text(value, index, ' '+number(value, scientific=True), va='center', fontsize=9)
         ax.set_yticks(range(len(names)), labels, fontsize=10)
         ax.set_ylim(len(names)-.4, -.6)
         if all_positive:
@@ -161,7 +163,7 @@ def render_report(root, summary):
             ax.set_xlim(0, float(values.max())*1.8 if values.max() > 0 else 1.)
         ax.set_title(('Descriptive average squared error: ' if metric == 'mean_norm' and nu <= 2 else 'MSE: ')+
                      labels_by_metric[metric], fontsize=11)
-        ax.set_xlabel('Exact values shown; '+('logarithmic axis' if all_positive else 'linear axis (includes zero)'))
+        ax.set_xlabel('MSE (two-decimal scientific labels); '+('logarithmic axis' if all_positive else 'linear axis (includes zero)'))
         ax.grid(axis='x', alpha=.2)
         ax.set_axisbelow(True)
     fig.suptitle(title+' — errors at equal sampling time\n'+budget, fontsize=14)
@@ -189,8 +191,8 @@ def render_report(root, summary):
         value = case['mean_iterations']
         axes[1].barh(index, value, color=colors[index], height=.62,
                      hatch='//' if case.get('policy') == 'adaptive' else None)
-        annotation = ('Mean N = '+repr(value)+'\nTotal N = '+str(case['total_iterations'])+
-                      '\nMean seconds = '+repr(case['mean_sampling_seconds']))
+        annotation = ('Mean N = '+number(value, integer=True)+'\nTotal N = '+str(case['total_iterations'])+
+                      '\nMean seconds = '+number(case['mean_sampling_seconds']))
         axes[1].text(value, index, ' '+annotation.replace('\n', '\n '), va='center', fontsize=8)
     axes[1].set_yticks(range(len(names)), labels, fontsize=9)
     axes[1].set_ylim(len(names)-.4, -.6)
@@ -310,8 +312,8 @@ def render_report(root, summary):
     ]+list(summary.get('notes', []))
     setup = {key: summary[key] for key in ('setup', 'fit_metadata', 'timing_protocol', 'environment', 'hardware')
              if key in summary}
-    details = ('<details><summary>Recorded setup and timing context</summary><pre>'+html.escape(
-        json.dumps(setup, indent=2, ensure_ascii=False, allow_nan=False))+'</pre></details>') if setup else ''
+    details = ('<details><summary>Recorded setup and timing context (full precision in summary.json)</summary><pre>'+html.escape(
+        cell(setup))+'</pre></details>') if setup else ''
     warning = '<p class="warning">Quick execution check only — do not interpret sampler rankings.</p>' if smoke else ''
     report = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Equal-time Student-t results</title><style>
@@ -328,6 +330,6 @@ th,td{padding:8px 10px;border-bottom:1px solid #e4e8ef;white-space:nowrap;text-a
     report += '<h2>All independent pilot candidates</h2>'+_table(pilot_rows)
     report += '<h2>Tail-indicator uncertainty comparisons</h2>'+_table(uncertainty_rows)
     report += '<h2>Interpretation and timing</h2><ul>'+''.join('<li>'+html.escape(note)+'</li>' for note in notes)+'</ul>'+details
-    report += '<p>CSV and HTML numbers preserve the full stored numerical precision. Plot labels are exact numerical values, not rounded paper approximations.</p></body></html>'
+    report += '<p>Plots and tables use two decimals, with scientific notation for MSE and small values. Integer sample counts remain exact. CSV and JSON preserve full numerical precision.</p></body></html>'
     (root/'paper_values.html').write_text(report, encoding='utf-8')
     return {'figures': figure_names, 'csv_files': list(csvs), 'html': 'paper_values.html'}

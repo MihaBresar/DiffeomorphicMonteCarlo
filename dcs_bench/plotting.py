@@ -10,6 +10,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from .targets import Target
 from .references import functional_draws, mcmc_diagnostics
+from .display import number, cell, figure_ticks
 
 COLORS = ['#9370DB', '#FF8C00', '#228B22', '#FF1493', '#4682B4']
 METHOD_COLORS = {'DCS-BW': '#9370DB', 'DCS-RWM': '#FF8C00', 'DCS-HnR': '#9370DB',
@@ -35,28 +36,32 @@ def save_figure(fig, folder, name, quick=False):
     if quick:
         title = fig._suptitle.get_text()+'\n' if fig._suptitle else ''
         fig.suptitle(title+'QUICK CHECK — not publication results', fontsize=14)
+    figure_ticks(fig)
     fig.tight_layout()
     for suffix in ('png', 'pdf'):
         fig.savefig(folder/f'{name}.{suffix}', dpi=220, bbox_inches='tight')
     plt.close(fig)
 
 
-def number(value):
-    """Shortest decimal which round-trips to the stored binary64 value."""
-    if value is None:
-        return 'unavailable'
-    if isinstance(value, (int, np.integer)):
-        return str(value)
-    return repr(float(value))
-
-
 def write_csv(path, rows):
     if not rows:
         return
     with Path(path).open('w', newline='', encoding='utf-8') as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(stream, fieldnames=list(dict.fromkeys(key for row in rows for key in row)))
         writer.writeheader()
         writer.writerows(rows)
+
+
+def burnin_counts(records):
+    """Bookkeeping for recorded sampling burn-in; absent for historical runs."""
+    if not records or not all('burnin_iterations' in row or 'discarded_iterations' in row for row in records):
+        return {}
+    burns = [int(row.get('burnin_iterations', row.get('discarded_iterations'))) for row in records]
+    used = [int(row.get('estimation_iterations', row['iterations']-burn)) for row, burn in zip(records, burns)]
+    if any(burn < 0 or count <= 0 or burn+count != row['iterations'] for row, burn, count in zip(records, burns, used)):
+        raise ValueError('Sampling burn-in and estimation counts must sum to generated iterations')
+    return {'total_burnin_iterations': sum(burns), 'mean_burnin_iterations': sum(burns)/len(burns),
+            'total_estimation_iterations': sum(used), 'mean_estimation_iterations': sum(used)/len(used)}
 
 
 def ball_map_description(config):
@@ -81,7 +86,7 @@ def method_labels(algorithms, config):
 
 
 def bar_panel(ax, algorithms, heights, config, title, ylabel):
-    """Original linear bars, with every plotted height printed without rounding."""
+    """Original linear bars with readable labels and full-precision CSV data."""
     values = [np.nan if h is None else h for h in heights]
     bars = ax.bar(np.arange(len(algorithms)), values,
                   color=[METHOD_COLORS[a] for a in algorithms], alpha=.8, edgecolor='black')
@@ -92,14 +97,17 @@ def bar_panel(ax, algorithms, heights, config, title, ylabel):
     finite = [v for v in values if np.isfinite(v)]
     ax.set_ylim(0, max(finite)*1.18 if finite and max(finite) > 0 else 1)
     for bar, value in zip(bars, heights):
-        ax.annotate(number(value), (bar.get_x()+bar.get_width()/2, value or 0),
+        ax.annotate(number(value, scientific='MSE' in title,
+                           integer='Iterations' in ylabel or 'Draws' in ylabel),
+                    (bar.get_x()+bar.get_width()/2, value or 0),
                     xytext=(0, 4), textcoords='offset points', ha='center', va='bottom', fontsize=8)
 
 
 def radial_boxplots(target, ref, data, config, labels):
     algorithms = list(data)
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    fig.suptitle(f'Ergodic Averages across {config["runs"]} Chains (d={target.d}, ν={target.nu:.1f})',
+    burn_note = '\nAfter step tuning, recorded sampling burn-in and thinning' if any(burnin_counts(data[a]['records']) for a in algorithms) else ''
+    fig.suptitle(f'Ergodic Averages across {config["runs"]} Chains (d={target.d}, ν={target.nu:.1f})'+burn_note,
                  fontsize=16, fontweight='bold')
     for k, ax in enumerate(axes):
         boxes = ax.boxplot([data[a]['estimates'][:, k] for a in algorithms], patch_artist=True,
@@ -152,6 +160,10 @@ def qq_reference(target, ref, config):
 def skew_figures(target, ref, data, config, labels, folder, quick):
     name, algorithms = config['figure'], list(data)
     reference, sources = qq_reference(target, ref, config)
+    # Historical summaries contain only the two QQ coordinates then plotted.
+    # Display those cached values instead of inventing unrecorded quantiles.
+    available = min(reference.shape[1], *(data[a]['quantiles'].shape[2] for a in algorithms))
+    reference, sources = reference[:, :available], sources[:available]
     fig, axes = plt.subplots(1, reference.shape[1], figsize=(20, 5), squeeze=False)
     fig.suptitle(f'Marginal Q–Q Diagnostics: Skew-t (d={target.d}, ν={target.nu:g})', fontsize=16)
     qq_rows = []
@@ -193,7 +205,8 @@ def skew_figures(target, ref, data, config, labels, folder, quick):
 
     # Explicitly distinguish generated iterations from retained (thinned) draws.
     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-    fig.suptitle('Sampling Output and Runtime', fontsize=16, fontweight='bold')
+    burn_note = '\nRetained draws follow recorded sampling burn-in and thinning' if any(burnin_counts(data[a]['records']) for a in algorithms) else ''
+    fig.suptitle('Sampling Output and Runtime'+burn_note, fontsize=16, fontweight='bold')
     for ax, metric, heading, units in zip(axes,
             ['mean_iterations', 'mean_retained_draws', 'mean_sampling_seconds'],
             ['Average Iterations Generated', 'Average Samples Retained', 'Average Runtime (s)'],
@@ -203,7 +216,7 @@ def skew_figures(target, ref, data, config, labels, folder, quick):
 
 
 def export_paper_values(output, config, all_summary):
-    """Full precision machine-readable and browser-readable plotted values."""
+    """Full-precision CSV values and a table with readable numerical labels."""
     rows, count_rows = [], []
     for s, scenario in enumerate(all_summary):
         ref = scenario['reference']
@@ -218,6 +231,7 @@ def export_paper_values(output, config, all_summary):
                 mean_retained_samples_exact=str(Fraction(summary['total_retained_draws'], config['runs'])),
                 thin=config['thin'], mean_production_seconds=summary['mean_sampling_seconds'],
                 total_coordinate_bulk_ess=summary.get('total_coordinate_bulk_ess'))
+            counts.update(burnin_counts(summary['records']))
             count_rows.append(counts)
             for k, functional in enumerate(ref['functional_names']):
                 rows.append(dict(counts, functional=functional, reference=ref['functional_truth'][k],
@@ -226,10 +240,14 @@ def export_paper_values(output, config, all_summary):
                     mse_bootstrap_95_high=summary['mse_bootstrap_95_interval'][1][k]))
     write_csv(output/'paper_values.csv', rows)
     write_csv(output/'sample_counts.csv', count_rows)
-    # No rounding or JavaScript number formatting: copy the exact stored decimals.
+    # Display formatting is separate from the full-precision CSV exports.
     columns = ['scenario', 'algorithm', 'functional', 'mse', 'reference', 'mean_iterations',
                'mean_retained_samples', 'total_iterations', 'total_retained_samples', 'mean_production_seconds']
-    content = ''.join('<tr>'+''.join('<td>'+html.escape(number(row[c]) if isinstance(row[c], (float, int)) else str(row[c]))+'</td>'
+    if any('total_burnin_iterations' in row for row in rows):
+        columns += ['total_burnin_iterations', 'total_estimation_iterations', 'mean_burnin_iterations', 'mean_estimation_iterations']
+    burn_note = ('Separate step tuning precedes sampling. Recorded sampling burn-in is included in generated counts and excluded from estimation counts. Retained samples follow tuning, sampling burn-in and thinning. '
+                 if any('total_burnin_iterations' in row for row in rows) else 'Retained samples are after warmup and thinning. ')
+    content = ''.join('<tr>'+''.join('<td>'+html.escape(cell(row.get(c), c))+'</td>'
                                   for c in columns)+'</tr>' for row in rows)
     page = ('<!doctype html><meta charset="utf-8"><title>Exact plotted values</title>'
             '<style>body{font:15px system-ui;margin:32px;color:#253047}table{border-collapse:collapse}'
@@ -239,8 +257,8 @@ def export_paper_values(output, config, all_summary):
             f'<p>Run size: <strong>{html.escape(config["preset"])}</strong>. '
             f'DCS map: <strong>{html.escape(ball_map_description(config))}</strong>. '
             'MSE is the average of independent-chain squared errors. Iterations include repeats after rejection; '
-            'retained samples are after warmup and thinning. These are finite numerical estimates, '
-            'printed at round-trip floating-point precision, not exact population quantities.</p>'
+            +burn_note+'These are finite numerical estimates, '
+            'displayed with two decimals, using scientific notation for small values. CSV and JSON retain full precision.</p>'
             '<p><a href="paper_values.csv">Download all values (CSV)</a> · '
             '<a href="sample_counts.csv">Sample counts and exact mean fractions (CSV)</a></p>'
             '<div class="scroll"><table><thead><tr>'+''.join('<th>'+c.replace('_', ' ')+'</th>' for c in columns)+
@@ -279,8 +297,8 @@ def rebuild(output):
             errors = mse_summary(estimates, ref['functional_truth'])
             family = 'sphere' if algorithm == 'SCS' else 'ball'
             setup_seconds = setup.get(family, {}).get('optimization', {}).get('seconds', 0.) if algorithm == 'SCS' or algorithm.startswith('DCS') else 0.
-            compilation_path = directory/'nuts_compilation.json'
-            if algorithm == 'NUTS' and compilation_path.exists():
+            compilation_path = directory/(('nuts' if algorithm == 'NUTS' else algorithm)+'_compilation.json')
+            if compilation_path.exists():
                 setup_seconds += json.loads(compilation_path.read_text())['seconds']
             totals = [r['sampling_seconds']+r.get('warmup_seconds', r.get('warmup_seconds_including_compilation', 0.))
                       +r.get('production_compile_and_pilot_seconds', 0.)+setup_seconds/config['runs'] for r in records]
@@ -291,6 +309,7 @@ def rebuild(output):
                 mean_seconds_including_setup=float(np.mean(totals)),
                 setup_cost_charging='Shared fit and summed worker compilation durations amortized over this method\'s runs; not total elapsed wall time',
                 records=list(records))
+            algo_summary.update(burnin_counts(records))
             for field in ('iterations', 'retained_draws'):
                 total = sum(int(r[field]) for r in records)
                 algo_summary['total_'+field] = total
@@ -317,14 +336,52 @@ def rebuild(output):
                         ess_per_sampling_second=None if ess is None else ess/record['sampling_seconds'],
                         sampling_seconds=record['sampling_seconds'], seconds_including_setup=totals[i],
                         iterations=record['iterations'], retained_draws=record['retained_draws']))
+                    if 'burnin_iterations' in record or 'discarded_iterations' in record:
+                        burn = record.get('burnin_iterations', record.get('discarded_iterations'))
+                        csv_rows[-1].update(burnin_iterations=burn,
+                                            estimation_iterations=record.get('estimation_iterations', record['iterations']-burn))
         all_summary.append(summary)
         all_data.append((target, ref, data))
     write_json(output/'summary.json', {'schema_version': 2, 'preset': config['preset'], 'scenarios': all_summary,
         'interpretation': 'MSE uses independent chain estimates. PosteriorDB and logistic references have Monte Carlo uncertainty. Quick results test execution only.'})
     with (output/'chain_metrics.csv').open('w', newline='') as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(csv_rows[0]))
+        writer = csv.DictWriter(stream, fieldnames=list(dict.fromkeys(key for row in csv_rows for key in row)))
         writer.writeheader()
         writer.writerows(csv_rows)
+    return _render_prepared(output, config, all_summary, all_data, labels)
+
+
+def render_saved_summary(output):
+    """Refresh display only, using cached statistics without reading chains."""
+    output = Path(output)
+    config = json.loads((output/'configuration.json').read_text())
+    saved = json.loads((output/'summary.json').read_text())
+    all_summary, all_data = saved['scenarios'], []
+    labels = dict(LABELS)
+    labels['tail_probability'] = rf'$P(\|X\|\geq {config["threshold"]:g})$'
+    for scenario in all_summary:
+        target, reference = Target(scenario['target']), scenario['reference']
+        reference.setdefault('functional_reference_mcse', [None]*len(reference['functional_names']))
+        for result in scenario['algorithms'].values():
+            # Older summaries saved exact per-chain counts but not totals.
+            # Recover only these bookkeeping aggregates; never recalculate ESS.
+            for field in ('iterations', 'retained_draws'):
+                total = sum(int(record[field]) for record in result['records'])
+                result.setdefault('total_'+field, total)
+                result.setdefault('mean_'+field, total/len(result['records']))
+            result.setdefault('total_coordinate_bulk_ess', None)
+            result.update(burnin_counts(result['records']))
+        data = {algorithm: {'estimates': np.asarray(result['chain_functional_estimates']),
+                            'quantiles': np.asarray(result['chain_quantiles']),
+                            'records': result['records'], 'summary': result}
+                for algorithm, result in scenario['algorithms'].items()}
+        all_data.append((target, reference, data))
+    return _render_prepared(output, config, all_summary, all_data, labels)
+
+
+def _render_prepared(output, config, all_summary, all_data, labels):
+    folder = output/'figures'
+    folder.mkdir(exist_ok=True)
     quick = config['preset'] == 'quick'
     export_paper_values(output, config, all_summary)
     if config['experiment'] == 'logistic-regression':
@@ -388,11 +445,11 @@ def rebuild(output):
             rows = []
             for a in algorithms:
                 summ = data[a]['summary']
-                rows.append(f'{a} & {summ["first_moment_rmse_across_chains_and_coordinates"]:.6g} & {summ["second_moment_rmse_across_chains_and_coordinates"]:.6g} \\\\')
+                rows.append(f'{a} & {summ["first_moment_rmse_across_chains_and_coordinates"]:.2e} & {summ["second_moment_rmse_across_chains_and_coordinates"]:.2e} \\\\')
             (output/'posterior_table.tex').write_text('% RMSE across independent chains and physical coordinates; reference is estimated.\n'+'\n'.join(rows)+'\n')
         save_figure(fig, folder/'supplementary' if target.kind == 'skew_t' else folder,
                     config['figure']+'_mse_uncertainty' if target.kind == 'skew_t' else config['figure'], quick)
-        if target.kind == 'skew_t':
+        if target.kind == 'skew_t' and min(data[a]['estimates'].shape[1] for a in algorithms) >= 4 and len(ref['functional_truth']) >= 4:
             fig, axes = plt.subplots(1, 2, figsize=(11, 4))
             fig.suptitle('Supplementary directional checks: positive-side probability and bounded projection mean')
             for k, ax in enumerate(axes, 2):

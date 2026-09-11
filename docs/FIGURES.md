@@ -52,10 +52,12 @@ are in `figures/supplementary`. The launcher puts them in a collapsed
 
 ## Exact numerical values
 
-MSE, iteration/sample counts, and runtime bars print the shortest decimal that
-recovers the stored floating-point value without loss. These are numerical
-estimates, not exact population quantities. References may have Monte Carlo
-uncertainty; that uncertainty remains in the summary and exported data.
+Plot annotations and HTML tables use two decimals. MSE labels use scientific
+notation, for example `2.10e-07`; runtimes use `33.20`. Small nonzero values use
+scientific notation so they are never displayed as zero. Actual iteration and
+sample counts remain exact integers. CSV and JSON retain every stored numerical
+digit. These are numerical estimates, not exact population quantities; reference
+uncertainty remains in the summary and exported data.
 
 Each experiment saves:
 

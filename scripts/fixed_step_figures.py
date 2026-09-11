@@ -4,6 +4,7 @@ import html
 import json
 from pathlib import Path
 import numpy as np
+from dcs_bench.display import number, cell, figure_ticks
 
 
 def case_label(name):
@@ -30,6 +31,7 @@ def render_report(root, summary):
     def color(name):
         return colors['vanilla'] if name.startswith('vanilla') else colors['DCS-BW' if 'DCS-BW' in name else 'SCS']
     def save(fig, name):
+        figure_ticks(fig)
         fig.savefig(figures/(name+'.png'), dpi=180, bbox_inches='tight')
         fig.savefig(figures/(name+'.pdf'), bbox_inches='tight')
         plt.close(fig)
@@ -44,7 +46,7 @@ def render_report(root, summary):
         ax.set_xticks(range(len(selected)), [case_label(name) for name in selected], fontsize=8)
         ax.set_title(['Tail-probability MSE', 'Mean-norm MSE'][i]); ax.set_ylabel('MSE')
         ax.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
-        ax.bar_label(bars, labels=[repr(float(value)) for value in values], fontsize=8, padding=5, rotation=8)
+        ax.bar_label(bars, labels=[number(value, scientific=True) for value in values], fontsize=8, padding=5, rotation=8)
         ax.margins(y=.3)
     fig.suptitle(title+'\n'+str(config['runs'])+' chains × '+str(config['iterations'])+' production iterations; '+str(config['iterations']//config['thin'])+' retained per chain', fontsize=12)
     fig.tight_layout(rect=(0, 0, 1, .90)); save(fig, 'fixed_step_comparison')
@@ -56,7 +58,7 @@ def render_report(root, summary):
         ax.set_yticks(range(len(names)), [case_label(name) for name in names], fontsize=8)
         ax.invert_yaxis(); ax.set_xscale('log'); ax.set_title(['Tail-probability MSE', 'Mean-norm MSE'][i])
         for bar, value in zip(bars, values):
-            ax.text(value, bar.get_y()+bar.get_height()/2, ' '+repr(float(value)), va='center', fontsize=7)
+            ax.text(value, bar.get_y()+bar.get_height()/2, ' '+number(value, scientific=True), va='center', fontsize=7)
         positive = [v for v in values if v > 0]
         if positive: ax.set_xlim(min(positive)/2, max(positive)*30)
     fig.suptitle(title+' — all map/tuning cases', fontsize=13)
@@ -123,19 +125,14 @@ def render_report(root, summary):
         if not values:
             return '<p>No values are available.</p>'
         columns = columns or list(values[0])
-        def cell(value):
-            if value is None:
-                return 'unavailable'
-            if isinstance(value, bool):
-                return 'yes' if value else 'no'
-            return html.escape(str(value))
         header = ''.join('<th>'+html.escape(key)+'</th>' for key in columns)
-        body = ''.join('<tr>'+''.join('<td>'+cell(row[key])+'</td>' for key in columns)+'</tr>' for row in values)
+        body = ''.join('<tr>'+''.join('<td>'+html.escape(cell(row[key], key))+'</td>' for key in columns)+'</tr>' for row in values)
         return '<div class="table-wrap"><table><thead><tr>'+header+'</tr></thead><tbody>'+body+'</tbody></table></div>'
 
     notes = 'All cases share the same target and physical starting point. Pilot choices use separate seeds. Continued adaptation is a historical sensitivity check. These diagnostic cases share a process pool, so their recorded times are not a throughput comparison. Different observables can favour different methods.'
     page = '<!doctype html><meta charset="utf-8"><title>Fixed-step audit values</title><style>body{font:16px system-ui;margin:32px;color:#172940}table{border-collapse:collapse;font-size:13px}td,th{padding:9px;border:1px solid #ccd5df;text-align:right}td:first-child,th:first-child{text-align:left}th{background:#eef3f8}p{max-width:1050px;line-height:1.6}.table-wrap{overflow-x:auto;margin:20px 0}h2{margin-top:36px}summary{cursor:pointer;font-weight:600;padding:12px 0}.warning{padding:12px 16px;border-left:4px solid #b76b11;background:#fff7e8}</style>'
     page += '<h1>'+html.escape(title)+'</h1><p>'+html.escape(notes)+'</p>'
+    page += '<p>Plots and tables use two decimals, with scientific notation for MSE and small values. Integer counts remain exact; CSV and JSON retain full precision.</p>'
     page += '<h2>Exact MSE values for every case</h2>'+table(rows)
     uncertainty_note = 'Descriptive paired-chain bootstrap intervals, conditional on the fitted maps, with no multiplicity correction. Differences are MSE(case A) minus MSE(case B); negative values favour A. An interval containing zero does not resolve the ranking. These intervals do not measure uncertainty from fitting the maps.'
     page += '<h2>Paired MSE differences and uncertainty</h2><p>'+html.escape(uncertainty_note)+'</p>'+table(uncertainty_rows)

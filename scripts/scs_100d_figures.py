@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+from dcs_bench.display import number, cell, figure_ticks
 
 METRICS = ('tail_probability', 'mean_norm')
 ALIASES = (('tail_probability', 'tail'), ('mean_norm', 'norm'))
@@ -65,12 +66,37 @@ def _table(rows):
         return '<p>No values available.</p>'
     fields = list(dict.fromkeys(key for row in rows for key in row))
     header = ''.join('<th>'+html.escape(key.replace('_', ' '))+'</th>' for key in fields)
-    body = ''.join('<tr>'+''.join('<td>'+html.escape(_text(row.get(key)))+'</td>' for key in fields)+'</tr>' for row in rows)
+    body = ''.join('<tr>'+''.join('<td>'+html.escape(cell(row.get(key), key))+'</td>' for key in fields)+'</tr>' for row in rows)
     return '<div class="table-wrap"><table><thead><tr>'+header+'</tr></thead><tbody>'+body+'</tbody></table></div>'
 
 
-def _policy(name):
+def _policy(name, timed=False):
+    if timed:
+        return ('Author SCS: fixed h = 0.10 with separate untimed equilibration' if name == 'SCS' else
+                'Separate proposal-step tuning, then frozen during timed sampling')
     return 'Paper-date SCS: fixed h = 0.1' if name == 'SCS' else 'Continuous smoothed dual averaging; target acceptance 0.234'
+
+
+def _counts(case, config, timed):
+    records = case.get('records', [])
+    if not records:
+        if timed:
+            raise ValueError('Timed reports require exact per-chain iteration and burn-in records')
+        records = [{'iterations': config['iterations']} for _ in range(case['chains'])]
+    generated = [int(row.get('iterations', config.get('iterations'))) for row in records]
+    if sum(generated) != case['total_iterations']:
+        raise ValueError('Per-chain generated counts must sum to total_iterations')
+    discarded = [int(row.get('discarded_iterations', row.get('burnin', 0))) for row in records]
+    if timed and any('discarded_iterations' not in row and 'burnin' not in row for row in records):
+        raise ValueError('Timed reports require recorded discarded_iterations or burnin')
+    used = [int(row.get('estimation_iterations', total-burn)) for row, total, burn in zip(records, generated, discarded)]
+    if any(total <= 0 or burn < 0 or remaining <= 0 or remaining != total-burn
+           for total, burn, remaining in zip(generated, discarded, used)):
+        raise ValueError('Generated, discarded, and estimation counts must agree')
+    retained = [row.get('retained_draws', total//config['thin'] if not timed else None)
+                for row, total in zip(records, generated)]
+    return {'generated': generated, 'discarded': discarded, 'used': used, 'retained': retained,
+            'mean_generated': float(np.mean(generated)), 'mean_used': float(np.mean(used))}
 
 
 def render_report(root, summary):
@@ -84,9 +110,11 @@ def render_report(root, summary):
     figures = root/'figures'
     figures.mkdir(exist_ok=True)
     cases, config = summary['cases'], summary['config']
+    timed = config.get('mode') == 'time' or config.get('protocol') == 'timed-dcs-author-scs-v2'
     if not cases or any(name not in METHODS for name in cases):
         raise ValueError('Expected completed DCS-RWM, DCS-BW, or SCS cases')
     names = [name for name in METHODS if name in cases]
+    counts = {name: _counts(cases[name], config, timed) for name in names}
     truth = _pair(summary['truth'])
     means = {name: _means(cases[name]) for name in names}
     mses = {name: _pair(cases[name]['mse']) for name in names}
@@ -102,14 +130,21 @@ def render_report(root, summary):
     threshold = config.get('threshold', 50.)
     smoke = config.get('preset') == 'quick'
     title = ('EXECUTION CHECK — ' if smoke else '')+f'{dimension}D skewed Student-t, ν = {nu:g}'
-    budget = (f"{config['runs']} chains × {config['iterations']} production iterations per method; "
+    budget = (f"{config['runs']} chains per method; {number(config['time_budget'])} s of timed sampling per chain; "
+              'first third of generated iterations discarded' if timed else
+              f"{config['runs']} chains × {config['iterations']} production iterations per method; "
               f"{config['warmup']} warmup iterations discarded")
+    estimation_note = ('Estimates use the remaining two thirds, including repeated states after rejection.' if timed else
+                       'All production iterations contribute, including rejected states.')
+    tuning_note = ('DCS steps are pretuned; author SCS uses h = 0.10 after untimed equilibration. All sampling steps stay fixed.' if timed else
+                   'DCS adapts during sampling; SCS uses h = 0.1.')
     metric_labels = (f'P(‖X‖ ≥ {threshold:g})', 'E[‖X‖]')
     x = np.arange(1, len(names)+1)
     colors = [COLORS[name] for name in names]
     figure_names = []
 
     def save(fig, name):
+        figure_ticks(fig)
         if smoke:
             fig.text(.5, .012, 'Quick execution check only — not evidence of sampler performance',
                      ha='center', fontsize=10, color='#995b08')
@@ -125,12 +160,12 @@ def render_report(root, summary):
     latitude = summary.get('maps', {}).get('sphere', {}).get('latitude', 1.1)
     original_labels = [name+(f' (β={beta:g})' if name != 'SCS' else f' (l₀={latitude:.2f})') for name in names]
     panels = ([mses[name][0] for name in names], [mses[name][1] for name in names],
-              [cases[name]['mean_seconds'] for name in names])
+              [counts[name]['mean_generated'] if timed else cases[name]['mean_seconds'] for name in names])
     for ax, values, label, ylabel in zip(axes, panels,
-            ('Tail-probability MSE', 'Mean-norm MSE', 'Average Runtime (s)'),
-            ('Mean Squared Error', 'Mean Squared Error', 'Seconds')):
+            ('Tail-probability MSE', 'Mean-norm MSE', 'Average Iterations Generated' if timed else 'Average Runtime (s)'),
+            ('Mean Squared Error', 'Mean Squared Error', 'Generated Iterations per Chain' if timed else 'Seconds')):
         bars = ax.bar(x, values, color=colors, alpha=.8, edgecolor='#333333', width=.8)
-        ax.bar_label(bars, labels=[repr(float(value)) for value in values], padding=5, fontsize=8)
+        ax.bar_label(bars, labels=[number(value, scientific='MSE' in label, integer='Iterations' in label) for value in values], padding=5, fontsize=8)
         ax.set_xticks(x, original_labels, rotation=15, ha='right', fontsize=9)
         ax.set_title(label)
         ax.set_ylabel(ylabel)
@@ -140,8 +175,8 @@ def render_report(root, summary):
         ax.ticklabel_format(axis='y', style='plain', useOffset=False)
     fig.suptitle(('EXECUTION CHECK — ' if smoke else '')+'Performance & Mean Squared Error Comparison\n'+
                  f'{dimension}D skewed Student-t, ν = {nu:g}', fontsize=14, fontweight='bold')
-    fig.text(.5, .079, budget+'. All production states enter the estimates.', ha='center', fontsize=9)
-    fig.text(.5, .049, 'DCS steps adapt continuously; SCS uses h = 0.1. Runtime includes estimation and excludes fitting, compilation and warmup.',
+    fig.text(.5, .079, budget+'.', ha='center', fontsize=9)
+    fig.text(.5, .049, tuning_note+' '+estimation_note,
              ha='center', fontsize=9)
     fig.tight_layout(rect=(0, .14, 1, .9))
     save(fig, 'VsSCS')
@@ -159,7 +194,7 @@ def render_report(root, summary):
             offsets = np.linspace(-.11, .11, len(values_)) if len(values_) > 1 else np.zeros(1)
             ax.scatter(position+offsets, values_, color=color, s=23, alpha=.8, zorder=3)
         ax.axhline(truth[metric], color='#27384a', linestyle='--', linewidth=1.4,
-                   label='True value = '+repr(float(truth[metric])))
+                   label='True value = '+number(truth[metric]))
         ax.set_xticks(x, names)
         ax.set_ylabel('Per-chain estimate')
         ax.set_title(label+' estimates')
@@ -176,10 +211,11 @@ def render_report(root, summary):
                 ax.bar(position, value, color=color, width=.58)
             else:
                 ax.plot(position, floor, marker='v', color=color)
-            ax.text(position, max(float(value), floor)*1.15, repr(float(value)),
+            ax.text(position, max(float(value), floor)*1.15, number(value, scientific=True),
                     ha='center', va='bottom', fontsize=9)
         ax.set_ylim(floor, max(float(values.max())*4, floor*10))
-        ax.set_xticks(x, [name+'\nN = '+str(config['iterations']) for name in names])
+        ax.set_xticks(x, [name+'\n'+('Mean used N = ' if timed else 'N = ')+
+                         number(counts[name]['mean_used'], integer=True) for name in names])
         ax.set_title(label+' MSE across chains')
         ax.set_ylabel('MSE (logarithmic scale)')
         ax.grid(axis='y', alpha=.2)
@@ -187,7 +223,7 @@ def render_report(root, summary):
         if np.any(values == 0):
             ax.text(.02, .02, 'Zero values marked at the lower axis edge', transform=ax.transAxes, fontsize=8)
     fig.suptitle(title+' — estimates and logarithmic MSE\n'+budget, fontsize=14)
-    fig.text(.5, .046, 'All production iterations contribute, including rejected states. DCS adapts during sampling; SCS uses h = 0.1.',
+    fig.text(.5, .046, estimation_note+' '+tuning_note,
              ha='center', fontsize=10)
     fig.tight_layout(rect=(0, .085, 1, .92))
     save(fig, 'scs_100d_estimates')
@@ -199,7 +235,7 @@ def render_report(root, summary):
         if np.any(values <= 0) or not np.all(np.isfinite(values)):
             raise ValueError('Measured runtime and throughput must be finite and positive')
         bars = ax.bar(x, values, color=colors, width=.58)
-        ax.bar_label(bars, labels=[repr(float(value)) for value in values], fontsize=9, padding=5)
+        ax.bar_label(bars, labels=[number(value) for value in values], fontsize=9, padding=5)
         ax.set_xticks(x, names)
         ax.set_ylabel(label)
         ax.set_title(label)
@@ -207,8 +243,9 @@ def render_report(root, summary):
         ax.grid(axis='y', alpha=.2)
         ax.set_axisbelow(True)
         ax.ticklabel_format(axis='y', style='plain', useOffset=False)
-    fig.suptitle(title+' — measured runtime at equal iteration counts\n'+budget, fontsize=14)
-    fig.text(.5, .055, 'Clock includes all-iteration estimation; excludes map fitting, compilation, warmup and saving. Hardware and load affect timing.',
+    fig.suptitle(title+(' — measured runtime and output at equal sampling time\n' if timed else ' — measured runtime at equal iteration counts\n')+budget, fontsize=14)
+    fig.text(.5, .055, 'Clock includes '+('discarded sampling burn-in and estimation' if timed else 'all-iteration estimation')+
+             '; excludes map fitting, compilation, step tuning/equilibration and saving. Hardware and load affect timing.',
              ha='center', fontsize=9)
     fig.tight_layout(rect=(0, .12, 1, .88))
     save(fig, 'scs_100d_runtime')
@@ -221,8 +258,8 @@ def render_report(root, summary):
         ax.bar(x, bias, bottom=variance, color=colors, width=.58, hatch='///', alpha=.5,
                label='Squared empirical bias')
         for position, variance_, bias_, name in zip(x, variance, bias, names):
-            ax.text(position, variance_+bias_, ' MSE = '+repr(float(mses[name][metric]))+
-                    '\n bias² = '+repr(float(bias_))+'\n variance = '+repr(float(variance_)),
+            ax.text(position, variance_+bias_, ' MSE = '+number(mses[name][metric], scientific=True)+
+                    '\n bias² = '+number(bias_, scientific=True)+'\n variance = '+number(variance_, scientific=True),
                     ha='center', va='bottom', fontsize=8)
         ymax = float((variance+bias).max())
         ax.set_ylim(0, ymax*1.8 if ymax > 0 else 1.)
@@ -245,7 +282,7 @@ def render_report(root, summary):
     for name in names:
         records = cases[name].get('records', [])
         checkpoints[name] = [{int(row['iterations']): _pair(row['mean_all_iterations'])
-                              for row in record.get('checkpoints', [])} for record in records]
+                              for row in record.get('checkpoints', [])} for record in records] if not timed else []
     dictionaries = [row for name in names for row in checkpoints[name]]
     common = sorted(set.intersection(*(set(row) for row in dictionaries))) if dictionaries else []
     if any(len(checkpoints[name]) != cases[name]['chains'] for name in names):
@@ -284,10 +321,16 @@ def render_report(root, summary):
     case_rows, chain_rows = [], []
     for name in names:
         case = cases[name]
-        row = {'method': name, 'production_step_policy': _policy(name), 'chains': case['chains'],
-               'iterations_per_chain': config['iterations'], 'total_iterations': case['total_iterations'],
+        count = counts[name]
+        per_chain = count['generated'][0] if len(set(count['generated'])) == 1 else 'varies; see chain table'
+        retained = (count['retained'][0] if len(set(count['retained'])) == 1 else 'varies; see chain table')
+        row = {'method': name, 'production_step_policy': _policy(name, timed), 'chains': case['chains'],
+               'iterations_per_chain': per_chain, 'mean_iterations': count['mean_generated'],
+               'total_iterations': case['total_iterations'],
+               'mean_estimation_iterations': count['mean_used'], 'total_estimation_iterations': sum(count['used']),
+               'total_discarded_iterations': sum(count['discarded']),
                'warmup_iterations': config['warmup'], 'thin': config['thin'],
-               'retained_per_chain': config['iterations']//config['thin'],
+               'retained_per_chain': retained,
                'mean_seconds': case['mean_seconds'], 'median_seconds': case['median_seconds'],
                'iterations_per_second': case['iterations_per_second'],
                'mean_acceptance': case['mean_acceptance'], 'final_scales': case['final_scales']}
@@ -302,8 +345,10 @@ def render_report(root, summary):
             raise ValueError('Each chain must have exactly one record')
         for index, estimate in enumerate(means[name]):
             row = dict(records[index]) if records else {'chain': index}
-            row.update(method=name, production_step_policy=_policy(name))
-            row.setdefault('iterations', config['iterations'])
+            row.update(method=name, production_step_policy=_policy(name, timed))
+            row.setdefault('iterations', count['generated'][index])
+            row.setdefault('discarded_iterations', count['discarded'][index])
+            row.setdefault('estimation_iterations', count['used'][index])
             for metric, key in enumerate(METRICS):
                 row[key+'_estimate'] = estimate[metric]
                 row[key+'_truth'] = truth[metric]
@@ -330,8 +375,9 @@ def render_report(root, summary):
                            'samples_per_step': fitting.get('samples_per_step'),
                            'total_training_draws': total_draws, 'training_count_source': count_source,
                            'training_batch_policy': fitting.get('training_batch_policy', fitting.get('batch_policy'))})
-    count_rows = [{key: row[key] for key in ('method', 'chains', 'iterations_per_chain',
-                   'total_iterations', 'warmup_iterations', 'thin', 'retained_per_chain',
+    count_rows = [{key: row[key] for key in ('method', 'chains', 'iterations_per_chain', 'mean_iterations',
+                   'total_iterations', 'mean_estimation_iterations', 'total_estimation_iterations',
+                   'total_discarded_iterations', 'warmup_iterations', 'thin', 'retained_per_chain',
                    'mean_seconds', 'median_seconds', 'iterations_per_second')} for row in case_rows]
     csvs = {'scs_100d_values.csv': case_rows, 'paper_values.csv': case_rows,
             'sample_counts.csv': count_rows, 'scs_100d_chains.csv': chain_rows,
@@ -353,15 +399,23 @@ def render_report(root, summary):
         'Squared empirical bias is the square of the mean chain estimate minus truth. Across-chain variance uses ddof = 0, so the two terms sum exactly, up to floating-point arithmetic, to empirical MSE. These numbers do not establish stationarity or exclude initialization bias.',
         'The SCS author VI and paper-date sampler are applied to the shared normal-CDF-skewed Student-t target at ν = 3. This is not a literal reproduction of the SCS publication target, which uses a Student-t CDF. The two reported functions are tail probability and mean norm.',
     ]+list(summary.get('notes', []))
+    if timed:
+        notes[:4] = [
+            'Every chain receives the same timed sampling budget. Generated iteration counts can differ. Each chain discards the first third of its actual generated iterations; only the remaining states enter the estimates, including rejection repeats.',
+            'DCS has a separate step-tuning phase before the sampling clock starts. Author SCS keeps its fixed h = 0.10 and receives separate untimed equilibration. Proposal steps are held fixed during timed sampling. The first-third discard is additional sampling burn-in inside that clock.',
+            'The SCS author transition and its fixed paper step are applied to the shared normal-CDF-skewed Student-t target. This default comparison intentionally preserves the author step; it does not give SCS the proposal pretuning used by the other benchmark experiments.',
+            'The sample-count panel reports all generated iterations. Exact generated, discarded and estimation counts are listed for every chain below. Final scales are the steps used during timed sampling.',
+        ]
+        notes[4] = 'Production time includes sampling burn-in and estimation, and excludes map fitting, compilation, separate step tuning or equilibration, and saving. Times describe this hardware, worker count and competing load.'
     notes += [summary[key] for key in ('target_note', 'mse_note', 'time_scope') if isinstance(summary.get(key), str)]
     warning = '<p class="warning">Quick execution check only — do not interpret sampler rankings.</p>' if smoke else ''
     page = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>100D original SCS comparison</title><style>body{font:15px/1.55 system-ui,sans-serif;max-width:1450px;margin:auto;padding:28px;color:#24354b;background:#f6f8fb}h1,h2{line-height:1.2}h2{margin-top:32px}a{color:#5a429c}figure{margin:24px 0;padding:10px;background:white;border-radius:8px}img{max-width:100%;height:auto}figcaption{font-size:13px;color:#566579}.table-wrap{overflow:auto;background:white}table{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}td,th{padding:8px;border:1px solid #dee4ee;text-align:left;white-space:nowrap}td{font-family:ui-monospace,monospace}th{background:#eaf0f8}.warning{padding:12px;background:#fff0cf;border-left:4px solid #a4670d}li{margin-bottom:8px}</style></head><body>'''
-    page += '<h1>'+html.escape(title)+' — original comparison protocol</h1>'+warning+'<p>'+html.escape(budget)+'.</p>'
+    page += '<h1>'+html.escape(title)+(' — equal sampling time' if timed else ' — original comparison protocol')+'</h1>'+warning+'<p>'+html.escape(budget)+'.</p>'
     page += '<p>'+' · '.join('<a href="'+filename+'">'+html.escape(filename)+'</a>' for filename in csvs)+'</p>'
     for filename in figure_names:
         page += '<figure><a href="figures/'+filename+'.pdf"><img src="figures/'+filename+'.png" alt="'+html.escape(filename.replace('_', ' '))+'"></a><figcaption>Click the figure to open its PDF.</figcaption></figure>'
-    page += '<h2>Exact counts, errors and runtime</h2>'+_table(case_rows)
+    page += '<h2>Counts, errors and runtime</h2>'+_table(case_rows)
     if setup_rows:
         page += '<h2>Map fitting excluded from production time</h2>'+_table(setup_rows)
     page += '<h2>Every chain</h2>'+_table(chain_rows)
@@ -369,6 +423,6 @@ def render_report(root, summary):
     if prefix_rows:
         page += '<h2>Exact checkpoint MSE values</h2>'+_table(prefix_rows)
     page += '<h2>Protocol and interpretation</h2><ul>'+''.join('<li>'+html.escape(note)+'</li>' for note in notes)+'</ul>'
-    page += '<p>CSV and HTML retain every stored numerical digit. Plot MSE labels use exact floating-point representations.</p></body></html>'
+    page += '<p>Plots and tables use two decimals, with scientific notation for MSE and small values. Integer sample counts remain exact. CSV and JSON retain full numerical precision.</p></body></html>'
     (root/'paper_values.html').write_text(page, encoding='utf-8')
     return {'figures': figure_names, 'csv_files': list(csvs), 'html': 'paper_values.html'}

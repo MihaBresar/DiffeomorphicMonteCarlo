@@ -101,7 +101,7 @@ class MetropolisKernel:
         return probability, accepted
 
 
-def run_metropolis(target, algorithm, mapping, config, seed, seconds=None):
+def run_numpy_metropolis(target, algorithm, mapping, config, seed, seconds=None):
     kernel = MetropolisKernel(target, algorithm, mapping, seed)
     scale = config.get('initial_scale', .1)
     adapter = DualAveraging(scale)
@@ -141,6 +141,25 @@ def run_metropolis(target, algorithm, mapping, config, seed, seconds=None):
                    'acceptance_rate': accepted/iterations, 'frozen_scale': scale,
                    'log_density_evaluations': kernel.evaluations-warmup_evaluations,
                    'warmup_log_density_evaluations': warmup_evaluations, 'adaptation_during_sampling': False}
+
+
+def make_metropolis_runner(target, algorithm, mapping, config):
+    """Select the native backend before a worker enters the start barrier."""
+    from .compiled_sampling import ALGORITHMS, KINDS, CompiledRunner
+    if target.kind in KINDS and algorithm in ALGORITHMS:
+        return CompiledRunner(target, algorithm, mapping, config)
+    return None
+
+
+def run_metropolis(target, algorithm, mapping, config, seed, seconds=None):
+    from .burnin import discard_burnin
+    runner = make_metropolis_runner(target, algorithm, mapping, config)
+    if runner is None:
+        draws, record = run_numpy_metropolis(target, algorithm, mapping, config, seed, seconds)
+        record['backend_note'] = 'Python fallback: target or transition has no compiled implementation'
+    else:
+        draws, record = runner.run(seed, seconds)
+    return discard_burnin(draws, record, config)
 
 
 class BlackJAXRunner:
@@ -200,7 +219,7 @@ class BlackJAXRunner:
         draws = np.asarray(self.target.physical(raw[c['thin']-1::c['thin']]))
         if len(draws) < 4 or not np.all(np.isfinite(draws)):
             raise RuntimeError('Insufficient or nonfinite NUTS draws')
-        return draws, {'algorithm': 'NUTS', 'implementation': 'BlackJAX', 'seed': seed,
+        record = {'algorithm': 'NUTS', 'implementation': 'BlackJAX', 'seed': seed,
             'iterations': len(raw), 'computed_iterations': count, 'retained_draws': len(draws), 'thin': c['thin'],
             'warmup_iterations': c['warmup'], 'warmup_seconds': warmup_seconds,
             'sampling_seconds': elapsed, 'requested_seconds': seconds,
@@ -210,6 +229,8 @@ class BlackJAXRunner:
             'gradient_evaluations': int(work.sum()), 'warmup_divergences': int(np.asarray(winfo[0]).sum()),
             'frozen_scale': float(parameters['step_size']), 'inverse_mass_matrix': np.asarray(parameters['inverse_mass_matrix']).tolist(),
             'adaptation_during_sampling': False}
+        from .burnin import discard_burnin
+        return discard_burnin(draws, record, c)
 
 
 class NumPyroRunner:
@@ -258,7 +279,7 @@ class NumPyroRunner:
         draws = np.asarray(self.target.physical(raw[c['thin']-1::c['thin']]))
         if len(draws) < 4 or not np.all(np.isfinite(draws)):
             raise RuntimeError('Insufficient or nonfinite NumPyro draws')
-        return draws, {'algorithm': 'NUTS', 'implementation': 'NumPyro', 'seed': seed,
+        record = {'algorithm': 'NUTS', 'implementation': 'NumPyro', 'seed': seed,
             'iterations': len(raw), 'retained_draws': len(draws), 'thin': c['thin'],
             'warmup_iterations': c['warmup'], 'warmup_seconds': warmup_seconds,
             'sampling_seconds': elapsed, 'acceptance_rate': float(acc.mean()),
@@ -268,3 +289,5 @@ class NumPyroRunner:
             'gradient_evaluations': int(work.sum()), 'frozen_scale': frozen_scale,
             'inverse_mass_matrix': np.asarray(final_state.adapt_state.inverse_mass_matrix).tolist(),
             'adaptation_during_sampling': False}
+        from .burnin import discard_burnin
+        return discard_burnin(draws, record, c)

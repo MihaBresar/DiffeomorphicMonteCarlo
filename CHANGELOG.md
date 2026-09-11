@@ -1,5 +1,13 @@
 # Changes
 
+## Native kernels across experiments, equal-time SCS and first-third burn-in
+
+- Compile all canonical DCS, HnR, ordinary random-walk and spherical comparison loops.
+- Keep tuning separate, freeze sampling kernels, and discard the first third of actual generated sampling iterations in every current experiment and generated reference chain.
+- Switch the default 100D skewed ν=3 comparison to equal time; keep super-heavy tails at equal iteration counts.
+- Display two decimal places and scientific MSE notation while retaining exact integer counts and full-precision exports.
+- Audit posterior comparison changes and measure native implementation speedups with paired benchmarks.
+
 ## Single 100D SCS comparison and compiled DCS
 
 - Simplified the default launcher to one skewed ν=3 comparison with DCS-RWM, DCS-BW and author SCS; previous audit choices are retired and their results retained.
