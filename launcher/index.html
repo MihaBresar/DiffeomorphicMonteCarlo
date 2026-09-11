@@ -17,8 +17,9 @@ const token=location.protocol==='file:'?null:__TOKEN__; if(token)document.getEle
 function useAllThreads(){document.getElementById('workers').value=cpuCapacity;describe()}
 function describe(){
   const audit=val('experiment')==='fixed-step-audit';
-  const chains=val('preset')==='quick'?2:val('preset')==='reproduce'?8:['skew-t-100d-fixed','logistic-regression','fixed-step-audit'].includes(val('experiment'))?20:50;
-  document.getElementById('concurrency-note').textContent='This selection runs up to '+Math.min(Number(val('workers')),chains)+' production chains at once. '+(val('experiment')==='all'&&val('preset')==='paper'?'The fixed-step and logistic experiments have 20 chains; the others have 50. ':'')+'CPU use falls during setup and when only the final chains remain.';
+  const chainsPerCase=val('preset')==='quick'?2:val('preset')==='reproduce'?8:['skew-t-100d-fixed','logistic-regression','fixed-step-audit'].includes(val('experiment'))?20:50;
+  const chains=audit?14*chainsPerCase:chainsPerCase;
+  document.getElementById('concurrency-note').textContent='This selection runs up to '+Math.min(Number(val('workers')),chains)+' production chains at once. '+(audit?'The audit shares a queue across all 14 diagnostic cases. ':val('experiment')==='all'&&val('preset')==='paper'?'The fixed-step and logistic experiments have 20 chains; the others have 50. ':'')+'CPU use falls during setup and when only the final chains remain.';
   document.getElementById('description').textContent=audit?'A separate diagnostic comparing old and current map fits, step-size schedules, vanilla DCS, and settings selected on independent pilot chains. It includes both map versions. Full settings use 20 chains of 500,000 production iterations per case; quick settings only check execution.':{quick:'A short execution check. These figures are not publication results.',reproduce:'Fewer chains and smaller budgets for an affordable reproduction. These are not the paper settings.',paper:'The manuscript-aligned configurations. All experiments can take several hours and several gigabytes. Logistic runs first prepare an independent reference.'}[val('preset')];
   document.getElementById('ball-map-policy').disabled=audit||document.getElementById('stop').disabled===false;
 }
