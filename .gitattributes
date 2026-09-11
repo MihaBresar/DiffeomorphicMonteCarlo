@@ -4,3 +4,5 @@
 *.json text eol=lf
 *.png binary
 *.pdf binary
+# Preserve the historical audit input exactly, including its mixed line endings.
+validation/legacy_fixed_step.py -text

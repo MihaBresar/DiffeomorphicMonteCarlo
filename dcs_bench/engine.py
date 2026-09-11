@@ -10,7 +10,7 @@ import subprocess
 import time
 import numpy as np
 from .targets import ROOT, Target
-from .tuning import fit_map
+from .tuning import fit_map, validate_ball_map_policy
 from .references import make_reference
 from .cpu import cpu_info, execution_plan, validate_workers
 from .parallel import launch_chains, compilation_summary
@@ -48,8 +48,7 @@ def load_config(name, preset='quick', overrides=None):
     if unused:
         raise ValueError(f'Overrides not used by {name}: {unused}')
     config.update({k: v for k, v in (overrides or {}).items() if v is not None})
-    if config.get('ball_scale_policy', 'fit') not in ('fit', 'sqrt-d'):
-        raise ValueError('Unknown ball scale policy')
+    config['ball_map_policy'] = validate_ball_map_policy(config)
     for field in ('runs', 'warmup', 'thin', 'iterations', 'nuts_samples', 'nuts_batch_size', 'reference_samples', 'reference_batch_size', 'optimizer_samples'):
         if config[field] <= 0:
             raise ValueError(f'{field} must be positive')
@@ -206,7 +205,7 @@ def run(config, output, resume=False, reference_dir=None):
                 for family, needed in [('ball', any(a.startswith('DCS') for a in config['algorithms'])),
                                        ('sphere', 'SCS' in config['algorithms'])]:
                     if needed:
-                        print(f'Fitting {family} map for scenario {s}', flush=True)
+                        print(f'Preparing {family} map for scenario {s}', flush=True)
                         mapping, meta = fit_map(target, config, family, config['seed']+s+811)
                         setup[family] = {'parameters': mapping.parameters(), 'optimization': meta}
                 write_json(setup_path, setup)

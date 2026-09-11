@@ -63,9 +63,19 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
    the full-precision MSE and sample-count values. Supplementary diagnostics
    appear in a separate collapsed section.
 
-The **DCS map scale** selector also lets you compare the proposed fixed R=√d
-fit with the default fit of R. Each choice starts a separate configuration;
-the fixed-R experiment is not the default manuscript setting.
+The **DCS map** selector offers **Möbius map**, which fits R, centre and Möbius
+parameters by VI, and **Vanilla map**, which uses untuned R=1, centre=0 and
+Möbius=0. Both keep the experiment's β and the same proposal-scale warmup.
+
+The additional **100D: DCS/SCS map and tuning audit** experiment compares both
+versions automatically, including step sizes chosen on separate pilot chains.
+Use Quick check first, then Full paper settings for 20 chains of 500,000
+production iterations in each diagnostic case. Its exact-value tables and
+all-case plots appear automatically. See [what this audit measures](FIXED_STEP_AUDIT.md).
+Select one choice and start a fresh run; repeat with the other choice and the
+same experiment, run size and worker count for an ablation. The figures and
+exact-value tables identify the chosen map. SCS fitting and the identity maps
+in Eight Schools and GARCH are unchanged. Fixed R=√d is no longer offered.
 
 Selecting 32 workers does not change the number of chains. A smaller reproduction
 uses at most eight workers, a quick check two, and logistic reference preparation

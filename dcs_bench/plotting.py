@@ -59,9 +59,22 @@ def write_csv(path, rows):
         writer.writerows(rows)
 
 
+def ball_map_description(config):
+    if config.get('targets') and all(t['kind'] in ('garch', 'eight_schools') for t in config['targets']):
+        return 'posterior identity map'
+    if config.get('ball_scale_policy') == 'sqrt-d':
+        return 'historical fixed R=√d'
+    if config.get('ball_map_policy') == 'vanilla':
+        return 'vanilla: R=1, centre=0, Möbius=0'
+    return 'Möbius VI'
+
+
 def method_labels(algorithms, config):
-    scale_note = ', R=√d' if config.get('ball_scale_policy') == 'sqrt-d' else ''
-    return [f'{a} (β={config["beta"]:g}{scale_note})' if a.startswith('DCS') else
+    description = ball_map_description(config)
+    map_note = ', R=√d' if description == 'historical fixed R=√d' else \
+        ', vanilla' if config.get('ball_map_policy') == 'vanilla' and description != 'posterior identity map' else \
+        ', Möbius VI' if config.get('ball_map_policy') == 'mobius' and description != 'posterior identity map' else ''
+    return [f'{a} (β={config["beta"]:g}{map_note})' if a.startswith('DCS') else
             f'SCS (l₀={config["latitude"]:.2f})' if a == 'SCS' else
             'RWM Stable (α=0.5)' if a == 'RWM-stable' else a.replace('-', ' ')
             for a in algorithms]
@@ -196,6 +209,8 @@ def export_paper_values(output, config, all_summary):
         ref = scenario['reference']
         for a, summary in scenario['algorithms'].items():
             counts = dict(experiment=config['experiment'], preset=config['preset'], scenario=s,
+                ball_map_policy=config.get('ball_map_policy', 'historical-fixed-scale' if config.get('ball_scale_policy') == 'sqrt-d' else 'mobius'),
+                ball_map_description=ball_map_description(config),
                 ball_scale_policy=config.get('ball_scale_policy', 'fit'),
                 algorithm=a, chains=config['runs'], total_iterations=summary['total_iterations'],
                 mean_iterations=summary['mean_iterations'], mean_iterations_exact=str(Fraction(summary['total_iterations'], config['runs'])),
@@ -222,7 +237,7 @@ def export_paper_values(output, config, all_summary):
             '.scroll{overflow:auto}td{font-variant-numeric:tabular-nums}</style>'
             f'<h1>{html.escape(config["experiment"])}: exact plotted values</h1>'
             f'<p>Run size: <strong>{html.escape(config["preset"])}</strong>. '
-            f'DCS map scale policy: <strong>{html.escape(config.get("ball_scale_policy", "fit"))}</strong>. '
+            f'DCS map: <strong>{html.escape(ball_map_description(config))}</strong>. '
             'MSE is the average of independent-chain squared errors. Iterations include repeats after rejection; '
             'retained samples are after warmup and thinning. These are finite numerical estimates, '
             'printed at round-trip floating-point precision, not exact population quantities.</p>'
@@ -315,7 +330,8 @@ def rebuild(output):
     if config['experiment'] == 'logistic-regression':
         fig, axes = plt.subplots(len(all_data), len(config['algorithms']), figsize=(12, 10), squeeze=False)
         fig.suptitle(r'Q–Q Plot of $\beta_1$ in Robust Logistic Regression'+
-                     ('\nFixed R=√d comparison' if config.get('ball_scale_policy') == 'sqrt-d' else ''), fontsize=16)
+                     ('\n'+ball_map_description(config) if config.get('ball_scale_policy') == 'sqrt-d'
+                      or config.get('ball_map_policy') == 'vanilla' else ''), fontsize=16)
         qq_rows = []
         for row, (target, ref, data) in enumerate(all_data):
             truth = np.array(ref['quantiles'])[:, 0]

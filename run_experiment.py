@@ -36,8 +36,9 @@ def parser():
         p.add_argument('--'+name, type=int)
     p.add_argument('--time-budget', type=float)
     p.add_argument('--nuts-target-accept', type=float)
-    p.add_argument('--ball-scale-policy', choices=['fit', 'sqrt-d'],
-                   help='Fit DCS scale by VI, or fix R=sqrt(d) while fitting centre and Möbius parameters')
+    p.add_argument('--ball-map-policy', choices=['mobius', 'vanilla'],
+                   help='Fit R, centre and Möbius parameters by VI, or use the untuned map R=1, centre=0, Möbius=0')
+    p.add_argument('--ball-scale-policy', help=argparse.SUPPRESS)
     return p
 
 

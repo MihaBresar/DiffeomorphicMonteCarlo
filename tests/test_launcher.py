@@ -10,12 +10,22 @@ from dcs_bench.cpu import cpu_info
 
 
 class LauncherTests(unittest.TestCase):
-    def test_scale_policy_reaches_production_not_reference_generation(self):
-        commands = launcher.commands_for_run('paper', 'logistic-regression', Path('results/test'), ball_scale_policy='sqrt-d')
-        self.assertNotIn('--ball-scale-policy', commands[0])
-        self.assertEqual(commands[1][commands[1].index('--ball-scale-policy')+1], 'sqrt-d')
+    def test_tuning_audit_runs_separate_fresh_pipeline(self):
+        command, = launcher.commands_for_run('quick', 'fixed-step-audit', Path('results/test'))
+        self.assertIn(str(launcher.ROOT/'scripts/audit_fixed_steps.py'), command)
+        self.assertEqual(command[command.index('--preset')+1], 'quick')
+        self.assertNotIn('--ball-map-policy', command)
         with self.assertRaises(ValueError):
-            launcher.commands_for_run('paper', 'all', Path('results/test'), ball_scale_policy='invalid')
+            launcher.commands_for_run('quick', 'fixed-step-audit', Path('results/test'), resume=True)
+
+    def test_map_policy_reaches_production_not_reference_generation(self):
+        commands = launcher.commands_for_run('paper', 'logistic-regression', Path('results/test'), ball_map_policy='vanilla')
+        self.assertNotIn('--ball-map-policy', commands[0])
+        self.assertEqual(commands[1][commands[1].index('--ball-map-policy')+1], 'vanilla')
+        command, = launcher.commands_for_run('paper', 'all', Path('results/test'), ball_map_policy='vanilla')
+        self.assertEqual(command[command.index('--ball-map-policy')+1], 'vanilla')
+        with self.assertRaises(ValueError):
+            launcher.commands_for_run('paper', 'all', Path('results/test'), ball_map_policy='sqrt-d')
 
     def test_logistic_reference_precedes_sampling_and_resumes(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -59,7 +69,8 @@ class LauncherTests(unittest.TestCase):
             folder = Path(tmp)/'saved-paper-run'
             folder.mkdir()
             workers = min(2, cpu_info()['capacity'])
-            (folder/'launcher-run.json').write_text(json.dumps({'preset': 'paper', 'experiment': 'garch11', 'workers': workers}))
+            (folder/'launcher-run.json').write_text(json.dumps({'preset': 'paper', 'experiment': 'garch11', 'workers': workers,
+                                                              'ball_map_policy': 'vanilla'}))
             result = folder/'garch11'
             result.mkdir()
             (result/'manifest.json').write_text('{}')
@@ -71,6 +82,7 @@ class LauncherTests(unittest.TestCase):
                 self.assertIn('--resume', command)
                 self.assertEqual(command[command.index('--preset')+1], 'paper')
                 self.assertEqual(command[command.index('--workers')+1], str(workers))
+                self.assertEqual(command[command.index('--ball-map-policy')+1], 'vanilla')
                 for invalid in ('..', '.', '../saved-paper-run', '/tmp'):
                     with self.assertRaises(ValueError):
                         controller.run(run_id=invalid)

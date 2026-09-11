@@ -70,13 +70,14 @@ DCS had lower mean-norm MSE with fresh VI in this check. SCS retained the lowest
 tail-probability MSE. This is why restoring the implementation cannot establish
 that DCS wins every metric; all outcomes must remain visible.
 
-## Fixed R=√d comparison
+## Historical fixed R=√d comparison
 
-The launcher offers **DCS map scale → Compare fixed R=√d**. The CLI equivalent
-is `--ball-scale-policy sqrt-d`. This holds the ball scale fixed while VI fits
-the centre and Möbius parameters. SCS continues its own map fit, and the identity
-maps in the two PosteriorDB experiments are unchanged. The default remains a
-joint VI fit of R, centre and Möbius shift. Every configuration records the policy.
+This earlier audit held the ball scale at R=√d while VI fitted the centre and
+Möbius parameters. SCS continued its own map fit, and the identity maps in the
+two PosteriorDB experiments were unchanged. This option has since been removed
+from new runs at the author's request. The launcher now offers a joint Möbius VI
+fit or a fully untuned vanilla map (R=1, centre=0 and Möbius=0). Historical
+fixed-R results and their labels remain readable through plot-only.
 
 With fresh VI and the same eight seeds and 25,000-step budgets, the check gave:
 
@@ -91,7 +92,7 @@ The second functional is mean norm for ν=3 and mean log₁₀(1+norm) for ν=0.
 These short checks argue against making fixed R=√d the default for these targets.
 Fixing R is a valid tuning experiment, not a change in the target distribution.
 In particular, R=√d can be badly mismatched to the β=0.2 map's extreme radial
-expansion. Test it as a separate run rather than replacing all paper settings.
+expansion. These results are historical comparisons, not runs of the new vanilla option.
 
 ## Other differences from the old scripts
 

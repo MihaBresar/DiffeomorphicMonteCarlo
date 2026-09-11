@@ -10,6 +10,14 @@ All proposal adaptation stops at the end of warmup. The fixed-iteration experime
 
 Synthetic map fitting is shared across chains and the resulting results are conditional on that fit. Optimizer seeds, settings, all training losses and fitted map parameters are saved. For per-method total-cost reporting, the full corresponding fit/compilation cost is amortized over that method's chains. Fitting once is not equivalent to independently rerunning the entire fitting pipeline for every replicate.
 
+Each new configuration records `ball_map_policy`: `mobius` fits DCS map parameters
+by VI; `vanilla` skips map training and uses R=1, centre=0 and Möbius=0. Vanilla
+retains the configured β and records zero optimizer steps and training draws.
+The proposal-scale warmup procedure and the SCS comparator are the same for both
+choices. The two PosteriorDB experiments retain their identity maps regardless
+of this selector. Use separate run folders for map ablations; the figures and
+exact-value tables identify the selected map.
+
 Posterior DCS receives the mean **production** time of the fixed-count NUTS runs; setup is reported separately for both. The quick profile alone imposes a one-second minimum DCS budget to ensure a useful execution check. Quick posterior comparisons therefore do not represent an equal-time experiment.
 
 `summary.json` and `chain_metrics.csv` report production cost and amortized complete cost. NUTS work counters count integrator steps (gradient evaluations inside trajectories); initialization, warmup and compilation are reported separately and are not silently included in that count. NumPyro's tree-saturation flag detects a full tree through its recorded step count; it is not an exact count of every trajectory that entered the final doubling level.

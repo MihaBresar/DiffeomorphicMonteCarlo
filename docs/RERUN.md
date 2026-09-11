@@ -1,5 +1,11 @@
 # What must be rerun
 
+**Möbius versus fully untuned vanilla, and the fixed-step tuning audit:** start
+a fresh run with the desired **DCS map** choice, or select the separate
+**100D: DCS/SCS map and tuning audit** to run all diagnostic comparisons.
+These require new chains. The original figures and exact-number tables are
+still generated; see [the controlled audit findings](FIXED_STEP_AUDIT.md).
+
 **Windows queue failure (`*.worker-*.json` missing):** download the updated
 repository and start a fresh run; see [the no-command update steps](WINDOWS_QUEUE_FIX.md).
 Completed runs need no new sampling for this queue-only fix.
@@ -10,10 +16,17 @@ Fresh launcher runs generate all original plot families and exact-number tables
 automatically; see [the figure guide](FIGURES.md).
 
 **To measure the faster kernels, new CPU scheduling, a different worker count,
-or fixed-R tuning, start a new run.** Select **Full paper settings**, the desired
+or a different DCS map, start a new run.** Select **Full paper settings**, the desired
 worker count, and **Start run**. Keep old results folders for comparison.
 Do not resume an old run with these changed execution conditions. Full paper
 figures have not been precomputed on your Ryzen; they must come from that run.
+
+To compare map fitting with a fully untuned map, select **DCS map → Möbius map**
+or **Vanilla map** and start a separate run for each. Keep the experiment, run
+size and worker count the same. The CLI equivalents are `--ball-map-policy mobius`
+and `--ball-map-policy vanilla`. Vanilla fixes R=1 and both centre and Möbius
+parameters to zero, preserving β and proposal-scale warmup. Fixed R=√d is no
+longer available for new runs; its saved figures remain readable with plot-only.
 
 ## Earlier scientific corrections
 

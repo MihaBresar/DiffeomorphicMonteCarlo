@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 import numpy as np
 from numpy.testing import assert_allclose
 from scipy import integrate, linalg, special, stats
@@ -54,19 +55,55 @@ class ScientificTests(unittest.TestCase):
                 assert_allclose(actual[0], expected[0], atol=1e-12)
                 np.testing.assert_array_equal(fast.state, oracle.state)
 
-    def test_fixed_sqrt_dimension_scale_still_fits_centre_and_mobius(self):
+    def test_vanilla_map_skips_all_training_and_scale_initialization(self):
         from dcs_bench.tuning import fit_map
         target = Target({'kind': 'skew_t', 'dimension': 3, 'nu': 3, 'alpha': {'0': 2}})
-        config = load_config('skew-t-100d-fixed', 'quick', {'optimizer_steps': 5, 'ball_scale_policy': 'sqrt-d'})
+        # No optimizer settings are needed: vanilla must bypass the optimizer.
+        config = {'beta': .2, 'ball_map_policy': 'vanilla', 'map_scale_initialization': 'radial_median'}
+        with patch('dcs_bench.tuning.uniform_ball', side_effect=AssertionError('Vanilla must not draw VI samples')), \
+                patch.object(target, 'log_prob', side_effect=AssertionError('Vanilla must not evaluate a VI objective')):
+            mapping, metadata = fit_map(target, config, 'ball', 581)
+        self.assertEqual(mapping.scale, 1.)
+        self.assertEqual(mapping.beta, .2)
+        assert_allclose(mapping.mu, np.zeros(3), atol=0)
+        assert_allclose(mapping.delta, np.zeros(3), atol=0)
+        self.assertEqual(metadata['map_policy'], 'vanilla')
+        self.assertEqual(metadata['steps'], 0)
+        self.assertEqual(metadata['total_training_draws'], 0)
+        self.assertEqual(metadata['loss'], [])
+
+    def test_mobius_fits_all_parameters_and_vanilla_does_not_change_scs(self):
+        from dcs_bench.tuning import fit_map
+        target = Target({'kind': 'skew_t', 'dimension': 3, 'nu': 3, 'alpha': {'0': 2}})
+        config = load_config('skew-t-100d-fixed', 'quick', {'optimizer_steps': 5})
+        self.assertEqual(config['ball_map_policy'], 'mobius')
         mapping, metadata = fit_map(target, config, 'ball', 581)
-        self.assertEqual(mapping.scale, np.sqrt(3))
+        self.assertNotEqual(mapping.scale, metadata['initial_scale'])
         self.assertGreater(np.linalg.norm(mapping.mu), 0)
         self.assertGreater(np.linalg.norm(mapping.delta), 0)
-        self.assertEqual(metadata['scale_policy'], 'fixed sqrt(d)')
+        self.assertEqual(metadata['map_policy'], 'mobius')
         self.assertEqual(metadata['batch_policy'], 'fresh')
         self.assertEqual(metadata['total_training_draws'], 5*config['optimizer_samples'])
         repeated, _ = fit_map(target, config, 'ball', 581)
         self.assertEqual(mapping.parameters(), repeated.parameters())
+        scs_mobius, _ = fit_map(target, config, 'sphere', 581)
+        scs_vanilla, _ = fit_map(target, dict(config, ball_map_policy='vanilla'), 'sphere', 581)
+        self.assertEqual(scs_mobius.parameters(), scs_vanilla.parameters())
+
+    def test_removed_scale_policy_rejected_and_posterior_maps_unchanged(self):
+        from dcs_bench.tuning import fit_map
+        for policy in ('sqrt-d', 'unknown'):
+            with self.assertRaisesRegex(ValueError, 'removed for new runs'):
+                load_config('skew-t-100d-fixed', 'quick', {'ball_scale_policy': policy})
+        with self.assertRaisesRegex(ValueError, 'mobius or vanilla'):
+            load_config('skew-t-100d-fixed', 'quick', {'ball_map_policy': 'unknown'})
+        for name in ('eight-schools', 'garch11'):
+            config = load_config(name, 'quick')
+            target = Target(config['targets'][0])
+            fitted, _ = fit_map(target, config, 'ball', 581)
+            vanilla, metadata = fit_map(target, dict(config, ball_map_policy='vanilla'), 'ball', 581)
+            self.assertEqual(fitted.parameters(), vanilla.parameters())
+            self.assertEqual(metadata['map_policy'], 'posterior-identity')
 
     def test_public_api_returns_fixed_kernel_draws(self):
         draws, info = sample(lambda x: -2.5*np.log1p(x@x/3), np.zeros(2), draws=200, warmup=100, seed=18)

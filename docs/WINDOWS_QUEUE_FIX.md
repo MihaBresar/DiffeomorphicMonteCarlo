@@ -29,6 +29,10 @@ no need to copy its environment or interrupted run into the new project.
 
 ## Advanced command-line compatibility
 
+The exception below documents the earlier queue-only release. The subsequent
+map-choice/scientific source update requires a fresh run; it does not extend
+that exception. The current launcher starts fresh runs.
+
 The compatibility exception applies only to the exact registered queue fix
 from release `0a87f3d20045c19d6cd866a2b4de1dc37dc6764b`. Resume still checks the
 configuration, scientific source files, Python/packages and hardware settings.

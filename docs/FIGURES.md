@@ -4,6 +4,11 @@ The original figure families are restored. The corrected saved chains and
 references determine the numbers; old paper values are never pasted into new
 results. Both fixed-time and fixed-iteration designs remain in the repository.
 
+New DCS labels identify the selected map as **Möbius VI** or **vanilla**. Vanilla
+means R=1, centre=0 and Möbius=0, with the experiment's β unchanged. Exact-value
+tables record the policy and its parameter meaning. The two PosteriorDB targets
+keep their identity maps. Old fixed-R=√d results retain their historical labels.
+
 | Main paper file | Panels, in their original order |
 |---|---|
 | `NUTS_PBW_vs` | Radial tail and norm boxplots with numerical reference lines |

@@ -27,10 +27,7 @@ def fit_map(target, config, family, seed):
     start = time.perf_counter()
     d, beta = target.d, config['beta']
     latitude = config.get('latitude', 1.1)
-    scale_policy = config.get('ball_scale_policy', 'fit')
-    if scale_policy not in ('fit', 'sqrt-d'):
-        raise ValueError('ball_scale_policy must be fit or sqrt-d')
-    fixed_scale = family == 'ball' and scale_policy == 'sqrt-d'
+    map_policy = validate_ball_map_policy(config)
     batch_policy = config.get('vi_batch_policy', 'fresh')
     if batch_policy not in ('fresh', 'fixed'):
         raise ValueError('vi_batch_policy must be fresh or fixed')
@@ -38,7 +35,15 @@ def fit_map(target, config, family, seed):
     # canonical unconstrained coordinates documented in TARGETS.md.
     if target.kind in ('garch', 'eight_schools'):
         mapping = BallMap(d, beta)
-        return mapping, {'seconds': time.perf_counter()-start, 'steps': 0, 'loss': []}
+        return mapping, {'seconds': time.perf_counter()-start, 'steps': 0, 'loss': [], 'map_policy': 'posterior-identity'}
+    if family == 'ball' and map_policy == 'vanilla':
+        # This ablation bypasses VI and radial-median initialization entirely.
+        # Proposal-scale warmup is unchanged and is handled by the sampler.
+        mapping = BallMap(d, beta)
+        return mapping, {'seconds': time.perf_counter()-start, 'steps': 0, 'loss': [],
+                         'map_policy': 'vanilla', 'scale_policy': 'unit',
+                         'training_draws': 0, 'total_training_draws': 0,
+                         'objective': None, 'seed': seed}
     import jax
     import jax.numpy as jnp
     jax.config.update('jax_enable_x64', True)
@@ -59,8 +64,6 @@ def fit_map(target, config, family, seed):
         else:
             mapped_radius = np.linalg.norm(base[:, :-1], axis=1)*latitude/(latitude-1-base[:, -1])
         initial_scale = radial_median/np.median(mapped_radius)
-    if fixed_scale:
-        initial_scale = np.sqrt(d)
     base = jnp.asarray(base)
     symmetric = target.kind == 'skew_t' and not np.any(target.alpha)
     limit = .999 if family == 'ball' else .999*np.sqrt(1-(latitude-1)**2)
@@ -70,7 +73,7 @@ def fit_map(target, config, family, seed):
         raw = jnp.zeros(d) if symmetric else p[d:2*d]
         # Smooth at zero; maps R^d strictly inside the admissible ball.
         shift = limit*raw/jnp.sqrt(1+jnp.sum(raw*raw))
-        return mu, shift, jnp.asarray(initial_scale) if fixed_scale else jnp.exp(p[-1])
+        return mu, shift, jnp.exp(p[-1])
 
     def objective(p, base):
         mu, shift, scale = unpack(p)
@@ -112,10 +115,20 @@ def fit_map(target, config, family, seed):
     return mapping, {'seconds': time.perf_counter()-start, 'steps': config['optimizer_steps'],
                      'training_draws': n, 'seed': seed, 'loss': history,
                      'initial_scale': initial_scale, 'scale_initialization': config.get('map_scale_initialization', 'unit'),
-                     'scale_policy': 'fixed sqrt(d)' if fixed_scale else 'VI-fitted',
+                     'scale_policy': 'VI-fitted', 'map_policy': map_policy if family == 'ball' else 'sphere-vi',
                      'objective': 'reverse KL on independent base draws', 'batch_policy': batch_policy,
                      'total_training_draws': n*max(1, config['optimizer_steps']) if batch_policy == 'fresh' else n,
                      'symmetric_constraints': symmetric}
+
+
+def validate_ball_map_policy(config):
+    if config.get('ball_scale_policy', 'fit') != 'fit':
+        raise ValueError('The fixed R=sqrt(d) option has been removed for new runs. '
+                         'Choose ball_map_policy="mobius" or "vanilla"; saved results still support plot-only.')
+    policy = config.get('ball_map_policy', 'mobius')
+    if policy not in ('mobius', 'vanilla'):
+        raise ValueError('ball_map_policy must be mobius or vanilla')
+    return policy
 
 
 class DualAveraging:

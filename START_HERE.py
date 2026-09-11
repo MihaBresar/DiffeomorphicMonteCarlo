@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent
 RUNS = ROOT/'results'/'click-runs'
 PRESETS = ('quick', 'reproduce', 'paper')
 EXPERIMENTS = ('all', 'skew-t-200d-nuts', 'skew-t-200d-baselines', 'skew-t-100d-fixed',
-               'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression')
+               'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression', 'fixed-step-audit')
 
 
 def environment_python():
@@ -71,15 +71,20 @@ def environment_ready():
         return False
 
 
-def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1, ball_scale_policy='fit'):
+def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1, ball_map_policy='mobius'):
     if preset not in PRESETS or experiment not in EXPERIMENTS:
         raise ValueError('Choose a listed preset and experiment')
     if not plot_only:
         validate_workers(workers)
-        if ball_scale_policy not in ('fit', 'sqrt-d'):
-            raise ValueError('Choose a listed DCS map scale policy')
+        if ball_map_policy not in ('mobius', 'vanilla'):
+            raise ValueError('Choose a listed DCS map policy')
     py = str(environment_python())
     directory = Path(directory)
+    if experiment == 'fixed-step-audit':
+        if resume or plot_only:
+            raise ValueError('The tuning audit starts from scratch in a new results folder.')
+        return [[py, '-u', str(ROOT/'scripts/audit_fixed_steps.py'), '--preset', preset,
+                 '--workers', str(workers), '--output-dir', str(directory/experiment)]]
     if experiment == 'all':
         command = [py, '-u', str(ROOT/'scripts/reproduce_all.py'), '--preset', preset, '--output-root', str(directory)]
         if plot_only:
@@ -87,7 +92,7 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
         elif resume:
             command.append('--resume')
         if not plot_only:
-            command += ['--workers', str(workers), '--ball-scale-policy', ball_scale_policy]
+            command += ['--workers', str(workers), '--ball-map-policy', ball_map_policy]
         return [command]
     result = directory/experiment
     if plot_only:
@@ -101,7 +106,7 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
         commands.append(command)
     command = [py, '-u', str(ROOT/'run_experiment.py'), experiment, '--preset', preset,
                '--output-dir', str(result), '--reference-dir', str(reference), '--workers', str(workers),
-               '--ball-scale-policy', ball_scale_policy]
+               '--ball-map-policy', ball_map_policy]
     if resume and (result/'manifest.json').exists():
         command.append('--resume')
     commands.append(command)
@@ -201,7 +206,7 @@ class Controller:
                 raise RuntimeError('Environment validation failed; see installation output above')
         self.start_job(work, 'Setting up the environment…')
 
-    def run(self, preset='quick', experiment='all', run_id=None, plot_only=False, workers=1, ball_scale_policy='fit'):
+    def run(self, preset='quick', experiment='all', run_id=None, plot_only=False, workers=1, ball_map_policy='mobius'):
         if not self.ready:
             raise ValueError('Click Set up environment first')
         if run_id:
@@ -211,16 +216,18 @@ class Controller:
             saved = json.loads((directory/'launcher-run.json').read_text())
             preset, experiment = saved['preset'], saved['experiment']
             workers = saved.get('workers', 1)
-            ball_scale_policy = saved.get('ball_scale_policy', 'fit')
+            ball_map_policy = saved.get('ball_map_policy', 'mobius')
+            if not plot_only and saved.get('ball_scale_policy', 'fit') != 'fit':
+                raise ValueError('The fixed R=sqrt(d) option has been removed. Start a new run with a Möbius or vanilla map.')
         else:
             run_id = datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'-'+preset
             directory = RUNS/run_id
         commands = commands_for_run(preset, experiment, directory, resume=bool(run_id and directory.exists()),
-                                    plot_only=plot_only, workers=workers, ball_scale_policy=ball_scale_policy)
+                                    plot_only=plot_only, workers=workers, ball_map_policy=ball_map_policy)
         def work():
             directory.mkdir(parents=True, exist_ok=True)
             (directory/'launcher-run.json').write_text(json.dumps({'preset': preset, 'experiment': experiment,
-                'workers': workers, 'ball_scale_policy': ball_scale_policy}, indent=2)+'\n')
+                'workers': workers, 'ball_map_policy': ball_map_policy}, indent=2)+'\n')
             self.current_run = run_id
             with (directory/'launcher.log').open('a', encoding='utf-8') as logfile:
                 for command in commands:
@@ -301,7 +308,7 @@ def make_handler(controller, token):
                 data = json.loads(self.rfile.read(size) or b'{}')
                 if self.path == '/setup': controller.setup()
                 elif self.path == '/run': controller.run(data.get('preset', 'quick'), data.get('experiment', 'all'),
-                    workers=data.get('workers', 1), ball_scale_policy=data.get('ball_scale_policy', 'fit'))
+                    workers=data.get('workers', 1), ball_map_policy=data.get('ball_map_policy', 'mobius'))
                 elif self.path == '/resume': controller.run(run_id=data['id'])
                 elif self.path == '/replot': controller.run(run_id=data['id'], plot_only=True)
                 elif self.path == '/show':
