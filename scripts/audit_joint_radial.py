@@ -40,7 +40,7 @@ PRESETS = {
         pilot_seconds=.02, pilot_burn=50, optimizer_steps=20, optimizer_samples=128,
         probe_chains=2, probe_steps=100),
     'reproduce': dict(runs=8, time_budget=5., warmup=1000, thin=10, pilot_chains=4,
-        pilot_seconds=.15, pilot_burn=1000, optimizer_steps=400, optimizer_samples=500,
+        pilot_seconds=.5, pilot_burn=1000, optimizer_steps=400, optimizer_samples=500,
         probe_chains=2, probe_steps=2000),
     'paper': dict(runs=20, time_budget=20., warmup=1500, thin=50, pilot_chains=4,
         pilot_seconds=.5, pilot_burn=2000, optimizer_steps=1500, optimizer_samples=2000,

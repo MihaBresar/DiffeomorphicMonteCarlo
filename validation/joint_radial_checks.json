@@ -49,5 +49,14 @@
   "local_unit_tests": 76,
   "quick_end_to_end": "passed",
   "preserved_canonical_kernel_decisions": "DCS-BW and SCS checked transition by transition, including RNG state",
-  "github_ci": "Windows and Linux checks run on each main-branch push"
+  "github_ci": "Windows and Linux checks run on each main-branch push",
+  "full_run_source_commit": "e0164cfd6904ab8a7e9a34d580c5164f2c7d4856",
+  "subsequent_runner_change": "Only reproduce.pilot_seconds increased from 0.15 to 0.5; paper and quick settings and sampling algorithms unchanged.",
+  "smaller_reproduction_end_to_end": {
+    "status": "passed",
+    "production_chains": 128,
+    "pilot_chains": 1024,
+    "pilot_seconds_per_chain": 0.5,
+    "summary_sha256": "5c907925845ace2dbb88be42bff283abc92ecda87102d1092f3d757d2a374289"
+  }
 }

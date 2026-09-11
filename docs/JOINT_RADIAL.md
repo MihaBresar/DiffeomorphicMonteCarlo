@@ -81,7 +81,7 @@ the same worker allocation, including the last partial wave.
 | Preset | Pilot chains per (R, step) | Discarded steps per chain | Timed pilot sampling per chain |
 |---|---:|---:|---:|
 | Quick check | 2 | 50 | 0.02 s |
-| Smaller reproduction | 4 | 1,000 | 0.15 s |
+| Smaller reproduction | 4 | 1,000 | 0.5 s |
 | Full paper settings | 4 | 2,000 | 0.5 s |
 
 Each method has 8×8 candidates on each target. Thus full settings allocate 256
@@ -90,6 +90,10 @@ method on each target, plus the same discarded-step budget. Methods can perform
 different numbers of iterations during that time. Actual times and deadline
 overshoots are recorded; map fitting and discarded sampling have separate
 costs. Equal sampling time does not imply exactly equal total preparation time.
+
+Smaller reproduction retains the full pilot sampling duration because shorter
+pilots can miss all tail visits at large R. It remains smaller through fewer VI
+updates, fewer discarded steps, fewer production chains and shorter production.
 
 The selection score is the smaller of the rank-based bulk ESS values for
 **I(||X||≥50)** and **log(1+||X||)**, per second. More precisely, each functional's
@@ -223,3 +227,5 @@ The joint pilot rule did not improve every held-out error. In the skewed DCS run
 R=√101 performed poorly for both methods. In the symmetric DCS probes it reduced outside-ball rejection from 19935/40000 (49.8375%) to 582/40000 (1.455%), but density rejection increased from 5652/40000 (14.13%) to 33440/40000 (83.6%). Symmetric SCS had 6402/40000 initial cap crossings, zero final infeasible proposals, and 5807 accepted transitions after step-out. These categories explain why the first boundary crossing cannot be treated as the same event in the two methods.
 
 At ν=2, the mean-norm squared-error column is descriptive because the target norm has infinite variance. These results do not establish a universal ranking, and equal-time counts depend on the recorded hardware. All prior audit results remain separate and unchanged.
+
+The full run used [source revision e0164cf](https://github.com/MihaBresar/DiffeomorphicMonteCarlo/commit/e0164cfd6904ab8a7e9a34d580c5164f2c7d4856). The subsequent numerical-runner change only increased the smaller preset’s pilot time from 0.15 to 0.5 seconds; full-paper settings and sampling algorithms are unchanged. The recorded source fingerprints continue to identify the exact generating code.
