@@ -14,7 +14,7 @@ keep their identity maps. Old fixed-R=√d results retain their historical label
 | `NUTS_PBW_vs` | Radial tail and norm boxplots with numerical reference lines |
 | `VsRWM_NUTS` | Linear MSE bars for tail probability and mean norm |
 | `VsSCS` | Linear MSE bars for tail probability, mean norm, then average runtime |
-| `SuperInfiniteFirstTest` | Linear MSE bars for tail probability, mean log norm, then average iterations |
+| `SuperInfiniteFirstTest` | Linear MSE bars for tail probability, mean log norm, then average runtime at equal iterations |
 | `QQ-regresssion` | Two-by-two marginal Q–Q plots for β₁, with ν=4 and ν=6 |
 
 Every skew-t experiment also saves the original four-coordinate marginal Q–Q
@@ -27,7 +27,14 @@ Each skew-t run additionally saves `*_sample_counts`, showing mean generated
 iterations, mean retained samples, and mean production runtime. The fixed-step
 experiment has the same iterations per method by design; its runtime and MSE
 compare efficiency. Timed experiments compare the iterations and retained draws
-generated within the common wall-time budget, along with MSE.
+generated within the common wall-time budget, along with MSE. The super-heavy-tail
+50D target (ν=0.5) now uses equal production iterations: 500,000 per chain and
+50 chains per method under Full paper settings, retaining 50,000 draws per chain
+at thinning 10. Its original image basenames and plot families remain, with
+runtime replacing unequal iteration counts in the main figure's third panel.
+For this target the mean norm does not exist; its second MSE panel continues to
+estimate the finite mean of log₁₀(1+‖X‖), and the marginal quantile plots remain.
+Older timed results keep their recorded design when replotted.
 
 The original purple/orange/pink method colors, linear MSE axes, boxplots with
 mean lines, and Q–Q median lines with empirical 5–95% chain bands are retained.

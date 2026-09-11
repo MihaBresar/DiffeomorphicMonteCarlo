@@ -1,5 +1,21 @@
 # What must be rerun
 
+**Skewed Student-t at equal time:** select **100D skewed t: equal-time DCS/SCS**
+and start a fresh run. Full settings use ν=2, β=2 and 20 seconds per chain,
+with eight fitted/untuned and frozen/adaptive cases. Existing fixed-count
+chains cannot be rescaled into this comparison. See [the protocol](SKEW_T_TIMED.md).
+
+**Super-heavy tails at equal sample counts:** start a fresh **50D t: infinite
+first moment, equal samples** run. Full paper settings now give every method 500,000 production
+iterations per chain across 50 chains, after separate step-size warmup; each
+chain retains 50,000 draws at thinning 10. All proposal steps remain pretuned
+and frozen for production. The original `SuperInfiniteFirstTest` figure family
+and exact-number tables remain; the main figure's third panel now compares
+runtime. Tail probability, the finite mean log norm and marginal quantiles
+remain the estimands, because the untransformed mean norm does not exist at
+ν=0.5. Existing timed chains cannot supply this equal-count comparison through
+replotting. Keep them as the previous timed design and generate new chains.
+
 **Symmetric Student-t control with both maps untuned:** select **100D symmetric
 t: untuned maps and step tuning** in the launcher and start a fresh run.
 It generates all 12 map/step controls automatically, including radial-focused
@@ -54,7 +70,7 @@ It prepares independent logistic references, runs the seven experiments, generat
 | `NUTS_PBW_vs.png` | `skew-t-200d-nuts` | Shared exact target/transform, frozen tuning, synchronized timing, exact radial reference |
 | `VsRWM_NUTS.png` | `skew-t-200d-baselines` | Dimension corrected from 100 to 200, plus shared corrections |
 | `VsSCS.png` | `skew-t-100d-fixed` | ν corrected from 2 to 3; warmup separated from 500,000 frozen production steps |
-| `SuperInfiniteFirstTest.png` | `skew-t-50d-nu-0.5` | Target corrected to α=0; symmetric map constraints enforced |
+| `SuperInfiniteFirstTest.png` | `skew-t-50d-nu-0.5` | Equal production iterations; target α=0 and symmetric map constraints preserved |
 | `QQ-regresssion.png` | `logistic-regression` | 30-second budget and a separate independent reference, replacing the pooled reference |
 | Table: Eight Schools | `eight-schools` | Common log-τ coordinates, pinned reference draws, correct chain-level RMSE and timing |
 | Table: GARCH | `garch11` | Unintended conditional-uniform prior removed; correct four-parameter target, references and RMSE |

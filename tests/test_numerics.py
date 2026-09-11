@@ -257,7 +257,10 @@ class ScientificTests(unittest.TestCase):
     def test_paper_settings_and_checkpoint_integrity(self):
         self.assertEqual(load_config('skew-t-200d-baselines', 'paper')['targets'][0]['dimension'], 200)
         self.assertEqual(load_config('skew-t-100d-fixed', 'paper')['targets'][0]['nu'], 3)
-        self.assertEqual(load_config('skew-t-50d-nu-0.5', 'paper')['targets'][0]['alpha'], {})
+        heavy = load_config('skew-t-50d-nu-0.5', 'paper')
+        self.assertEqual(heavy['targets'][0]['alpha'], {})
+        self.assertEqual((heavy['mode'], heavy['iterations'], heavy['runs'], heavy['thin']),
+                         ('iterations', 500000, 50, 10))
         self.assertEqual(load_config('logistic-regression', 'paper')['time_budget'], 30)
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/'chain.npz'

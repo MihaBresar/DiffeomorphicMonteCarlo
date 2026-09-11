@@ -82,6 +82,30 @@ settings run 20 chains of 500,000 production iterations in each of 12 cases.
 Choose Quick check first, then Full paper settings. No map selection or commands
 are needed. See [the symmetric audit](SYMMETRIC_T_AUDIT.md).
 
+For an equal-time comparison of the paper's radial quantities, select **100D
+skewed t: equal-time DCS/SCS**. The target has 2 degrees of freedom and DCS uses
+β=2. The four map choices include fitted and fully untuned maps for both DCS
+and SCS. Each is tested with frozen steps and with continuously adaptive steps,
+giving eight cases; the map selector is disabled because every run includes
+all eight. Every case starts from a step pretuned on independent pilots. Frozen
+cases keep that step during production. Adaptive cases use the same smoothed
+dual-averaging rule for both methods, targeting acceptance 0.234 during warmup
+and production. The maps remain fixed in every case. Quick check uses 2 chains
+with 1 second of production sampling per
+chain, Smaller reproduction uses 8 chains with 5 seconds each, and Full paper
+settings uses 20 chains with 20 seconds each. The cases run separately in
+matched worker groups, with synchronized production starts after warmup.
+Sampling time is matched; map fitting, pilot tuning and warmup costs are
+reported separately. Open `paper_values.html` after completion for exact sample
+counts, tail-probability MSE and descriptive mean-norm squared errors based on every production iteration,
+including rejection repeats. Use the same worker count when comparing runs on
+the same computer. See [the complete equal-time protocol](SKEW_T_TIMED.md).
+
+The **50D t: infinite first moment, equal samples** experiment uses an equal
+number of production iterations instead. Full paper settings uses 500,000
+iterations per chain. Its mean norm is infinite, so it reports tail probability,
+the finite mean log norm and marginal quantiles.
+
 For the main experiments, select one DCS map choice and start a fresh run; repeat with the other choice and the
 same experiment, run size and worker count for an ablation. The figures and
 exact-value tables identify the chosen map. SCS fitting and the identity maps
@@ -90,10 +114,13 @@ in Eight Schools and GARCH are unchanged. Fixed R=√d is no longer offered.
 Selecting 32 workers does not change the number of chains. In the main
 experiments, a smaller reproduction uses at most eight workers, a quick check
 two, and logistic reference preparation four. Full paper experiments use at
-most 20 or 50 chains depending on the design. The two diagnostic audits queue
+most 20 or 50 chains depending on the design. The two iteration-based diagnostic audits queue
 cases together and can use more workers: the symmetric quick check has 24
 production jobs, and its full run has 240. Hardware capacity and the selected
-worker count still apply. The launcher displays the applicable production limit.
+worker count still apply. The equal-time skewed audit runs its eight cases
+separately, so it uses at most 2, 8 or 20 production workers in Quick check,
+Smaller reproduction or Full paper settings. The launcher displays the
+applicable production limit.
 
 Full paper runs can take many hours and several gigabytes. Keep the computer
 plugged in, awake, and available for the benchmark. Independent chains can run on

@@ -45,7 +45,7 @@
     "DCS-BW",
     "SCS"
   ],
-  "mode": "time",
+  "mode": "iterations",
   "figure": "SuperInfiniteFirstTest",
   "experiment": "skew-t-50d-nu-0.5",
   "preset": "paper",

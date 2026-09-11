@@ -1,0 +1,621 @@
+{
+  "schema_version": 1,
+  "registered_before_sampling": true,
+  "started_utc": "2026-09-11T09:00:21.214670+00:00",
+  "target": {
+    "kind": "skew_t",
+    "dimension": 100,
+    "nu": 2.0,
+    "alpha": {
+      "0": 100,
+      "1": -100
+    }
+  },
+  "config": {
+    "runs": 20,
+    "time_budget": 20.0,
+    "warmup": 1500,
+    "thin": 50,
+    "pilot_chains": 4,
+    "pilot_burn": 2000,
+    "pilot_retained": 8000,
+    "optimizer_steps": 1500,
+    "optimizer_samples": 2000,
+    "preset": "paper",
+    "workers": 8
+  },
+  "beta": 2.0,
+  "latitude": 1.1,
+  "threshold": 50.0,
+  "cases": [
+    {
+      "case": "mobius-DCS-BW-frozen",
+      "label": "DCS-BW: Mobius VI / frozen",
+      "algorithm": "DCS-BW",
+      "map_kind": "fitted",
+      "map_group": "mobius-DCS-BW",
+      "policy": "frozen"
+    },
+    {
+      "case": "mobius-DCS-BW-adaptive",
+      "label": "DCS-BW: Mobius VI / adaptive",
+      "algorithm": "DCS-BW",
+      "map_kind": "fitted",
+      "map_group": "mobius-DCS-BW",
+      "policy": "adaptive"
+    },
+    {
+      "case": "fitted-SCS-frozen",
+      "label": "SCS: fitted map / frozen",
+      "algorithm": "SCS",
+      "map_kind": "fitted",
+      "map_group": "fitted-SCS",
+      "policy": "frozen"
+    },
+    {
+      "case": "fitted-SCS-adaptive",
+      "label": "SCS: fitted map / adaptive",
+      "algorithm": "SCS",
+      "map_kind": "fitted",
+      "map_group": "fitted-SCS",
+      "policy": "adaptive"
+    },
+    {
+      "case": "vanilla-DCS-BW-frozen",
+      "label": "DCS-BW: untuned map / frozen",
+      "algorithm": "DCS-BW",
+      "map_kind": "untuned",
+      "map_group": "vanilla-DCS-BW",
+      "policy": "frozen"
+    },
+    {
+      "case": "vanilla-DCS-BW-adaptive",
+      "label": "DCS-BW: untuned map / adaptive",
+      "algorithm": "DCS-BW",
+      "map_kind": "untuned",
+      "map_group": "vanilla-DCS-BW",
+      "policy": "adaptive"
+    },
+    {
+      "case": "untuned-SCS-frozen",
+      "label": "SCS: untuned map / frozen",
+      "algorithm": "SCS",
+      "map_kind": "untuned",
+      "map_group": "untuned-SCS",
+      "policy": "frozen"
+    },
+    {
+      "case": "untuned-SCS-adaptive",
+      "label": "SCS: untuned map / adaptive",
+      "algorithm": "SCS",
+      "map_kind": "untuned",
+      "map_group": "untuned-SCS",
+      "policy": "adaptive"
+    }
+  ],
+  "grids": {
+    "DCS-BW": [
+      0.025,
+      0.05,
+      0.075,
+      0.1,
+      0.15,
+      0.2,
+      0.3,
+      0.45
+    ],
+    "SCS": [
+      0.01,
+      0.025,
+      0.05,
+      0.1,
+      0.2,
+      0.4,
+      1.0,
+      4.0
+    ]
+  },
+  "selection_functions": [
+    "log1p_norm",
+    "radial_95",
+    "asinh_skew",
+    "asinh_x3",
+    "asinh_x4"
+  ],
+  "source_hashes": {
+    "dcs_bench/__init__.py": "824e883a0dfde9241e0b7742f2bc61aba10cd82a49576de89c96f6f4450cb8bd",
+    "dcs_bench/api.py": "ff37bc553e37f62cd177770fd3437a3fdb35cbb788e079c63b63c5234fd72fc7",
+    "dcs_bench/cpu.py": "b7193c8ee964e6859d6f80d18efeb9d28eae4633dc1158697f50da0eb08ccef4",
+    "dcs_bench/engine.py": "caefba561a53129ec44a360f8ff4794e94c619828b4f2bd70dc368dc3db5b497",
+    "dcs_bench/parallel.py": "1b3c56daefc0d0fd8ffbcf7def29972cb80030eabe1bfde0845c5f6946e1c7ca",
+    "dcs_bench/plotting.py": "749f4e4eff77c6b8a72a4d23cb09172991cead3889a8ad56b0bda15e47583ae6",
+    "dcs_bench/references.py": "a95734c645b3239c243d2970c2213abdd0e71cbaffe9cc758d5af80ab1b6af43",
+    "dcs_bench/samplers.py": "865aebf200c6d748e9a9ba8c903488585d22e44730d200eaeb2cd0c852361f09",
+    "dcs_bench/targets.py": "19d8dbabf4cdac998739c735fec8ee8946b79b7c8de2e25c095542f156bc9a63",
+    "dcs_bench/transforms.py": "fb7161b32cd5430c7e899e9927a588cfddefb7511411360820f679bcab99efaa",
+    "dcs_bench/tuning.py": "82b5610d2734d7647f1e0ff667d9c40a1eb6ccb7b5d8c5c73e12d44dfd54b42c",
+    "dcs_bench/worker.py": "26f5d3d8b7407e8802c8d92e2ee58581f4487b16dd70e50fbad87fa9133242f0",
+    "scripts/audit_skew_t_timed.py": "12753130bf9891bb3587372a32f801ad3f2b2f29bb92d5cc1163bcc7317b0cdc",
+    "scripts/skew_t_timed_figures.py": "70ff64489f839ee075848dc3c81260f17d7c7799a31b32b68fe896794d12bd43",
+    "scripts/fixed_step_pilots.py": "2c4fe0afb19470d8b23aee5c0c5004c23d0aca0378ec5593db9d8ebfa12103bf",
+    "requirements-cpu.txt": "b583516a2068933982a64a45374bbe2d9522657575b11144f7f8f4434a74e2ee",
+    "configs/skew-t-100d-fixed.json": "93089248a92e3801e0eb8c6ada07d14a1b061a2ca187b66011ed6a0b38e70d11"
+  },
+  "fingerprint": "07bf21319c008cde210d3e883e43e87816a8720a5aaa2b0502ba4c8f8bd41cfa",
+  "environment": {
+    "python": "3.12.14",
+    "platform": "macOS-15.6-arm64-arm-64bit",
+    "processor": "arm",
+    "cpu_count": 12,
+    "cpu_allocation": {
+      "logical_cpus": 12,
+      "physical_cores": 12,
+      "capacity": 12,
+      "cpu_ids": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "pinning": "os-managed",
+      "basis": "logical CPU count; physical topology unavailable; OS-managed scheduling"
+    },
+    "jax_backend": "cpu",
+    "jax_devices": [
+      "TFRT_CPU_0"
+    ],
+    "packages": {
+      "numpyro": "0.15.3",
+      "ml_dtypes": "0.5.4",
+      "oauthlib": "3.3.1",
+      "optax": "0.2.5",
+      "pandas": "3.0.5",
+      "kiwisolver": "1.5.1",
+      "toolz": "1.1.0",
+      "httpcore2": "2.12.0",
+      "fastprogress": "1.0.3",
+      "click": "8.5.0",
+      "packaging": "26.3",
+      "matplotlib": "3.9.4",
+      "fonttools": "4.65.0",
+      "arviz": "0.19.0",
+      "httpx2": "2.12.0",
+      "opt_einsum": "3.4.0",
+      "contourpy": "1.3.3",
+      "h5netcdf": "1.8.1",
+      "itsdangerous": "2.2.0",
+      "fastcore": "2.2.23",
+      "numpy": "1.26.4",
+      "starlette": "1.6.0",
+      "jax": "0.4.35",
+      "absl-py": "2.5.0",
+      "pip": "25.0.1",
+      "setuptools": "84.0.0",
+      "blackjax": "1.2.5",
+      "soupsieve": "2.9.2",
+      "httptools": "0.8.0",
+      "h11": "0.16.0",
+      "python-multipart": "0.0.32",
+      "python-dateutil": "2.9.0.post0",
+      "PyYAML": "6.0.3",
+      "xarray": "2026.7.0",
+      "idna": "3.19",
+      "dm-tree": "0.1.10",
+      "jaxlib": "0.4.35",
+      "watchfiles": "1.2.0",
+      "cycler": "0.12.1",
+      "pyparsing": "3.3.2",
+      "multipledispatch": "1.0.0",
+      "xarray-einstats": "0.9.1",
+      "tqdm": "4.70.0",
+      "python-fasthtml": "0.14.13",
+      "attrs": "26.1.0",
+      "python-dotenv": "1.2.3",
+      "websockets": "17.1",
+      "wrapt": "2.4.1",
+      "scipy": "1.14.1",
+      "typing_extensions": "4.16.0",
+      "beautifulsoup4": "4.15.0",
+      "uvloop": "0.22.1",
+      "jaxopt": "0.8.5",
+      "truststore": "0.10.4",
+      "uvicorn": "0.52.4",
+      "pillow": "12.3.0",
+      "chex": "0.1.90",
+      "anyio": "4.15.1",
+      "six": "1.17.0"
+    },
+    "threads": {
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1",
+      "XLA_FLAGS": "--xla_cpu_multi_thread_eigen=false --xla_force_host_platform_device_count=1 intra_op_parallelism_threads=1"
+    },
+    "git_commit": null,
+    "git_status": "?? ./\n?? ../review/"
+  },
+  "hardware": {
+    "logical_cpus": 12,
+    "physical_cores": 12,
+    "capacity": 12,
+    "cpu_ids": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "pinning": "os-managed",
+    "basis": "logical CPU count; physical topology unavailable; OS-managed scheduling"
+  },
+  "truth": {
+    "tail_probability": 0.03919519628762017,
+    "mean_norm": 17.68028324242731
+  },
+  "production_schedule": [
+    {
+      "wave": 0,
+      "case": "mobius-DCS-BW-frozen",
+      "chains": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "wave": 0,
+      "case": "mobius-DCS-BW-adaptive",
+      "chains": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "wave": 0,
+      "case": "fitted-SCS-frozen",
+      "chains": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "wave": 0,
+      "case": "fitted-SCS-adaptive",
+      "chains": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "wave": 0,
+      "case": "vanilla-DCS-BW-frozen",
+      "chains": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "wave": 0,
+      "case": "vanilla-DCS-BW-adaptive",
+      "chains": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "wave": 0,
+      "case": "untuned-SCS-frozen",
+      "chains": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "wave": 0,
+      "case": "untuned-SCS-adaptive",
+      "chains": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "wave": 1,
+      "case": "fitted-SCS-adaptive",
+      "chains": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "wave": 1,
+      "case": "vanilla-DCS-BW-frozen",
+      "chains": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "wave": 1,
+      "case": "vanilla-DCS-BW-adaptive",
+      "chains": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "wave": 1,
+      "case": "untuned-SCS-frozen",
+      "chains": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "wave": 1,
+      "case": "untuned-SCS-adaptive",
+      "chains": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "wave": 1,
+      "case": "mobius-DCS-BW-frozen",
+      "chains": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "wave": 1,
+      "case": "mobius-DCS-BW-adaptive",
+      "chains": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "wave": 1,
+      "case": "fitted-SCS-frozen",
+      "chains": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "wave": 2,
+      "case": "untuned-SCS-frozen",
+      "chains": [
+        16,
+        17,
+        18,
+        19
+      ]
+    },
+    {
+      "wave": 2,
+      "case": "untuned-SCS-adaptive",
+      "chains": [
+        16,
+        17,
+        18,
+        19
+      ]
+    },
+    {
+      "wave": 2,
+      "case": "mobius-DCS-BW-frozen",
+      "chains": [
+        16,
+        17,
+        18,
+        19
+      ]
+    },
+    {
+      "wave": 2,
+      "case": "mobius-DCS-BW-adaptive",
+      "chains": [
+        16,
+        17,
+        18,
+        19
+      ]
+    },
+    {
+      "wave": 2,
+      "case": "fitted-SCS-frozen",
+      "chains": [
+        16,
+        17,
+        18,
+        19
+      ]
+    },
+    {
+      "wave": 2,
+      "case": "fitted-SCS-adaptive",
+      "chains": [
+        16,
+        17,
+        18,
+        19
+      ]
+    },
+    {
+      "wave": 2,
+      "case": "vanilla-DCS-BW-frozen",
+      "chains": [
+        16,
+        17,
+        18,
+        19
+      ]
+    },
+    {
+      "wave": 2,
+      "case": "vanilla-DCS-BW-adaptive",
+      "chains": [
+        16,
+        17,
+        18,
+        19
+      ]
+    }
+  ],
+  "map_seed": 6100001,
+  "pilot_initial_seed": 6200001,
+  "pilot_seed_rule": "6210001 + case_index*10000 + candidate_index*100 + chain",
+  "production_seeds": [
+    6300001,
+    6300002,
+    6300003,
+    6300004,
+    6300005,
+    6300006,
+    6300007,
+    6300008,
+    6300009,
+    6300010,
+    6300011,
+    6300012,
+    6300013,
+    6300014,
+    6300015,
+    6300016,
+    6300017,
+    6300018,
+    6300019,
+    6300020
+  ],
+  "notes": [
+    "Fresh actual equal production wall time, not retrospective MSE rescaling from fixed-iteration runs.",
+    "Four map groups each have frozen and adaptive production cases. All eight start from independently pretuned proposal sizes; map fitting precedes proposal pilots and maps remain fixed.",
+    "The adaptive arms apply the historical DCS smoothed dual-averaging update to BOTH methods, target acceptance 0.234, starting at the pilot-selected step and continuing through discarded warmup and timed production. Update cost is included in the time budget.",
+    "The same seed pairs frozen/adaptive cases, but their warmup paths can differ because adaptation begins during warmup. This comparison evaluates the complete adaptation policy, not production adaptation in isolation.",
+    "Adaptive transitions depend on sampling history; fixed-kernel convergence results do not automatically justify this empirical adaptive comparison. Initial/final scales and ceiling fractions are recorded.",
+    "The five-function ESS-per-iteration pilot rule and eight candidates match the closer skewed diagnostic; target nu is now 2. This rule is not a proven optimum for MSE per second.",
+    "Pilot initial points are shared exact target draws: an explicitly oracle-assisted synthetic diagnostic. Production starts at physical ones(100).",
+    "One case per synchronized wave, identical worker allocation and chain counts; method order rotates across waves. No algorithms compete in a mixed timed queue.",
+    "Production wall time includes transitions, all-iteration radial estimates and thinned trace collection; VI, pilots, warmup, process startup and file saving are excluded and separately reported.",
+    "The stopping rule checks elapsed time before each transition. The final completed transition can exceed the deadline; actual elapsed and overshoot are recorded.",
+    "Every completed iteration including rejected repeats contributes equally. Saved thinned traces do not determine the reported estimates.",
+    "At nu=2, the norm has a finite mean but infinite second moment. Its empirical mean squared error and median absolute error describe these runs; no finite-variance norm MSE inference or norm bootstrap interval is claimed.",
+    "Only tail-probability MSE differences have descriptive paired bootstrap intervals: 20000 resamples, seed6410001; conditional on maps and pilots, no multiplicity adjustment.",
+    "Wall-time stopping makes sample count random and potentially state-dependent. These are actual fixed-wall-budget algorithm outputs, not fixed-count stationary MSE estimates.",
+    "Timing and iteration counts depend on hardware, worker count and load; CPU time is saved alongside wall time. On macOS CPU scheduling is OS-managed.",
+    "All cases and pilot candidates are retained. Quick check is a software smoke test, not a scientific ranking."
+  ],
+  "status": "complete"
+}

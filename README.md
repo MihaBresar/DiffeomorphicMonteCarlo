@@ -2,7 +2,7 @@
 
 Reproducible experiments for *Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions*, by Miha Brešar and Aleksandar Mijatović.
 
-This corrected implementation centralizes target densities and transformations, freezes tuning before retained sampling, saves individual chains, and regenerates figures and tables from saved results. The synthetic and logistic targets are local constructions; only Eight Schools and GARCH use PosteriorDB. Empirical examples are not required to satisfy the paper's sufficient theorem assumptions.
+This corrected implementation centralizes target densities and transformations, saves individual chains, and regenerates figures and tables from saved results. The main experiments freeze tuning before retained sampling; the separate equal-time skewed audit also evaluates continued step adaptation for both DCS and SCS. The synthetic and logistic targets are local constructions; only Eight Schools and GARCH use PosteriorDB. Empirical examples are not required to satisfy the paper's sufficient theorem assumptions.
 
 ## Run with clicks — no commands needed
 
@@ -58,7 +58,7 @@ python scripts/reproduce_all.py --preset paper --output-root results/paper --res
 python scripts/reproduce_all.py --preset paper --output-root results/paper --plot-only
 ```
 
-The full run is substantial. The four timed synthetic/regression comparisons alone require at least 7,900 seconds of aggregate per-chain production sampling at the paper settings. Parallel workers overlap that work; speedup depends on CPU and memory limits. Fixed-iteration SCS, both posterior comparisons, warmup, fitting and reference generation add to this. Actual CPU time and disk use depend on the machine. First measure a `reproduce` run; do not extrapolate performance from `quick` plots. See [the rerun guide](docs/RERUN.md) for individual commands and exact manuscript filenames, and [parallel execution](docs/PARALLEL.md) for CPU allocation, timing and resume rules.
+The full run is substantial. Timed synthetic/regression comparisons require thousands of seconds of aggregate per-chain production sampling. Parallel workers overlap that work; speedup depends on CPU and memory limits. The two fixed-iteration comparisons, both posterior comparisons, warmup, fitting and reference generation add to this. Actual CPU time and disk use depend on the machine. First measure a `reproduce` run; do not extrapolate performance from `quick` plots. See [the rerun guide](docs/RERUN.md) for individual commands and exact manuscript filenames, and [parallel execution](docs/PARALLEL.md) for CPU allocation, timing and resume rules.
 
 ## Experiments
 
@@ -67,12 +67,20 @@ The full run is substantial. The four timed synthetic/regression comparisons alo
 | `skew-t-200d-nuts` | d=200, ν=3, α=(20,-30,0,…) | 50 chains/method, 20 s each |
 | `skew-t-200d-baselines` | Same target | 50 chains/method, 10 s each |
 | `skew-t-100d-fixed` | d=100, ν=3, α=(100,-100,0,…) | 20 chains/method, 500,000 steps each |
-| `skew-t-50d-nu-0.5` | Symmetric t, d=50, ν=0.5 | 50 chains/method, 10 s each |
+| `skew-t-50d-nu-0.5` | Symmetric t, d=50, ν=0.5 | 50 chains/method, 500,000 steps each |
 | `logistic-regression` | d=20, independent t priors, ν=4 and 6 | 20 chains/method/ν, 30 s each |
 | `eight-schools` | Centered hierarchy, log τ coordinate | 50 chains, 150,000 NUTS steps; DCS matched to mean NUTS production time |
 | `garch11` | Four-parameter PosteriorDB GARCH | Same posterior timing design |
 
 The legacy name `skew-t-100d-baselines` forwards to the corrected **200-dimensional** configuration with a message. Every setting is explicit in `configs/<identifier>.json`; the paper profile no longer inherits script constants. `--dry-run` displays the resolved configuration.
+
+The launcher also offers **100D skewed t: equal-time DCS/SCS**: ν=2, β=2,
+α=(100,−100,0,…), 20 seconds of production per chain at full settings.
+It compares fitted and fully untuned maps, each with independently pretuned
+steps that are either frozen or continue adapting using the same smoothed
+dual-averaging rule for both methods. Its eight cases save exact iteration
+counts, tail-probability errors and descriptive mean-norm squared errors.
+See [the equal-time protocol and results](docs/SKEW_T_TIMED.md).
 
 ## Saved artifacts
 
