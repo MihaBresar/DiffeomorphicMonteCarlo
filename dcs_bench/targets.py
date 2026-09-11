@@ -19,7 +19,7 @@ def read_archive(path):
     bundle = ROOT/'data/posteriordb'
     if path.is_relative_to(bundle):
         manifest = json.loads((bundle/'manifest.json').read_text())
-        expected = manifest['files'][str(path.relative_to(bundle))]['sha256']
+        expected = manifest['files'][path.relative_to(bundle).as_posix()]['sha256']
         if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
             raise ValueError(f'PosteriorDB checksum mismatch: {path}')
     with zipfile.ZipFile(path) as archive:

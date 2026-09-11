@@ -274,7 +274,7 @@ def make_handler(controller, token):
                     folder = RUNS/controller.current_run
                     for p in sorted(folder.rglob('*')):
                         if p.is_file() and (p.suffix in ('.png', '.pdf', '.tex') or p.name == 'posteriordb_rmse.csv'):
-                            links.append({'name': str(p.relative_to(folder)), 'url': '/artifact/'+str(p.relative_to(RUNS))})
+                            links.append({'name': p.relative_to(folder).as_posix(), 'url': '/artifact/'+p.relative_to(RUNS).as_posix()})
                 return self.respond(links)
             if path.startswith('/artifact/'):
                 p = (RUNS/path[len('/artifact/'):]).resolve()

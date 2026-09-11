@@ -82,5 +82,18 @@
   },
   "scope": "Short execution checks, fixed-iteration seed/draw equivalence and interrupted-run checks. Full paper production results have not been regenerated. Linux/Windows results are recorded by GitHub Actions.",
   "final_source_quick_pipeline": "all seven completed after Windows UTF-8 log handling change",
-  "resume_check_scope": "48 checkpoints and eight interrupted-run checkpoints verified before the final Windows-only output encoding adjustment"
+  "resume_check_scope": "48 checkpoints and eight interrupted-run checkpoints verified before the final Windows-only output encoding adjustment",
+  "portability_followup": {
+    "local_unit_tests_passed": 24,
+    "changes": [
+      "Normalize bundled data and source-manifest keys to POSIX paths on Windows",
+      "Normalize launcher figure URLs on Windows",
+      "CI chooses up to two workers within the hosted runner CPU allocation"
+    ],
+    "source_hashes": {
+      "dcs_bench/targets.py": "8a0535e0bdbe9452ba257a103567ce529f907d3e921a0a2b20efd580a67885de",
+      "dcs_bench/engine.py": "f8ed9de897ac5ca4cf6060957e6232183f4924f9d417bd481a60c493d1cbf458",
+      "START_HERE.py": "e3ab522ac449868cbe02008c236c5ee57d695b20eb984b7a02854a895ce63bd4"
+    }
+  }
 }

@@ -67,7 +67,7 @@ def write_json(path, value):
 def source_hashes():
     paths = list((ROOT/'dcs_bench').glob('*.py'))+list((ROOT/'configs').glob('*.json'))
     paths += [ROOT/'run_experiment.py', ROOT/'prepare_reference.py', ROOT/'requirements-cpu.txt', ROOT/'data/posteriordb/manifest.json']
-    return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
+    return {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
 
 
 def fingerprint(config, hashes):
