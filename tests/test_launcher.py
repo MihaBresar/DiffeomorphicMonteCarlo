@@ -10,6 +10,22 @@ from dcs_bench.cpu import cpu_info
 
 
 class LauncherTests(unittest.TestCase):
+    def test_joint_radial_audit_runs_separate_fresh_pipeline(self):
+        workers = min(2, cpu_info()['capacity'])
+        for preset in ('quick', 'reproduce', 'paper'):
+            with self.subTest(preset=preset):
+                command, = launcher.commands_for_run(preset, 'joint-r-step-audit', Path('results/test'),
+                                                      workers=workers, ball_map_policy='vanilla')
+                self.assertIn(str(launcher.ROOT/'scripts/audit_joint_radial.py'), command)
+                self.assertEqual(command[command.index('--preset')+1], preset)
+                self.assertEqual(command[command.index('--workers')+1], str(workers))
+                self.assertEqual(command[command.index('--output-dir')+1],
+                                 str(Path('results/test')/'joint-r-step-audit'))
+                self.assertNotIn('--ball-map-policy', command)
+        for options in ({'resume': True}, {'plot_only': True}):
+            with self.subTest(options=options), self.assertRaises(ValueError):
+                launcher.commands_for_run('quick', 'joint-r-step-audit', Path('results/test'), **options)
+
     def test_timed_skew_audit_runs_separate_fresh_pipeline(self):
         workers = min(2, cpu_info()['capacity'])
         for preset in ('quick', 'reproduce', 'paper'):

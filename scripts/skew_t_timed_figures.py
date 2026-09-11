@@ -86,7 +86,7 @@ def render_report(root, summary):
     threshold = config.get('threshold', 50.)
     budget_seconds = config['time_budget']
     smoke = config.get('preset') == 'quick'
-    title = f'{dimension}D skewed Student-t, ν = {nu:g}'
+    title = summary.get('target_label', f'{dimension}D skewed Student-t, ν = {nu:g}')
     if smoke:
         title = 'EXECUTION CHECK — '+title
     budget = (f"{config['runs']} chains per method; {budget_seconds:g} seconds of production per chain; "
@@ -314,7 +314,7 @@ def render_report(root, summary):
         json.dumps(setup, indent=2, ensure_ascii=False, allow_nan=False))+'</pre></details>') if setup else ''
     warning = '<p class="warning">Quick execution check only — do not interpret sampler rankings.</p>' if smoke else ''
     report = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Equal-time skewed Student-t results</title><style>
+<title>Equal-time Student-t results</title><style>
 body{font:15px/1.55 system-ui,sans-serif;color:#203147;background:#f6f8fb;margin:0 auto;max-width:1500px;padding:28px}
 h1,h2{line-height:1.2}h2{margin-top:36px}a{color:#4e46a5}figure{margin:24px 0;background:white;padding:12px;border-radius:9px}img{max-width:100%;height:auto}
 figcaption{font-size:13px;color:#576478}.table-wrap{overflow-x:auto;background:#fff;border:1px solid #dde3ed;border-radius:6px}table{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13px}

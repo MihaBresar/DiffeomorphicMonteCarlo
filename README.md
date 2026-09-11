@@ -82,6 +82,12 @@ dual-averaging rule for both methods. Its eight cases save exact iteration
 counts, tail-probability errors and descriptive mean-norm squared errors.
 See [the equal-time protocol and results](docs/SKEW_T_TIMED.md).
 
+The separate **joint R-and-step audit** tests both the symmetric ν=3 and skewed
+ν=2 targets with equal independent pilot sampling time for DCS-BW and SCS.
+It includes R=√(d+1), compares joint selection with three fixed-R controls,
+and records boundary crossings separately from final rejections. Every
+production step is pretuned and frozen. See [the joint calibration protocol](docs/JOINT_RADIAL.md).
+
 ## Saved artifacts
 
 Each run saves `configuration.json`, `manifest.json`, `summary.json`, `chain_metrics.csv`, and PNG/PDF figures. Each scenario contains map parameters and optimization history, its independent reference and provenance, and one compressed NPZ checkpoint per method/chain. Checkpoints contain all retained physical-coordinate draws and metadata; NumPy loads them with `allow_pickle=False`. Reference preparation has its own checkpoints. Failed or empty chains raise an error and leave the run marked failed; they are never replaced by zeros.

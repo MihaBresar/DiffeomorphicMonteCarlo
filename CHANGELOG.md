@@ -1,5 +1,13 @@
 # Changes
 
+## Joint radial calibration
+
+- Added an independent R-and-step audit for the symmetric ν=3 and skewed ν=2 targets, with equal pilot sampling budgets and 8×8 candidate grids for each method.
+- Added jointly selected, R=1, VI-R and R=√(d+1) comparisons; every case receives proposal pretuning followed by fresh equal-time validation.
+- Added separate boundary probes that preserve the original DCS and SCS transitions, with exact crossing, step-out, rejection and acceptance counts.
+- Added calibration profiles, heatmaps and full-precision tables alongside the existing estimator, error and sample-count figures.
+- Added a no-command launcher option and Windows/Linux execution checks. Existing experiments and saved results remain available.
+
 ## Parallel CPU execution
 
 - Added a CPU-worker selector and bounded independent chain processes, including logistic references.

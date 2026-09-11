@@ -38,6 +38,7 @@ jobs:
       - run: python scripts/audit_fixed_steps.py --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-audit
       - run: python scripts/audit_symmetric_t.py --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-symmetric
       - run: python scripts/audit_skew_t_timed.py --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-skew-timed
+      - run: python scripts/audit_joint_radial.py --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-joint-r-step
       - run: python run_experiment.py skew-t-50d-nu-0.5 --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-superheavy-counts
       - uses: actions/upload-artifact@v4
         if: always()
@@ -49,4 +50,5 @@ jobs:
             results/ci-audit
             results/ci-symmetric
             results/ci-skew-timed
+            results/ci-joint-r-step
             results/ci-superheavy-counts

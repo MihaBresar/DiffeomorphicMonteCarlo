@@ -1,0 +1,53 @@
+{
+  "status": "passed",
+  "pilot_chains": 1024,
+  "production_chains": 320,
+  "probe_chains": 64,
+  "pilot_budgets": {
+    "symmetric-nu3/DCS-BW": {
+      "chains": 256,
+      "seconds": 128.00328316403466,
+      "cpu_seconds": 126.65857599999987,
+      "iterations": 8867015
+    },
+    "symmetric-nu3/SCS": {
+      "chains": 256,
+      "seconds": 128.00254532707186,
+      "cpu_seconds": 127.02960099999994,
+      "iterations": 8436216
+    },
+    "skewed-nu2/DCS-BW": {
+      "chains": 256,
+      "seconds": 128.0038921270534,
+      "cpu_seconds": 127.15810499999998,
+      "iterations": 7947990
+    },
+    "skewed-nu2/SCS": {
+      "chains": 256,
+      "seconds": 128.00273207105784,
+      "cpu_seconds": 126.91981299999996,
+      "iterations": 7880369
+    }
+  },
+  "production_iterations": 363039077,
+  "max_production_overshoot_seconds": 0.00014591600483981892,
+  "max_wave_start_spread_seconds": 0.0005755829988629557,
+  "summary_sha256": "cc7e2101db63771affe968477e2ef4c3e0ffec0360c1e2996af4e35a83ce0471",
+  "protocol_sha256": "afdb8cafc202e56f53859c7795b4ba934022b1cf4397125740b965049ef97307",
+  "checks": [
+    "source fingerprints",
+    "phase stream separation",
+    "matched full pilot allocations",
+    "fresh independently pretuned frozen production",
+    "nonoverlapping homogeneous timed waves",
+    "all chain provenance",
+    "exact errors and counts",
+    "symmetric zero shape parameters",
+    "probe outcome partitions",
+    "tail-only MSE contrasts"
+  ],
+  "local_unit_tests": 76,
+  "quick_end_to_end": "passed",
+  "preserved_canonical_kernel_decisions": "DCS-BW and SCS checked transition by transition, including RNG state",
+  "github_ci": "Windows and Linux checks run on each main-branch push"
+}

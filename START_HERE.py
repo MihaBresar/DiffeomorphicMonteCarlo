@@ -24,7 +24,7 @@ RUNS = ROOT/'results'/'click-runs'
 PRESETS = ('quick', 'reproduce', 'paper')
 EXPERIMENTS = ('all', 'skew-t-200d-nuts', 'skew-t-200d-baselines', 'skew-t-100d-fixed',
                'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression',
-               'fixed-step-audit', 'symmetric-t-audit', 'skew-t-timed-audit')
+               'fixed-step-audit', 'symmetric-t-audit', 'skew-t-timed-audit', 'joint-r-step-audit')
 
 
 def environment_python():
@@ -82,7 +82,7 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
     py = str(environment_python())
     directory = Path(directory)
     audits = {'fixed-step-audit': 'audit_fixed_steps.py', 'symmetric-t-audit': 'audit_symmetric_t.py',
-              'skew-t-timed-audit': 'audit_skew_t_timed.py'}
+              'skew-t-timed-audit': 'audit_skew_t_timed.py', 'joint-r-step-audit': 'audit_joint_radial.py'}
     if experiment in audits:
         if resume or plot_only:
             raise ValueError('The tuning audit starts from scratch in a new results folder.')
