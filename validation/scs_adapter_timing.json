@@ -1,0 +1,92 @@
+{
+  "config": {
+    "dimension": 100,
+    "nu": 3.0,
+    "alpha": {
+      "0": 100.0,
+      "1": -100.0
+    },
+    "iterations": 50000,
+    "warmup": 100,
+    "thin": 50
+  },
+  "source_commit": "ea6f27a6cb1d0ca90d8c1cd92c32fc3dcf8ea565",
+  "mapping_file": "/Users/mihabresar/Documents/ChatGPT/DiffeomorphicMonteCarlo/Koncna/results/single-scs-100d-paper/maps.json",
+  "direct_compile_seconds": 0.4343814169988036,
+  "time_scope": "Synchronized compiled production; all states contribute tail/norm sums and checkpoints; excludes compilation and discarded warmup",
+  "direct_description": "One unmodified author SCS scan, followed by original projection of every state and radial summaries inside the same compiled executable",
+  "adapter_description": "Current block=thin adapter calling the unchanged author scan and accumulating radial summaries online",
+  "median_seconds": {
+    "adapter": 0.4086899159956374,
+    "direct": 0.40761949999432545
+  },
+  "adapter_over_direct": 1.002626017649614,
+  "records": [
+    {
+      "method": "adapter",
+      "repeat": 0,
+      "seconds": 0.40746179199777544,
+      "cpu_seconds": 0.41742199999999974,
+      "mean_all_iterations": [
+        0.01122,
+        13.874692619738239
+      ],
+      "acceptance": 0.25282
+    },
+    {
+      "method": "direct",
+      "repeat": 0,
+      "seconds": 0.4071560419979505,
+      "cpu_seconds": 0.4204620000000001,
+      "mean_all_iterations": [
+        0.01156,
+        14.027074898899926
+      ],
+      "acceptance": 0.25728
+    },
+    {
+      "method": "direct",
+      "repeat": 1,
+      "seconds": 0.40773333300603554,
+      "cpu_seconds": 0.42044999999999977,
+      "mean_all_iterations": [
+        0.00922,
+        13.592381110212807
+      ],
+      "acceptance": 0.25896
+    },
+    {
+      "method": "adapter",
+      "repeat": 1,
+      "seconds": 0.4093122920021415,
+      "cpu_seconds": 0.41925599999999985,
+      "mean_all_iterations": [
+        0.01274,
+        13.834127833199156
+      ],
+      "acceptance": 0.25686
+    },
+    {
+      "method": "adapter",
+      "repeat": 2,
+      "seconds": 0.4086899159956374,
+      "cpu_seconds": 0.4180809999999999,
+      "mean_all_iterations": [
+        0.01146,
+        13.688536583032539
+      ],
+      "acceptance": 0.26314
+    },
+    {
+      "method": "direct",
+      "repeat": 2,
+      "seconds": 0.40761949999432545,
+      "cpu_seconds": 0.42012099999999997,
+      "mean_all_iterations": [
+        0.0097,
+        13.689449367123848
+      ],
+      "acceptance": 0.25416
+    }
+  ]
+}

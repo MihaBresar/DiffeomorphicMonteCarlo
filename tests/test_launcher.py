@@ -52,7 +52,7 @@ class LauncherTests(unittest.TestCase):
                 if tag == 'select':
                     self.in_menu = False
         menu = ExperimentMenu()
-        menu.feed((launcher.ROOT/'launcher/index.html').read_text())
+        menu.feed((launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8'))
         self.assertEqual({x['value'] for x in menu.options}, set(launcher.EXPERIMENTS))
         self.assertEqual([x['value'] for x in menu.options if 'selected' in x], ['skew-t-100d-fixed'])
         self.assertEqual(sum('SCS' in label for label in menu.labels), 1)

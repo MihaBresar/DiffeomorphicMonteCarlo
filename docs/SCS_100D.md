@@ -152,3 +152,12 @@ archived plots alone. The earlier controlled constant-caching check improved
 change in their ratio. Proposal scale, rejection frequency, map geometry,
 implementation and timing boundaries all affect transition cost. The new
 compiled-loop benchmark isolates an actual DCS implementation speedup.
+
+A separate check verified that the SCS adapter does not create a large
+comparison overhead: three alternating 50,000-iteration runs gave median
+0.4086899159956374 s for the adapter and 0.40761949999432545 s for one direct
+author scan, with identical all-iteration radial reporting costs included.
+The measured difference was 0.26%. Raw records are in
+`validation/scs_adapter_timing.json`; repeat using
+`python scripts/benchmark_scs_adapter.py`. This is an implementation timing
+check, not another target or sampler-tuning experiment.
