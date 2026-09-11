@@ -10,10 +10,10 @@ import subprocess
 import time
 import numpy as np
 from .targets import ROOT, Target
-from .transforms import BallMap, SphereMap
 from .tuning import fit_map
 from .references import make_reference
-from .samplers import BlackJAXRunner, NumPyroRunner, run_metropolis
+from .cpu import cpu_info, execution_plan, validate_workers
+from .parallel import launch_chains, compilation_summary
 
 ALIASES = {'skew-t-100d-baselines': 'skew-t-200d-baselines'}
 
@@ -53,8 +53,7 @@ def load_config(name, preset='quick', overrides=None):
             raise ValueError(f'{field} must be positive')
     if config['time_budget'] <= 0 or config['optimizer_steps'] < 0:
         raise ValueError('Time budget must be positive and optimizer steps nonnegative')
-    if config.get('workers', 1) != 1:
-        raise ValueError('Timing comparisons run sequentially on one CPU; --workers must be 1')
+    validate_workers(config.get('workers', 1))
     return config
 
 
@@ -81,13 +80,16 @@ def environment():
     packages = {p.metadata['Name']: p.version for p in importlib.metadata.distributions()}
     import jax
     result = {'python': platform.python_version(), 'platform': platform.platform(),
-        'processor': platform.processor(), 'cpu_count': os.cpu_count(),
+        'processor': platform.processor(), 'cpu_count': os.cpu_count(), 'cpu_allocation': cpu_info(),
         'jax_backend': jax.default_backend(), 'jax_devices': [str(d) for d in jax.devices()],
         'packages': packages, 'threads': {k: os.environ.get(k) for k in
             ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'VECLIB_MAXIMUM_THREADS', 'XLA_FLAGS')}}
     for name, args in [('git_commit', ['git', 'rev-parse', 'HEAD']), ('git_status', ['git', 'status', '--short'])]:
-        proc = subprocess.run(args, cwd=ROOT, text=True, capture_output=True)
-        result[name] = proc.stdout.strip() if proc.returncode == 0 else None
+        try:
+            proc = subprocess.run(args, cwd=ROOT, text=True, capture_output=True)
+            result[name] = proc.stdout.strip() if proc.returncode == 0 else None
+        except OSError:
+            result[name] = None  # ZIP downloads do not require Git to be installed.
     return result
 
 
@@ -115,7 +117,8 @@ def read_chain(path, expected=None):
 
 
 def run(config, output, resume=False, reference_dir=None):
-    output = Path(output)
+    output = Path(output).resolve()
+    plan = execution_plan(config['workers'], config['runs'])
     hashes = source_hashes()
     digest = fingerprint(config, hashes)
     existing = output/'manifest.json'
@@ -126,19 +129,24 @@ def run(config, output, resume=False, reference_dir=None):
         if manifest['fingerprint'] != digest:
             raise ValueError('Configuration or scientific source changed. Use a new output directory.')
         current_environment = environment()
-        for key in ('python', 'platform', 'processor', 'cpu_count', 'jax_backend', 'jax_devices', 'packages', 'threads'):
+        for key in ('python', 'platform', 'processor', 'cpu_count', 'cpu_allocation', 'jax_backend', 'jax_devices', 'packages', 'threads'):
             if manifest['environment'].get(key) != current_environment.get(key):
                 raise ValueError(f'Resume environment changed ({key}); use a new output directory to avoid mixing benchmark conditions')
     else:
         if resume:
             raise FileNotFoundError('--resume requires an existing manifest')
         output.mkdir(parents=True, exist_ok=True)
-        manifest = {'schema_version': 2, 'started_utc': datetime.now(timezone.utc).isoformat(),
+        manifest = {'schema_version': 3, 'started_utc': datetime.now(timezone.utc).isoformat(),
             'fingerprint': digest, 'source_hashes': hashes, 'environment': environment(),
-            'timing_policy': 'One sequential CPU worker. Production time includes retained-draw collection; map fitting, compilation and warmup are separately reported.',
+            'execution_plan': plan,
+            'timing_policy': 'Independent chains in bounded CPU processes, one method at a time. Per-chain production wall time includes retained-draw collection. Fitting, worker compilation, warmup and total invocation wall time are separately reported. Pinning is recorded; macOS scheduling is OS-managed.',
             'status': 'running'}
         write_json(output/'configuration.json', config)
         write_json(existing, manifest)
+    manifest['status'] = 'running'
+    manifest.pop('failure', None)
+    write_json(existing, manifest)
+    invocation_started = time.perf_counter()
     try:
         for s, spec in enumerate(config['targets']):
             target = Target(spec)
@@ -159,35 +167,24 @@ def run(config, output, resume=False, reference_dir=None):
                         mapping, meta = fit_map(target, config, family, config['seed']+s+811)
                         setup[family] = {'parameters': mapping.parameters(), 'optimization': meta}
                 write_json(setup_path, setup)
-            maps = {k: (BallMap if k == 'ball' else SphereMap)(**v['parameters']) for k, v in setup.items()}
-            nuts_runner = None
+            maps = {k: v['parameters'] for k, v in setup.items()}
             matched_seconds = None
             for ai, algorithm in enumerate(config['algorithms']):
+                pending = []
                 for chain in range(config['runs']):
                     path = directory/'chains'/f'{algorithm}-{chain:03d}.npz'
                     if path.exists():
                         read_chain(path, digest)
                         print(f'Resumed {s}/{algorithm}/{chain}', flush=True)
                         continue
-                    seed = chain_seed(config, s, ai, chain)
-                    print(f'Running scenario {s}, {algorithm}, chain {chain+1}/{config["runs"]}', flush=True)
-                    if algorithm == 'NUTS':
-                        if config['mode'] == 'nuts_matched_time':
-                            if nuts_runner is None:
-                                nuts_runner = NumPyroRunner(target, config)
-                                write_json(directory/'nuts_compilation.json', {'seconds': nuts_runner.compile_seconds})
-                            draws, record = nuts_runner.run(seed)
-                        else:
-                            if nuts_runner is None:
-                                nuts_runner = BlackJAXRunner(target, config)
-                                write_json(directory/'nuts_compilation.json', {'seconds': nuts_runner.compile_seconds})
-                            draws, record = nuts_runner.run(seed, seconds=config['time_budget'])
-                    else:
-                        mapping = maps.get('sphere' if algorithm == 'SCS' else 'ball') if algorithm == 'SCS' or algorithm.startswith('DCS') else None
-                        seconds = None if config['mode'] == 'iterations' else (matched_seconds if config['mode'] == 'nuts_matched_time' else config['time_budget'])
-                        draws, record = run_metropolis(target, algorithm, mapping, config, seed, seconds)
-                    record.update(fingerprint=digest, scenario=s, chain=chain, parameter_names=target.names)
-                    save_chain(path, draws, record)
+                    pending.append({'index': chain, 'seed': chain_seed(config, s, ai, chain), 'path': str(path)})
+                seconds = None if config['mode'] == 'iterations' else (matched_seconds if config['mode'] == 'nuts_matched_time' else config['time_budget'])
+                print(f'Scenario {s}, {algorithm}: {len(pending)} pending chains, up to {plan["max_concurrent_chains"]} workers', flush=True)
+                launch_chains({'target': spec, 'config': config, 'algorithm': algorithm, 'maps': maps,
+                               'seconds': seconds, 'fingerprint': digest, 'scenario': s},
+                              pending, directory/'execution', plan)
+                if algorithm == 'NUTS':
+                    write_json(directory/'nuts_compilation.json', compilation_summary(directory/'execution'))
                 if algorithm == 'NUTS' and config['mode'] == 'nuts_matched_time':
                     records = [read_chain(directory/'chains'/f'NUTS-{i:03d}.npz', digest)[1] for i in range(config['runs'])]
                     matched_seconds = float(np.mean([r['sampling_seconds'] for r in records]))
@@ -200,10 +197,12 @@ def run(config, output, resume=False, reference_dir=None):
         rebuild(output)
         manifest['status'] = 'complete'
         manifest['completed_utc'] = datetime.now(timezone.utc).isoformat()
-        write_json(existing, manifest)
     except BaseException as error:
         manifest.update(status='interrupted' if isinstance(error, KeyboardInterrupt) else 'failed',
                         failure={'type': type(error).__name__, 'message': str(error)})
-        write_json(existing, manifest)
         raise
+    finally:
+        manifest.setdefault('invocations', []).append({'ended_utc': datetime.now(timezone.utc).isoformat(),
+            'wall_seconds': time.perf_counter()-invocation_started, 'resume': resume, 'status': manifest['status']})
+        write_json(existing, manifest)
     return output

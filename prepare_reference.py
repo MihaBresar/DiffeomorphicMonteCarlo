@@ -7,10 +7,11 @@ from pathlib import Path
 import hashlib
 import json
 import numpy as np
-from dcs_bench.engine import load_config, write_json, environment, save_chain, read_chain, source_hashes
+from dcs_bench.engine import load_config, write_json, environment, read_chain, source_hashes
 from dcs_bench.targets import Target
-from dcs_bench.samplers import NumPyroRunner
 from dcs_bench.references import mcmc_diagnostics
+from dcs_bench.cpu import execution_plan
+from dcs_bench.parallel import launch_chains, compilation_summary
 
 
 def main():
@@ -20,35 +21,42 @@ def main():
     parser.add_argument('--draws', type=int)
     parser.add_argument('--warmup', type=int)
     parser.add_argument('--resume', action='store_true')
+    parser.add_argument('--workers', type=int, default=1)
     args = parser.parse_args()
-    root = args.output_dir or Path(f'results/references/logistic-{args.preset}')
-    config = load_config('logistic-regression', args.preset)
+    root = (args.output_dir or Path(f'results/references/logistic-{args.preset}')).resolve()
+    config = load_config('logistic-regression', args.preset, {'workers': args.workers})
     config.update(warmup=args.warmup or {'paper': 4000, 'reproduce': 1000, 'quick': 100}[args.preset],
                   nuts_samples=args.draws or {'paper': 100000, 'reproduce': 10000, 'quick': 128}[args.preset],
                   nuts_target_accept=.95, nuts_max_depth=12, thin=1)
     root.mkdir(parents=True, exist_ok=True)
+    plan = execution_plan(config['workers'], 4)
+    context = environment()
+    # Git metadata can change without altering executable sources; execution
+    # conditions must remain identical across resumed reference chains.
+    context_key = {key: value for key, value in context.items() if not key.startswith('git_')}
     failures = []
-    for spec in config['targets']:
+    for scenario, spec in enumerate(config['targets']):
         target = Target(spec)
         seed = 918274  # Separate stream from all production and optimization seeds.
         hashes = source_hashes()
-        fingerprint = hashlib.sha256(json.dumps([spec, config, seed, hashes], sort_keys=True).encode()).hexdigest()
+        fingerprint = hashlib.sha256(json.dumps([spec, config, seed, hashes, context_key, plan], sort_keys=True).encode()).hexdigest()
         checkpoint_dir = root/f'nu-{target.nu:g}-chains'
         records, draws = [], []
-        runner = None
+        pending = []
         for i in range(4):
             checkpoint = checkpoint_dir/f'{i}.npz'
             if checkpoint.exists():
                 if not args.resume:
                     raise FileExistsError(f'{checkpoint} exists; pass --resume')
-                x, record = read_chain(checkpoint, fingerprint)
+                read_chain(checkpoint, fingerprint)
             else:
-                print(f'Independent logistic reference ν={target.nu:g}, chain {i+1}/4', flush=True)
-                if runner is None:
-                    runner = NumPyroRunner(target, config)
-                x, record = runner.run(seed+i)
-                record['fingerprint'] = fingerprint
-                save_chain(checkpoint, x, record)
+                pending.append({'index': i, 'seed': seed+i, 'path': str(checkpoint)})
+        print(f'Independent logistic reference ν={target.nu:g}: {len(pending)} pending chains, up to {plan["max_concurrent_chains"]} workers', flush=True)
+        launch_chains({'target': spec, 'config': config, 'algorithm': 'NUTS', 'reference': True,
+                       'fingerprint': fingerprint, 'scenario': scenario},
+                      pending, checkpoint_dir/'execution', plan)
+        for i in range(4):
+            x, record = read_chain(checkpoint_dir/f'{i}.npz', fingerprint)
             draws.append(x)
             records.append(record)
         draws = np.stack(draws)
@@ -63,7 +71,8 @@ def main():
         np.savez_compressed(path, draws=draws)
         write_json(path.with_suffix('.json'), {'source': 'Independent NumPyro NUTS reference',
             'exact': False, 'target': spec, 'config': config, 'records': records,
-            'diagnostics': diag, 'quality_passed': quality, 'environment': environment(), 'source_hashes': hashes,
+            'diagnostics': diag, 'quality_passed': quality, 'environment': context, 'source_hashes': hashes,
+            'execution_plan': plan, 'compilation': compilation_summary(checkpoint_dir/'execution'),
             'quality_thresholds': {'max_rhat': 1.01, 'min_bulk_ess': 2000, 'min_tail_ess': 1000,
                                    'max_divergences': 0, 'max_depth_hits': 0}})
         if args.preset == 'paper' and not quality:

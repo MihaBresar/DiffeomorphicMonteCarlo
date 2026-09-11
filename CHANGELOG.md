@@ -1,5 +1,13 @@
 # Changes
 
+## Parallel CPU execution
+
+- Added a CPU-worker selector and bounded independent chain processes, including logistic references.
+- Added native Linux/Windows CPU affinity, explicit thread limits, worker provenance and compilation accounting; macOS scheduling remains OS-managed.
+- Preserved deterministic chain seeds, matched NUTS/DCS budget ordering, atomic checkpoints and saved-worker-count resume.
+- Added cross-platform worker checks and made Git optional for running downloaded ZIP copies.
+- Earlier sequential-only checkpoints remain available for plotting; start a new run after updating the scientific source.
+
 ## 0.2.0 — corrected experimental implementation
 
 - Centralized targets, ball/cap transforms, tuning and kernels; retained thin compatibility entry points.

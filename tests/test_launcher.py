@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 import START_HERE as launcher
+from dcs_bench.cpu import cpu_info
 
 
 class LauncherTests(unittest.TestCase):
@@ -16,13 +17,15 @@ class LauncherTests(unittest.TestCase):
             result = root/'logistic-regression'
             result.mkdir()
             (result/'manifest.json').write_text('{}')
-            commands = launcher.commands_for_run('paper', 'logistic-regression', root, resume=True)
+            workers = min(2, cpu_info()['capacity'])
+            commands = launcher.commands_for_run('paper', 'logistic-regression', root, resume=True, workers=workers)
             self.assertEqual(len(commands), 2)
             self.assertIn(str(launcher.ROOT/'prepare_reference.py'), commands[0])
             self.assertIn(str(launcher.ROOT/'run_experiment.py'), commands[1])
             for command in commands:
                 self.assertIn('--resume', command)
                 self.assertEqual(command[command.index('--preset')+1], 'paper')
+                self.assertEqual(command[command.index('--workers')+1], str(workers))
             self.assertEqual(commands[1][commands[1].index('--reference-dir')+1], str(root/'logistic-reference'))
 
     def test_replot_does_not_prepare_reference_or_start_new_sampling(self):
@@ -48,7 +51,8 @@ class LauncherTests(unittest.TestCase):
             controller = launcher.Controller()
             folder = Path(tmp)/'saved-paper-run'
             folder.mkdir()
-            (folder/'launcher-run.json').write_text(json.dumps({'preset': 'paper', 'experiment': 'garch11'}))
+            workers = min(2, cpu_info()['capacity'])
+            (folder/'launcher-run.json').write_text(json.dumps({'preset': 'paper', 'experiment': 'garch11', 'workers': workers}))
             result = folder/'garch11'
             result.mkdir()
             (result/'manifest.json').write_text('{}')
@@ -59,6 +63,7 @@ class LauncherTests(unittest.TestCase):
                 self.assertIn('garch11', command)
                 self.assertIn('--resume', command)
                 self.assertEqual(command[command.index('--preset')+1], 'paper')
+                self.assertEqual(command[command.index('--workers')+1], str(workers))
                 for invalid in ('..', '.', '../saved-paper-run', '/tmp'):
                     with self.assertRaises(ValueError):
                         controller.run(run_id=invalid)

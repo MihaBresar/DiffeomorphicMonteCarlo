@@ -76,7 +76,7 @@ def rebuild(output):
                 diagnostic_draws_per_chain=length, independent_chain_diagnostics=indiv,
                 mean_sampling_seconds=float(np.mean([r['sampling_seconds'] for r in records])),
                 mean_seconds_including_setup=float(np.mean(totals)),
-                setup_cost_charging='Full shared fit cost amortized over this method\'s runs',
+                setup_cost_charging='Shared fit and summed worker compilation durations amortized over this method\'s runs; not total elapsed wall time',
                 records=list(records))
             if target.kind in ('garch', 'eight_schools'):
                 algo_summary['first_moment_rmse_across_chains_and_coordinates'] = float(np.sqrt(np.mean((estimates[:, :target.d]-ref['functional_truth'][:target.d])**2)))

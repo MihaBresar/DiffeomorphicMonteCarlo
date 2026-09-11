@@ -12,7 +12,8 @@ Download this repository using **Code → Download ZIP**, extract it, and instal
 and choose **Run → Run Module** (F5).
 
 In the browser, click **Set up environment**, then **Start new run** with
-**Quick check** selected. Once that succeeds, choose **Full paper settings**
+**Quick check** selected. Choose **CPU workers** to run independent chains in
+parallel (start with 2–4). Once that succeeds, choose **Full paper settings**
 for the publication runs. Buttons also resume saved runs, rebuild figures,
 and open results. See the [step-by-step click-to-run guide](docs/CLICK_TO_RUN.md)
 for installation, moving to another computer, and troubleshooting. These
@@ -31,7 +32,7 @@ python -m examples.basic_sampler
 python run_experiment.py skew-t-50d-nu-0.5 --preset quick
 ```
 
-On Windows activate with `.venv\Scripts\activate`. The local validation was on macOS ARM64; Linux is covered by the supplied CI configuration, not a claim of an already completed remote CI run. Other Python/JAX versions are not part of the tested environment.
+On Windows activate with `.venv\Scripts\activate`. Local validation uses macOS ARM64. CI checks CPU workers on Linux and Windows; consult the repository's Actions tab for the latest results. Other Python/JAX versions are not part of the tested environment.
 
 ## Regenerate results
 
@@ -45,6 +46,9 @@ python scripts/reproduce_all.py --preset reproduce --output-root results/reprodu
 # All full paper experiments and the combined posterior table:
 python scripts/reproduce_all.py --preset paper --output-root results/paper
 
+# The same pipeline with four parallel CPU workers:
+python scripts/reproduce_all.py --preset paper --workers 4 --output-root results/paper-4-workers
+
 # Continue interrupted work; completed chains are checked and reused:
 python scripts/reproduce_all.py --preset paper --output-root results/paper --resume
 
@@ -52,7 +56,7 @@ python scripts/reproduce_all.py --preset paper --output-root results/paper --res
 python scripts/reproduce_all.py --preset paper --output-root results/paper --plot-only
 ```
 
-The full run is substantial. The four timed synthetic/regression comparisons alone require at least 7,900 seconds of sequential production sampling at the paper settings. Fixed-iteration SCS, both posterior comparisons, warmup, fitting and reference generation add to this. Actual CPU time and disk use depend on the machine. First measure a `reproduce` run; do not extrapolate performance from `quick` plots. See [the rerun guide](docs/RERUN.md) for individual commands and exact manuscript filenames.
+The full run is substantial. The four timed synthetic/regression comparisons alone require at least 7,900 seconds of aggregate per-chain production sampling at the paper settings. Parallel workers overlap that work; speedup depends on CPU and memory limits. Fixed-iteration SCS, both posterior comparisons, warmup, fitting and reference generation add to this. Actual CPU time and disk use depend on the machine. First measure a `reproduce` run; do not extrapolate performance from `quick` plots. See [the rerun guide](docs/RERUN.md) for individual commands and exact manuscript filenames, and [parallel execution](docs/PARALLEL.md) for CPU allocation, timing and resume rules.
 
 ## Experiments
 

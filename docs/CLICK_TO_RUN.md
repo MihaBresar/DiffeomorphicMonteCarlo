@@ -49,7 +49,7 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 1. Click **Set up environment** and wait for **Environment ready**. This installs
    the pinned packages inside this project and can take several minutes.
 2. Select **All seven experiments + posterior table**, leave **Quick check**
-   selected, and click **Start new run**. This checks that the computer can run
+   selected, choose **CPU workers** (start with 2–4), and click **Start new run**. This checks that the computer can run
    the complete pipeline. Quick-check graphs are not publication results.
 3. After the quick check succeeds, select **Full paper settings** and click
    **Start new run** again. This regenerates all five main figures, the extra
@@ -59,10 +59,12 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
    to view a graph. All files remain in **results → click-runs → dated folder**.
 
 Full paper runs can take many hours and several gigabytes. Keep the computer
-plugged in, awake, and available for the benchmark. The supplied comparisons use
-one worker to avoid competing chains distorting the wall-clock comparisons;
+plugged in, awake, and available for the benchmark. Independent chains can run on
+several CPU cores; methods are compared using the same worker setting. More
+workers need more memory. Linux/Windows workers are pinned to detected cores;
+macOS assigns cores through its scheduler. See [parallel execution](PARALLEL.md).
 GPU acceleration is not part of this reproduction configuration. Timing-based
-graphs will differ across machines.
+graphs will differ across machines and worker settings.
 
 ## Stop, resume, or redraw
 
@@ -71,7 +73,8 @@ graphs will differ across machines.
 - To continue later, reopen the launcher, choose the dated folder under
   **Saved launcher runs**, and click **Resume selected run**. This also works
   after a restart. Resume with the same code, Python environment and computer;
-  if you change computers, start a new run for comparable timings.
+  the launcher restores the original saved worker count.
+  If you change computers, start a new run for comparable timings.
 - Click **Rebuild figures** to redraw an existing completed run without
   sampling again. It requires all the relevant saved results.
 - Use **Close launcher** when finished. Closing only the browser tab does not
@@ -82,5 +85,7 @@ is saved as `launcher.log` in its dated results folder. Setup failures are
 displayed on the page. Existing command-line workflows remain available in
 [README](../README.md) and the [figure-by-figure rerun guide](RERUN.md).
 
-The launcher was exercised on macOS. Windows launch scripts and paths are
-provided, but have not been executed on a Windows computer in this validation.
+The launcher was exercised on macOS. Automated CI covers Linux and Windows
+worker execution; the Windows desktop launch button still requires a desktop
+check. Open `START_HERE.py` through the launcher files or IDLE, not `launcher/index.html`
+directly: the HTML interface needs the local Python runner.

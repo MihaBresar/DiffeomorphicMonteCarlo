@@ -3,6 +3,10 @@ import argparse
 from pathlib import Path
 import subprocess
 import sys
+import signal
+
+if hasattr(signal, 'SIGBREAK'):
+    signal.signal(signal.SIGBREAK, signal.default_int_handler)
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPERIMENTS = ['skew-t-200d-nuts', 'skew-t-200d-baselines', 'skew-t-100d-fixed',
@@ -15,12 +19,13 @@ def main():
     parser.add_argument('--output-root', type=Path)
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--plot-only', action='store_true')
+    parser.add_argument('--workers', type=int, default=1)
     args = parser.parse_args()
     output = (args.output_root or ROOT/'results'/args.preset).resolve()
     reference = output/'logistic-reference'
     if not args.plot_only:
         command = [sys.executable, str(ROOT/'prepare_reference.py'), '--preset', args.preset,
-                   '--output-dir', str(reference)]
+                   '--output-dir', str(reference), '--workers', str(args.workers)]
         if args.resume and reference.exists():
             command.append('--resume')
         subprocess.run(command, cwd=ROOT, check=True)
@@ -30,7 +35,7 @@ def main():
         if args.plot_only:
             command += ['--plot-only', str(directory)]
         else:
-            command += [name, '--preset', args.preset, '--output-dir', str(directory), '--reference-dir', str(reference)]
+            command += [name, '--preset', args.preset, '--output-dir', str(directory), '--reference-dir', str(reference), '--workers', str(args.workers)]
             if args.resume and (directory/'manifest.json').exists():
                 command.append('--resume')
         print(' '.join(command), flush=True)

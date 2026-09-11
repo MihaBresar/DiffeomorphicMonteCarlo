@@ -2,7 +2,7 @@
 
 **Regenerate all five manuscript figures and both rows of the PosteriorDB table.** The previous aggregate-only outputs cannot repair changes to targets, adaptation, references, or timing. Original PNGs remain archival assets and are not updated results.
 
-From the repository root, activate the Python 3.12 environment and install `requirements-cpu.txt`. The single command below runs everything in the correct order, with one sequential CPU worker:
+From the repository root, activate the Python 3.12 environment and install `requirements-cpu.txt`. The command below runs everything in the correct order with the default single worker. Add `--workers 4` for four parallel chains, or choose CPU workers in the launcher. Keep the same worker setting when resuming. See [parallel execution](PARALLEL.md); updating from the sequential-only code requires a new run directory.
 
 ```bash
 python scripts/reproduce_all.py --preset paper --output-root results/paper

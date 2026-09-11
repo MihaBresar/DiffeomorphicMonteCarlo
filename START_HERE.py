@@ -17,6 +17,7 @@ import sys
 import threading
 from urllib.parse import unquote, urlsplit
 import webbrowser
+from dcs_bench.cpu import cpu_info, validate_workers
 
 ROOT = Path(__file__).resolve().parent
 RUNS = ROOT/'results'/'click-runs'
@@ -70,9 +71,11 @@ def environment_ready():
         return False
 
 
-def commands_for_run(preset, experiment, directory, resume=False, plot_only=False):
+def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1):
     if preset not in PRESETS or experiment not in EXPERIMENTS:
         raise ValueError('Choose a listed preset and experiment')
+    if not plot_only:
+        validate_workers(workers)
     py = str(environment_python())
     directory = Path(directory)
     if experiment == 'all':
@@ -81,6 +84,8 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
             command.append('--plot-only')
         elif resume:
             command.append('--resume')
+        if not plot_only:
+            command += ['--workers', str(workers)]
         return [command]
     result = directory/experiment
     if plot_only:
@@ -88,12 +93,12 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
     commands = []
     reference = directory/'logistic-reference'
     if experiment == 'logistic-regression':
-        command = [py, '-u', str(ROOT/'prepare_reference.py'), '--preset', preset, '--output-dir', str(reference)]
+        command = [py, '-u', str(ROOT/'prepare_reference.py'), '--preset', preset, '--output-dir', str(reference), '--workers', str(workers)]
         if resume and reference.exists():
             command.append('--resume')
         commands.append(command)
     command = [py, '-u', str(ROOT/'run_experiment.py'), experiment, '--preset', preset,
-               '--output-dir', str(result), '--reference-dir', str(reference)]
+               '--output-dir', str(result), '--reference-dir', str(reference), '--workers', str(workers)]
     if resume and (result/'manifest.json').exists():
         command.append('--resume')
     commands.append(command)
@@ -108,6 +113,7 @@ class Controller:
         self.process = None
         self.cancelled = False
         self.ready = environment_ready()
+        self.cpu = cpu_info()
         self.status = 'Ready to run' if self.ready else 'Set up the experiment environment first'
         self.current_run = None
 
@@ -130,7 +136,7 @@ class Controller:
         with self.lock:
             return {'active': self.active, 'ready': self.ready, 'status': self.status,
                     'log': '\n'.join(self.messages), 'runs': self.saved_runs(), 'current_run': self.current_run,
-                    'folder': str(ROOT)}
+                    'folder': str(ROOT), 'cpu': self.cpu}
 
     def start_job(self, work, status):
         with self.lock:
@@ -158,7 +164,8 @@ class Controller:
                 raise RuntimeError('Run stopped')
             options = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt' else {'start_new_session': True}
             self.process = subprocess.Popen(command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, encoding='utf-8', errors='replace', bufsize=1, env=dict(os.environ, PYTHONUNBUFFERED='1'), **options)
+                text=True, encoding='utf-8', errors='replace', bufsize=1,
+                env=dict(os.environ, PYTHONUNBUFFERED='1', PYTHONUTF8='1', PYTHONIOENCODING='utf-8'), **options)
             process = self.process
         for line in process.stdout:
             self.log(line)
@@ -191,7 +198,7 @@ class Controller:
                 raise RuntimeError('Environment validation failed; see installation output above')
         self.start_job(work, 'Setting up the environment…')
 
-    def run(self, preset='quick', experiment='all', run_id=None, plot_only=False):
+    def run(self, preset='quick', experiment='all', run_id=None, plot_only=False, workers=1):
         if not self.ready:
             raise ValueError('Click Set up environment first')
         if run_id:
@@ -200,18 +207,19 @@ class Controller:
             directory = RUNS/run_id
             saved = json.loads((directory/'launcher-run.json').read_text())
             preset, experiment = saved['preset'], saved['experiment']
+            workers = saved.get('workers', 1)
         else:
             run_id = datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'-'+preset
             directory = RUNS/run_id
-        commands = commands_for_run(preset, experiment, directory, resume=bool(run_id and directory.exists()), plot_only=plot_only)
+        commands = commands_for_run(preset, experiment, directory, resume=bool(run_id and directory.exists()), plot_only=plot_only, workers=workers)
         def work():
             directory.mkdir(parents=True, exist_ok=True)
-            (directory/'launcher-run.json').write_text(json.dumps({'preset': preset, 'experiment': experiment}, indent=2)+'\n')
+            (directory/'launcher-run.json').write_text(json.dumps({'preset': preset, 'experiment': experiment, 'workers': workers}, indent=2)+'\n')
             self.current_run = run_id
             with (directory/'launcher.log').open('a', encoding='utf-8') as logfile:
                 for command in commands:
                     self.run_command(command, logfile)
-        self.start_job(work, 'Rebuilding figures…' if plot_only else f'Running {experiment} ({preset})…')
+        self.start_job(work, 'Rebuilding figures…' if plot_only else f'Running {experiment} ({preset}, up to {workers} workers)…')
 
     def stop(self):
         with self.lock:
@@ -282,7 +290,7 @@ def make_handler(controller, token):
                 if not 0 <= size <= 4096: raise ValueError('Invalid request size')
                 data = json.loads(self.rfile.read(size) or b'{}')
                 if self.path == '/setup': controller.setup()
-                elif self.path == '/run': controller.run(data.get('preset', 'quick'), data.get('experiment', 'all'))
+                elif self.path == '/run': controller.run(data.get('preset', 'quick'), data.get('experiment', 'all'), workers=data.get('workers', 1))
                 elif self.path == '/resume': controller.run(run_id=data['id'])
                 elif self.path == '/replot': controller.run(run_id=data['id'], plot_only=True)
                 elif self.path == '/show':

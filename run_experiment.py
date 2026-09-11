@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """Run, resume, or replot a named benchmark with a recorded configuration."""
 import os
+import signal
+import sys
+if os.name == 'nt':
+    # Greek parameter names must also work in redirected Windows console logs.
+    for _stream in (sys.stdout, sys.stderr):
+        if hasattr(_stream, 'reconfigure'):
+            _stream.reconfigure(encoding='utf-8', errors='backslashreplace')
+if hasattr(signal, 'SIGBREAK'):
+    signal.signal(signal.SIGBREAK, signal.default_int_handler)
 for _name in ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'VECLIB_MAXIMUM_THREADS', 'NUMEXPR_NUM_THREADS'):
     os.environ.setdefault(_name, '1')
 os.environ.setdefault('JAX_PLATFORMS', 'cpu')
