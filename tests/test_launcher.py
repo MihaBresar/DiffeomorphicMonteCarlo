@@ -10,61 +10,52 @@ from dcs_bench.cpu import cpu_info
 
 
 class LauncherTests(unittest.TestCase):
-    def test_joint_radial_audit_runs_separate_fresh_pipeline(self):
+    def test_single_scs_comparison_runs_fresh_pipeline(self):
         workers = min(2, cpu_info()['capacity'])
         for preset in ('quick', 'reproduce', 'paper'):
             with self.subTest(preset=preset):
-                command, = launcher.commands_for_run(preset, 'joint-r-step-audit', Path('results/test'),
+                command, = launcher.commands_for_run(preset, 'skew-t-100d-fixed', Path('results/test'),
                                                       workers=workers, ball_map_policy='vanilla')
-                self.assertIn(str(launcher.ROOT/'scripts/audit_joint_radial.py'), command)
+                self.assertIn(str(launcher.ROOT/'scripts/reproduce_scs_100d.py'), command)
                 self.assertEqual(command[command.index('--preset')+1], preset)
                 self.assertEqual(command[command.index('--workers')+1], str(workers))
                 self.assertEqual(command[command.index('--output-dir')+1],
-                                 str(Path('results/test')/'joint-r-step-audit'))
+                                 str(Path('results/test')/'skew-t-100d-fixed'))
                 self.assertNotIn('--ball-map-policy', command)
         for options in ({'resume': True}, {'plot_only': True}):
             with self.subTest(options=options), self.assertRaises(ValueError):
-                launcher.commands_for_run('quick', 'joint-r-step-audit', Path('results/test'), **options)
+                launcher.commands_for_run('quick', 'skew-t-100d-fixed', Path('results/test'), **options)
 
-    def test_timed_skew_audit_runs_separate_fresh_pipeline(self):
-        workers = min(2, cpu_info()['capacity'])
-        for preset in ('quick', 'reproduce', 'paper'):
-            with self.subTest(preset=preset):
-                command, = launcher.commands_for_run(preset, 'skew-t-timed-audit', Path('results/test'),
-                                                      workers=workers, ball_map_policy='vanilla')
-                self.assertIn(str(launcher.ROOT/'scripts/audit_skew_t_timed.py'), command)
-                self.assertEqual(command[command.index('--preset')+1], preset)
-                self.assertEqual(command[command.index('--workers')+1], str(workers))
-                self.assertEqual(command[command.index('--output-dir')+1],
-                                 str(Path('results/test')/'skew-t-timed-audit'))
-                self.assertNotIn('--ball-map-policy', command)
-        for options in ({'resume': True}, {'plot_only': True}):
-            with self.subTest(options=options), self.assertRaises(ValueError):
-                launcher.commands_for_run('quick', 'skew-t-timed-audit', Path('results/test'), **options)
+    def test_diagnostic_audits_are_archived_from_launcher(self):
+        for experiment in ('fixed-step-audit', 'symmetric-t-audit', 'skew-t-timed-audit', 'joint-r-step-audit'):
+            with self.subTest(experiment=experiment), self.assertRaises(ValueError):
+                launcher.commands_for_run('quick', experiment, Path('results/test'))
 
-    def test_symmetric_audit_runs_separate_fresh_pipeline(self):
-        workers = min(2, cpu_info()['capacity'])
-        for preset in ('quick', 'reproduce', 'paper'):
-            with self.subTest(preset=preset):
-                command, = launcher.commands_for_run(preset, 'symmetric-t-audit', Path('results/test'),
-                                                      workers=workers, ball_map_policy='vanilla')
-                self.assertIn(str(launcher.ROOT/'scripts/audit_symmetric_t.py'), command)
-                self.assertEqual(command[command.index('--preset')+1], preset)
-                self.assertEqual(command[command.index('--workers')+1], str(workers))
-                self.assertEqual(command[command.index('--output-dir')+1],
-                                 str(Path('results/test')/'symmetric-t-audit'))
-                self.assertNotIn('--ball-map-policy', command)
-        for options in ({'resume': True}, {'plot_only': True}):
-            with self.subTest(options=options), self.assertRaises(ValueError):
-                launcher.commands_for_run('quick', 'symmetric-t-audit', Path('results/test'), **options)
-
-    def test_tuning_audit_runs_separate_fresh_pipeline(self):
-        command, = launcher.commands_for_run('quick', 'fixed-step-audit', Path('results/test'))
-        self.assertIn(str(launcher.ROOT/'scripts/audit_fixed_steps.py'), command)
-        self.assertEqual(command[command.index('--preset')+1], 'quick')
-        self.assertNotIn('--ball-map-policy', command)
-        with self.assertRaises(ValueError):
-            launcher.commands_for_run('quick', 'fixed-step-audit', Path('results/test'), resume=True)
+    def test_visible_menu_has_one_scs_comparison_and_defaults_to_it(self):
+        from html.parser import HTMLParser
+        class ExperimentMenu(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.in_menu = False
+                self.options = []
+                self.labels = []
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if tag == 'select':
+                    self.in_menu = attrs.get('id') == 'experiment'
+                elif tag == 'option' and self.in_menu:
+                    self.options.append(attrs)
+            def handle_data(self, data):
+                if self.in_menu:
+                    self.labels.append(data)
+            def handle_endtag(self, tag):
+                if tag == 'select':
+                    self.in_menu = False
+        menu = ExperimentMenu()
+        menu.feed((launcher.ROOT/'launcher/index.html').read_text())
+        self.assertEqual({x['value'] for x in menu.options}, set(launcher.EXPERIMENTS))
+        self.assertEqual([x['value'] for x in menu.options if 'selected' in x], ['skew-t-100d-fixed'])
+        self.assertEqual(sum('SCS' in label for label in menu.labels), 1)
 
     def test_map_policy_reaches_production_not_reference_generation(self):
         commands = launcher.commands_for_run('paper', 'logistic-regression', Path('results/test'), ball_map_policy='vanilla')

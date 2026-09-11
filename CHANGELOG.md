@@ -1,5 +1,14 @@
 # Changes
 
+## Single 100D SCS comparison and compiled DCS
+
+- Simplified the default launcher to one skewed ν=3 comparison with DCS-RWM, DCS-BW and author SCS; previous audit choices are retired and their results retained.
+- Restored original DCS VI and continuous smoothed 0.234 adaptation, with correct physical initialization and unclipped production density.
+- Vendored the MIT-licensed paper-date SCS source unchanged and applied its original VI/step recipe to the shared normal-CDF target.
+- Compiled DCS sampling loops, cached radial quantities, and added numerical/RNG parity checks; pinned Numba and llvmlite.
+- Added 50 full-length chains per method, isolated sampling clocks, exact all-iteration radial estimates, original VsSCS panels and chain-level bias/variance reports.
+- Routed the launcher, CLI and All seven entry to the same current SCS experiment.
+
 ## Joint radial calibration
 
 - Added an independent R-and-step audit for the symmetric ν=3 and skewed ν=2 targets, with equal pilot sampling budgets and 8×8 candidate grids for each method.

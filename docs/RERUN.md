@@ -1,3 +1,7 @@
+# Default 100D comparison update
+
+To regenerate the current comparison, select **100D skewed t (ν=3): DCS-RWM, DCS-BW and SCS** in the launcher and start a fresh run. Run **Set up environment** first to install the new compiled-loop dependencies. This regenerates **VsSCS**, runtime, bias/variance and exact-value tables. The four diagnostic menus are retired; their old results remain intact. See [the single comparison protocol](SCS_100D.md).
+
 # What must be rerun
 
 **Skewed Student-t at equal time:** select **100D skewed t: equal-time DCS/SCS**

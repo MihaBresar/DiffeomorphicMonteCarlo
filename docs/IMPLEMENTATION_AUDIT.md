@@ -1,5 +1,9 @@
 # DCS/SCS implementation and tuning audit
 
+This is a historical audit. The current default 100D comparison uses the
+[original DCS recipes, author SCS and compiled DCS loops](SCS_100D.md).
+The frozen-adaptation and launcher descriptions below describe the earlier release.
+
 The September 11 update restores the original figures, removes the physical-core
 worker cap, improves scheduling and density-evaluation speed, and restores fresh
 VI batches. It does not hard-code a winning sampler or reuse old plotted values.

@@ -23,8 +23,7 @@ ROOT = Path(__file__).resolve().parent
 RUNS = ROOT/'results'/'click-runs'
 PRESETS = ('quick', 'reproduce', 'paper')
 EXPERIMENTS = ('all', 'skew-t-200d-nuts', 'skew-t-200d-baselines', 'skew-t-100d-fixed',
-               'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression',
-               'fixed-step-audit', 'symmetric-t-audit', 'skew-t-timed-audit', 'joint-r-step-audit')
+               'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression')
 
 
 def environment_python():
@@ -81,12 +80,10 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
             raise ValueError('Choose a listed DCS map policy')
     py = str(environment_python())
     directory = Path(directory)
-    audits = {'fixed-step-audit': 'audit_fixed_steps.py', 'symmetric-t-audit': 'audit_symmetric_t.py',
-              'skew-t-timed-audit': 'audit_skew_t_timed.py', 'joint-r-step-audit': 'audit_joint_radial.py'}
-    if experiment in audits:
+    if experiment == 'skew-t-100d-fixed':
         if resume or plot_only:
-            raise ValueError('The tuning audit starts from scratch in a new results folder.')
-        return [[py, '-u', str(ROOT/'scripts'/audits[experiment]), '--preset', preset,
+            raise ValueError('The 100D SCS comparison starts from scratch in a new results folder.')
+        return [[py, '-u', str(ROOT/'scripts/reproduce_scs_100d.py'), '--preset', preset,
                  '--workers', str(workers), '--output-dir', str(directory/experiment)]]
     if experiment == 'all':
         command = [py, '-u', str(ROOT/'scripts/reproduce_all.py'), '--preset', preset, '--output-root', str(directory)]
@@ -209,7 +206,7 @@ class Controller:
                 raise RuntimeError('Environment validation failed; see installation output above')
         self.start_job(work, 'Setting up the environment…')
 
-    def run(self, preset='quick', experiment='all', run_id=None, plot_only=False, workers=1, ball_map_policy='mobius'):
+    def run(self, preset='quick', experiment='skew-t-100d-fixed', run_id=None, plot_only=False, workers=1, ball_map_policy='mobius'):
         if not self.ready:
             raise ValueError('Click Set up environment first')
         if run_id:
@@ -310,7 +307,7 @@ def make_handler(controller, token):
                 if not 0 <= size <= 4096: raise ValueError('Invalid request size')
                 data = json.loads(self.rfile.read(size) or b'{}')
                 if self.path == '/setup': controller.setup()
-                elif self.path == '/run': controller.run(data.get('preset', 'quick'), data.get('experiment', 'all'),
+                elif self.path == '/run': controller.run(data.get('preset', 'quick'), data.get('experiment', 'skew-t-100d-fixed'),
                     workers=data.get('workers', 1), ball_map_policy=data.get('ball_map_policy', 'mobius'))
                 elif self.path == '/resume': controller.run(run_id=data['id'])
                 elif self.path == '/replot': controller.run(run_id=data['id'], plot_only=True)

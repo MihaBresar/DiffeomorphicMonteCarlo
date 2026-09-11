@@ -37,8 +37,16 @@ def main():
             command += ['--plot-only', str(directory)]
         else:
             command += [name, '--preset', args.preset, '--output-dir', str(directory), '--reference-dir', str(reference),
-                        '--workers', str(args.workers), '--ball-map-policy', args.ball_map_policy]
+                        '--workers', str(args.workers)]
+            if name != 'skew-t-100d-fixed':
+                command += ['--ball-map-policy', args.ball_map_policy]
             if args.resume and (directory/'manifest.json').exists():
+                if name == 'skew-t-100d-fixed':
+                    import json
+                    manifest = json.loads((directory/'manifest.json').read_text(encoding='utf-8'))
+                    if manifest.get('protocol') == 'original-dcs-author-scs-v1' and manifest.get('status') == 'complete':
+                        continue
+                    raise ValueError('The single SCS comparison requires a fresh output folder after an interrupted run.')
                 command.append('--resume')
         print(' '.join(command), flush=True)
         subprocess.run(command, cwd=ROOT, check=True)

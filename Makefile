@@ -1,5 +1,5 @@
 PYTHON ?= python3
-EXPERIMENT ?= skew-t-50d-nu-0.5
+EXPERIMENT ?= skew-t-100d-fixed
 .PHONY: list test quick quick-all paper
 list:
 	$(PYTHON) run_experiment.py --list

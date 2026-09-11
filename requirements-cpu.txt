@@ -15,10 +15,12 @@ jax==0.4.35
 jaxlib==0.4.35
 jaxopt==0.8.5
 kiwisolver==1.5.1
+llvmlite==0.44.0
 matplotlib==3.9.4
 ml-dtypes==0.5.4
 multipledispatch==1.0.0
 numpy==1.26.4
+numba==0.61.2
 numpyro==0.15.3
 opt-einsum==3.4.0
 optax==0.2.5

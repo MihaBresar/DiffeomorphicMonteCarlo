@@ -1,0 +1,21 @@
+{
+  "repository": "liusf15/sub-cauchy-sampler",
+  "commit": "ea6f27a6cb1d0ca90d8c1cd92c32fc3dcf8ea565",
+  "files": {
+    "src/scp_core.py": {
+      "sha256": "4772c4944c5e9d96631d095b5b8d7749b5dc52932394391a69ba19c386c0c452",
+      "git_blob_sha": "c611aad0b209df92b76f77fe9be905a52e91d13d",
+      "bytes": 8801
+    },
+    "src/train.py": {
+      "sha256": "cad66edc58b9fb9b9943b61951ff6ebad09fc86c8f0e3aed993f965dcc5604c1",
+      "git_blob_sha": "d4f26c54ce21c6129eff1bdbcec6378b4bc24990",
+      "bytes": 735
+    },
+    "LICENSE": {
+      "sha256": "d450c91c0784a70a33e001af1e50379412f8caeef9a5ae4026c682291dc20e37",
+      "git_blob_sha": "36f82dd66179f18dcde82a2ad56efb49e227b26e",
+      "bytes": 1066
+    }
+  }
+}

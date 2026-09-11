@@ -52,5 +52,7 @@
   "figure": "VsSCS",
   "experiment": "skew-t-100d-fixed",
   "preset": "paper",
-  "map_scale_initialization": "radial_median"
+  "map_scale_initialization": "radial_median",
+  "entrypoint": "scripts/reproduce_scs_100d.py",
+  "configuration_note": "CLI and launcher use the dedicated original-DCS/author-SCS protocol and presets. Remaining fields preserve the previous engine configuration for archived audits."
 }

@@ -2,7 +2,7 @@
 
 Reproducible experiments for *Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions*, by Miha Brešar and Aleksandar Mijatović.
 
-This corrected implementation centralizes target densities and transformations, saves individual chains, and regenerates figures and tables from saved results. The main experiments freeze tuning before retained sampling; the separate equal-time skewed audit also evaluates continued step adaptation for both DCS and SCS. The synthetic and logistic targets are local constructions; only Eight Schools and GARCH use PosteriorDB. Empirical examples are not required to satisfy the paper's sufficient theorem assumptions.
+This corrected implementation centralizes target densities and transformations, saves individual chains, and regenerates figures and tables from saved results. The default 100D comparison restores original DCS fitting and continued step adaptation and uses the SCS authors’ original implementation. Other main experiments freeze proposal tuning before retained sampling. The synthetic and logistic targets are local constructions; only Eight Schools and GARCH use PosteriorDB. Empirical examples are not required to satisfy the paper's sufficient theorem assumptions.
 
 ## Run with clicks — no commands needed
 
@@ -42,7 +42,7 @@ On Windows activate with `.venv\Scripts\activate`. Local validation uses macOS A
 # All short execution checks, including independent logistic references:
 python scripts/reproduce_all.py --preset quick --output-root results/quick
 
-# A smaller scientific reproduction (8 chains; not the paper configuration):
+# Smaller reproductions (20 chains for the default SCS comparison, otherwise 8):
 python scripts/reproduce_all.py --preset reproduce --output-root results/reproduce
 
 # All full paper experiments and the combined posterior table:
@@ -66,35 +66,33 @@ The full run is substantial. Timed synthetic/regression comparisons require thou
 |---|---|---|
 | `skew-t-200d-nuts` | d=200, ν=3, α=(20,-30,0,…) | 50 chains/method, 20 s each |
 | `skew-t-200d-baselines` | Same target | 50 chains/method, 10 s each |
-| `skew-t-100d-fixed` | d=100, ν=3, α=(100,-100,0,…) | 20 chains/method, 500,000 steps each |
+| `skew-t-100d-fixed` | d=100, ν=3, α=(100,-100,0,…) | 50 chains/method, 500,000 steps each; original DCS-RWM/BW and author SCS |
 | `skew-t-50d-nu-0.5` | Symmetric t, d=50, ν=0.5 | 50 chains/method, 500,000 steps each |
 | `logistic-regression` | d=20, independent t priors, ν=4 and 6 | 20 chains/method/ν, 30 s each |
 | `eight-schools` | Centered hierarchy, log τ coordinate | 50 chains, 150,000 NUTS steps; DCS matched to mean NUTS production time |
 | `garch11` | Four-parameter PosteriorDB GARCH | Same posterior timing design |
 
-The legacy name `skew-t-100d-baselines` forwards to the corrected **200-dimensional** configuration with a message. Every setting is explicit in `configs/<identifier>.json`; the paper profile no longer inherits script constants. `--dry-run` displays the resolved configuration.
+The legacy name `skew-t-100d-baselines` forwards to the corrected **200-dimensional** configuration with a message. The default comparison’s presets are explicit in `scripts/reproduce_scs_100d.py`; other experiment settings are in `configs/<identifier>.json`. `--dry-run` displays the resolved configuration.
 
-The launcher also offers **100D skewed t: equal-time DCS/SCS**: ν=2, β=2,
-α=(100,−100,0,…), 20 seconds of production per chain at full settings.
-It compares fitted and fully untuned maps, each with independently pretuned
-steps that are either frozen or continue adapting using the same smoothed
-dual-averaging rule for both methods. Its eight cases save exact iteration
-counts, tail-probability errors and descriptive mean-norm squared errors.
-See [the equal-time protocol and results](docs/SKEW_T_TIMED.md).
+The default **100D skewed t (ν=3): DCS-RWM, DCS-BW and SCS** is one comparison,
+with equal production iterations and measured sampling time. DCS uses its original
+VI and continuous smoothed adaptation toward 0.234; SCS uses the author’s original
+VI and fixed step 0.1. Both implementations compile their production loops before
+timing. The shared target is the original DCS normal-CDF skew-t; the SCS paper’s
+Student-t-CDF target is different. See [the exact protocol](docs/SCS_100D.md).
+The command-line identifier routes to the same runner as the launcher.
 
-The separate **joint R-and-step audit** tests both the symmetric ν=3 and skewed
-ν=2 targets with equal independent pilot sampling time for DCS-BW and SCS.
-It includes R=√(d+1), compares joint selection with three fixed-R controls,
-and records boundary crossings separately from final rejections. Every
-production step is pretuned and frozen. See [the joint calibration protocol](docs/JOINT_RADIAL.md).
+Earlier fitting, symmetric, equal-time and joint-radius audits remain in `scripts`,
+`validation` and their protocol documents for provenance. They are no longer
+launcher choices.
 
 ## Saved artifacts
 
-Each run saves `configuration.json`, `manifest.json`, `summary.json`, `chain_metrics.csv`, and PNG/PDF figures. Each scenario contains map parameters and optimization history, its independent reference and provenance, and one compressed NPZ checkpoint per method/chain. Checkpoints contain all retained physical-coordinate draws and metadata; NumPy loads them with `allow_pickle=False`. Reference preparation has its own checkpoints. Failed or empty chains raise an error and leave the run marked failed; they are never replaced by zeros.
+The other six experiments save `configuration.json`, `manifest.json`, `summary.json`, `chain_metrics.csv`, and PNG/PDF figures. Each scenario contains map parameters and optimization history, its independent reference and provenance, and one compressed NPZ checkpoint per method/chain. Checkpoints contain all retained physical-coordinate draws and metadata; NumPy loads them with `allow_pickle=False`. Reference preparation has its own checkpoints. Failed or empty chains raise an error and leave the run marked failed; they are never replaced by zeros.
 
 Summary files report chain estimates, MSE/RMSE and descriptive bootstrap intervals, functional MCSE, bulk/tail ESS, rank R-hat, NUTS divergences, tree saturation indicators, work counts, frozen tuning and timings. Unavailable diagnostics are null with an explanation. MSE is averaged over independent-chain squared errors. Posterior references remain finite Monte Carlo estimates, with their uncertainty reported.
 
-Each skew-t run also creates a supplementary `*_directional` figure. Radial functions cannot assess whether skewness is sampled correctly, so these check a bounded directional probability and a bounded directional mean against independent references.
+Each of the other skew-t runs also creates a supplementary `*_directional` figure. Radial functions cannot assess whether skewness is sampled correctly, so these check a bounded directional probability and a bounded directional mean against independent references.
 
 The original Q–Q, radial boxplot and linear MSE figure families are restored,
 including both fixed-time and fixed-iteration comparisons. Additional directional
@@ -102,7 +100,7 @@ and MSE-uncertainty plots live in `figures/supplementary`. Bars show full-precis
 values; `paper_values.html`, `paper_values.csv` and `sample_counts.csv` expose
 the exact stored numbers. See [the figure guide](docs/FIGURES.md).
 
-The **DCS map** selector offers **Möbius map** (the default VI fit of R, centre
+For experiments other than the default 100D comparison, the **DCS map** selector offers **Möbius map** (the default VI fit of R, centre
 and Möbius parameters) and **Vanilla map** (fully untuned R=1, centre=0 and
 Möbius=0). Vanilla retains the experiment's β and skips map fitting entirely.
 Both choices keep proposal-scale warmup and freezing unchanged; SCS keeps its
@@ -112,18 +110,6 @@ identity maps. For command-line runs use `--ball-map-policy mobius` or
 `--ball-map-policy vanilla`. Fixed R=√d has been removed from new runs; saved
 results can still be replotted. See [the implementation audit](docs/IMPLEMENTATION_AUDIT.md)
 for earlier tuning comparisons and their limits.
-
-For a controlled skew-target comparison of map fitting and proposal tuning,
-select **100D: DCS/SCS map and tuning audit** in the launcher. See the
-[full-length audit and exact results](docs/FIXED_STEP_AUDIT.md).
-
-To remove map pretuning from **both** methods, select
-**100D symmetric t: untuned maps and step tuning**. This uses exactly symmetric
-Student-t₃ targets. Every proposal step is pretuned, using warmup or one of two
-independent-pilot selection rules, then frozen. Scale-only VI controls separate
-fitting R from proposal tuning.
-See [the symmetric comparison](docs/SYMMETRIC_T_AUDIT.md). Both audits are
-separate from the original fixed-time and fixed-step experiments.
 
 ## Use the sampler on another target
 

@@ -49,11 +49,39 @@ def main(argv=None):
         print('\n'.join(experiment_names()))
         return 0
     if args.plot_only:
+        summary_path = args.plot_only/'summary.json'
+        if summary_path.exists():
+            summary = json.loads(summary_path.read_text(encoding='utf-8'))
+            if summary.get('config', {}).get('protocol') == 'original-dcs-author-scs-v1':
+                from scripts.scs_100d_figures import render_report
+                render_report(args.plot_only, summary)
+                print(args.plot_only.resolve())
+                return 0
         from dcs_bench.plotting import rebuild
         print(rebuild(args.plot_only))
         return 0
     if args.experiment is None:
         p.error('choose an experiment or --plot-only SAVED_RUN')
+    if args.experiment == 'skew-t-100d-fixed':
+        if args.resume:
+            p.error('The single SCS comparison starts from scratch; choose a fresh output folder.')
+        from scripts.reproduce_scs_100d import main as single_main
+        command = ['--preset', args.preset, '--workers', str(args.workers or 1)]
+        if args.output_dir:
+            command += ['--output-dir', str(args.output_dir)]
+        if args.dry_run:
+            command.append('--dry-run')
+        for name in ('runs', 'iterations', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples', 'seed'):
+            value = getattr(args, name)
+            if value is not None:
+                command += ['--'+name.replace('_', '-'), str(value)]
+        if args.ball_map_policy == 'vanilla' or args.ball_scale_policy is not None or args.time_budget is not None:
+            p.error('This comparison uses the original fitted DCS map and fixed iterations; map variants and time budgets are not supported.')
+        unused = [name for name in ('nuts_samples', 'nuts_max_depth', 'nuts_batch_size', 'nuts_target_accept',
+                                     'reference_samples', 'reference_batch_size') if getattr(args, name) is not None]
+        if unused:
+            p.error('These options are not used by the single SCS comparison: '+', '.join(unused))
+        return single_main(command)
     if args.experiment in ALIASES:
         print(f'Legacy name {args.experiment} now resolves to {ALIASES[args.experiment]} (d=200).', file=sys.stderr)
     overrides = {k: v for k, v in vars(args).items() if k not in ('experiment', 'list', 'preset', 'output_dir', 'reference_dir', 'resume', 'plot_only', 'dry_run')}

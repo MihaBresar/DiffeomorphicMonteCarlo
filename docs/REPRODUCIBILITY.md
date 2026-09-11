@@ -1,5 +1,10 @@
 # Reproducibility and timing policy
 
+The default 100D original-DCS/author-SCS comparison has its own explicitly
+recorded [protocol](SCS_100D.md): DCS continues smoothed adaptation, SCS uses
+its published example step, and both compiled production loops are timed.
+The policies below describe the other main experiments.
+
 All paper inputs are explicit JSON files. The manifest records their resolved values, scientific source hashes, Git commit/status when available, Python and package versions, OS/CPU count, JAX devices, float64/CPU policy and numerical-library thread settings. A run made from a dirty or uncommitted checkout records that fact; use a tagged clean checkout for the publication archive.
 
 Benchmarks support bounded parallel chains through `--workers N` and the launcher's CPU-worker selector. Methods run one at a time. Workers use fresh Python processes, single-thread numerical-library settings, and distinct allowed CPU threads on Linux/Windows, filling physical cores before SMT siblings; macOS scheduling remains OS-managed. Worker allocation, actual thread settings and total invocation wall time are recorded. Hardware sharing, thermal throttling and other active processes still affect wall-time experiments. Keep the same worker count for comparisons and resumed runs; see [parallel execution](PARALLEL.md). The common log-density work counts are complementary to timing; a target evaluation is not assumed to cost the same as a gradient evaluation.

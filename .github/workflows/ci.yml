@@ -31,6 +31,8 @@ jobs:
         run: python -c "from dcs_bench.cpu import cpu_info; import os; info=cpu_info(); print(info); open(os.environ['GITHUB_ENV'], 'a').write('BENCH_WORKERS='+str(min(2, info['capacity']))+'\n')"
       - run: python -m unittest discover -s tests -v
       - run: python -m examples.basic_sampler
+      - run: python run_experiment.py skew-t-100d-fixed --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-single-scs
+      - run: python run_experiment.py --plot-only results/ci-single-scs
       - run: python prepare_reference.py --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-reference
       - run: python run_experiment.py skew-t-200d-nuts --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci
       - run: python run_experiment.py --plot-only results/ci
@@ -52,3 +54,4 @@ jobs:
             results/ci-skew-timed
             results/ci-joint-r-step
             results/ci-superheavy-counts
+            results/ci-single-scs
