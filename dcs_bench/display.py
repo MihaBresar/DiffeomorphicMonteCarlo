@@ -42,4 +42,6 @@ def figure_ticks(fig):
         for axis, label in ((ax.xaxis, ax.get_xlabel()), (ax.yaxis, ax.get_ylabel())):
             if isinstance(axis.get_major_formatter(), ScalarFormatter):
                 count = any(word in label.lower() for word in ('iterations', 'chain number', 'samples', 'retained values', 'draws'))
-                axis.set_major_formatter(FuncFormatter(lambda value, position, count=count: number(value, integer=count)))
+                error = any(word in label.lower() for word in ('mse', 'rmse', 'squared error', 'estimation error'))
+                axis.set_major_formatter(FuncFormatter(lambda value, position, count=count, error=error:
+                                                       number(value, integer=count, scientific=error)))

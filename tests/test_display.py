@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from dcs_bench.display import number, cell
+from dcs_bench.display import number, cell, figure_ticks
 
 
 class DisplayTests(unittest.TestCase):
@@ -33,6 +33,26 @@ class DisplayTests(unittest.TestCase):
         self.assertIn('7.51e-05', rendered)
         self.assertIn('500000', rendered)
         self.assertEqual(data, before)
+
+    def test_error_axis_ticks_remain_distinct_above_scientific_threshold(self):
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        for label in ('Mean Squared Error', 'MSE', 'RMSE relative to reference', 'Squared estimation error'):
+            fig, ax = plt.subplots()
+            try:
+                ax.set_ylabel(label)
+                ax.set_yticks([.010, .012, .014])
+                ax.set_xlabel('Generated iterations')
+                ax.set_xticks([1000, 2000, 3000])
+                figure_ticks(fig)
+                formatted = [ax.yaxis.get_major_formatter()(value, index)
+                             for index, value in enumerate((.010, .012, .014))]
+                self.assertEqual(formatted, ['1.00e-02', '1.20e-02', '1.40e-02'])
+                self.assertEqual(len(set(formatted)), 3)
+                self.assertEqual(ax.xaxis.get_major_formatter()(2000, 1), '2000')
+            finally:
+                plt.close(fig)
 
 
 if __name__ == '__main__':
