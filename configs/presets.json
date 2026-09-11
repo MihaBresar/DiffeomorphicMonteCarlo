@@ -1,16 +1,31 @@
 {
-  "quick": {
-    "HEAVY_TAILS_NUM_RUNS": 2,
-    "HEAVY_TAILS_TIME_BUDGET": 1.0,
-    "HEAVY_TAILS_NUM_ITERS": 1000,
-    "HEAVY_TAILS_REFERENCE_SAMPLES": 10000,
-    "HEAVY_TAILS_REFERENCE_BATCH_SIZE": 10000,
-    "HEAVY_TAILS_OPTIMIZATION_STEPS": 25,
-    "HEAVY_TAILS_OPTIMIZATION_SAMPLES": 250,
-    "HEAVY_TAILS_WARMUP_STEPS": 100,
-    "HEAVY_TAILS_NUTS_SAMPLES": 200,
-    "HEAVY_TAILS_NUTS_WARMUP": 100,
-    "HEAVY_TAILS_WORKERS": 1
+  "paper": {
+    "description": "Exact settings are in each named configuration JSON; no module defaults."
   },
-  "paper": {}
+  "quick": {
+    "runs": 2,
+    "warmup": 100,
+    "thin": 1,
+    "iterations": 500,
+    "time_budget": 1.0,
+    "nuts_samples": 128,
+    "nuts_batch_size": 8,
+    "optimizer_steps": 20,
+    "optimizer_samples": 128,
+    "reference_samples": 10000,
+    "reference_batch_size": 1000
+  },
+  "reproduce": {
+    "runs": 8,
+    "warmup": 1000,
+    "thin": 10,
+    "iterations": 25000,
+    "time_budget": 5.0,
+    "nuts_samples": 5000,
+    "nuts_batch_size": 16,
+    "optimizer_steps": 400,
+    "optimizer_samples": 500,
+    "reference_samples": 100000,
+    "reference_batch_size": 5000
+  }
 }

@@ -1,148 +1,92 @@
-# Heavy-Tailed Sampling Benchmarks for a Projection Sampler
+# Diffeomorphic Markov chain Monte Carlo
 
-This repository contains the simulation code supporting a paper on a novel
-projection sampler for challenging heavy-tailed targets.  It preserves the
-research implementations while adding stable experiment names, portable data,
-small smoke configurations, saved figures, and per-run provenance files.
+Reproducible experiments for *Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions*, by Miha Brešar and Aleksandar Mijatović.
 
-All benchmark model specifications and ground-truth/reference quantities are
-sourced from PosteriorDB. Some experiment modules reproduce reference
-quantities locally with fixed-seed Monte Carlo calculations; those local
-calculations should be checked against the corresponding pinned PosteriorDB
-records before the final paper release.
+This corrected implementation centralizes target densities and transformations, freezes tuning before retained sampling, saves individual chains, and regenerates figures and tables from saved results. The synthetic and logistic targets are local constructions; only Eight Schools and GARCH use PosteriorDB. Empirical examples are not required to satisfy the paper's sufficient theorem assumptions.
 
-The repository deliberately does **not** make a performance claim in this
-README.  Before using any generated number in a manuscript, read the
-[validation notes](docs/VALIDATION.md); they identify checks that are still
-needed to establish the intended target/reference correspondence.
+## Run with clicks — no commands needed
 
-## Quick start
+Download this repository using **Code → Download ZIP**, extract it, and install
+**Python 3.12 (64-bit)**. On Windows double-click **Start.bat**; on macOS open
+**Start.command**. Alternatively, open **START_HERE.py** in Python's IDLE editor
+and choose **Run → Run Module** (F5).
 
-Use a clean Python 3.11 environment.  This is the documented CPU baseline;
-record the exact installed package set for a final paper run.
+In the browser, click **Set up environment**, then **Start new run** with
+**Quick check** selected. Once that succeeds, choose **Full paper settings**
+for the publication runs. Buttons also resume saved runs, rebuild figures,
+and open results. See the [step-by-step click-to-run guide](docs/CLICK_TO_RUN.md)
+for installation, moving to another computer, and troubleshooting. These
+experiments run locally on your computer.
+
+## Install and check from a terminal
+
+Use **Python 3.12**, a CPU, and a clean environment. The complete dependency closure is pinned in `requirements-cpu.txt`.
 
 ```bash
-python3.11 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
 python -m pip install -r requirements-cpu.txt
 python -m unittest discover -s tests -v
-
-python run_experiment.py --list
+python -m examples.basic_sampler
 python run_experiment.py skew-t-50d-nu-0.5 --preset quick
 ```
 
-Continuous integration installs and imports this dependency stack and runs the
-repository-contract checks, but it does not certify the numerical conclusions
-of a full scientific experiment.
+On Windows activate with `.venv\Scripts\activate`. The local validation was on macOS ARM64; Linux is covered by the supplied CI configuration, not a claim of an already completed remote CI run. Other Python/JAX versions are not part of the tested environment.
 
-`quick` is a reduced smoke profile.  It verifies the execution path and writes
-artifacts; it is not intended to reproduce paper-quality estimates.  To use a
-module's original paper-scale constants, use `--preset paper`:
+## Regenerate results
 
 ```bash
-python run_experiment.py skew-t-100d-baselines --preset paper \
-  --output-dir results/paper/skew-t-100d-baselines
+# All short execution checks, including independent logistic references:
+python scripts/reproduce_all.py --preset quick --output-root results/quick
+
+# A smaller scientific reproduction (8 chains; not the paper configuration):
+python scripts/reproduce_all.py --preset reproduce --output-root results/reproduce
+
+# All full paper experiments and the combined posterior table:
+python scripts/reproduce_all.py --preset paper --output-root results/paper
+
+# Continue interrupted work; completed chains are checked and reused:
+python scripts/reproduce_all.py --preset paper --output-root results/paper --resume
+
+# Rebuild figures/tables without running samplers:
+python scripts/reproduce_all.py --preset paper --output-root results/paper --plot-only
 ```
 
-Use `--dry-run` to inspect the command and output location without starting an
-experiment.  Command-line overrides such as `--workers`, `--runs`,
-`--time-budget`, `--iterations`, `--reference-samples`,
-`--reference-batch-size`, and `--optimizer-steps` make an invocation explicit
-and are stored in its manifest.  The runner rejects a flag that is not used by
-the chosen experiment and automatically chooses a compatible reference batch
-size when only `--reference-samples` is supplied.
+The full run is substantial. The four timed synthetic/regression comparisons alone require at least 7,900 seconds of sequential production sampling at the paper settings. Fixed-iteration SCS, both posterior comparisons, warmup, fitting and reference generation add to this. Actual CPU time and disk use depend on the machine. First measure a `reproduce` run; do not extrapolate performance from `quick` plots. See [the rerun guide](docs/RERUN.md) for individual commands and exact manuscript filenames.
 
-## What a run saves
+## Experiments
 
-Each successful CLI run writes to `results/<experiment>/<UTC timestamp>/` by
-default:
+| Identifier | Paper target | Production design |
+|---|---|---|
+| `skew-t-200d-nuts` | d=200, ν=3, α=(20,-30,0,…) | 50 chains/method, 20 s each |
+| `skew-t-200d-baselines` | Same target | 50 chains/method, 10 s each |
+| `skew-t-100d-fixed` | d=100, ν=3, α=(100,-100,0,…) | 20 chains/method, 500,000 steps each |
+| `skew-t-50d-nu-0.5` | Symmetric t, d=50, ν=0.5 | 50 chains/method, 10 s each |
+| `logistic-regression` | d=20, independent t priors, ν=4 and 6 | 20 chains/method/ν, 30 s each |
+| `eight-schools` | Centered hierarchy, log τ coordinate | 50 chains, 150,000 NUTS steps; DCS matched to mean NUTS production time |
+| `garch11` | Four-parameter PosteriorDB GARCH | Same posterior timing design |
 
-```text
-results/<experiment>/<timestamp>/
-├── configuration.json  # model and sampler settings reported by the module
-├── manifest.json       # outer CLI, child command, package/JAX/platform metadata
-├── run.log             # runner header plus combined child stdout/stderr
-├── summary.json        # aggregate numerical diagnostics
-└── figures/            # saved PNG and PDF figures (validate before publication)
+The legacy name `skew-t-100d-baselines` forwards to the corrected **200-dimensional** configuration with a message. Every setting is explicit in `configs/<identifier>.json`; the paper profile no longer inherits script constants. `--dry-run` displays the resolved configuration.
+
+## Saved artifacts
+
+Each run saves `configuration.json`, `manifest.json`, `summary.json`, `chain_metrics.csv`, and PNG/PDF figures. Each scenario contains map parameters and optimization history, its independent reference and provenance, and one compressed NPZ checkpoint per method/chain. Checkpoints contain all retained physical-coordinate draws and metadata; NumPy loads them with `allow_pickle=False`. Reference preparation has its own checkpoints. Failed or empty chains raise an error and leave the run marked failed; they are never replaced by zeros.
+
+Summary files report chain estimates, MSE/RMSE and descriptive bootstrap intervals, functional MCSE, bulk/tail ESS, rank R-hat, NUTS divergences, tree saturation indicators, work counts, frozen tuning and timings. Unavailable diagnostics are null with an explanation. MSE is averaged over independent-chain squared errors. Posterior references remain finite Monte Carlo estimates, with their uncertainty reported.
+
+Each skew-t run also creates a supplementary `*_directional` figure. Radial functions cannot assess whether skewness is sampled correctly, so these check a bounded directional probability and a bounded directional mean against independent references.
+
+## Use the sampler on another target
+
+```python
+import numpy as np
+from dcs_bench.api import sample
+
+log_density = lambda x: -2.5 * np.log1p(np.dot(x, x) / 3)
+x, info = sample(log_density, initial=np.zeros(2), draws=10000,
+                 warmup=1500, beta=2, seed=81)
 ```
 
-`results/` is intentionally ignored by Git.  Keep the directory for each
-manuscript figure, or archive it alongside the paper's data/code release.
+`sample` needs no gradients; it accepts DCS-BW, DCS-RWM and DCS-HnR. Benchmark map fitting uses JAX gradients. [Target and coordinate definitions](docs/TARGETS.md), [timing and reproducibility](docs/REPRODUCIBILITY.md), [validation](docs/VALIDATION.md), and [manuscript changes](docs/MANUSCRIPT_CHANGES.md) explain the scientific choices.
 
-## Experiment catalogue
-
-| Public identifier | Target and comparison | Paper-scale profile |
-| --- | --- | --- |
-| `eight-schools` | Centered Eight Schools funnel; NumPyro NUTS vs. projected slice/HnR | 50 chains; 150,000 post-warmup NUTS draws per chain |
-| `garch11` | PosteriorDB GARCH(1,1); NumPyro NUTS vs. projected slice/HnR | 50 chains; 150,000 post-warmup NUTS draws per chain |
-| `logistic-regression` | Student-t-prior logistic regression at ν=4, 6; DCS-BW/PBW vs. SCS | 20 chains per sampler/ν; 20 seconds per chain |
-| `skew-t-50d-nu-0.5` | 50-dimensional skew-t at ν=0.5; DCS-RWM, DCS-BW/PBW, SCS | 50 chains; 10 seconds per chain; 10M-draw reference estimate |
-| `skew-t-100d-fixed` | 100-dimensional skew-t at ν=2; DCS-RWM, DCS-BW/PBW, SCS | 20 chains; 500,000 iterations per chain; 10M-draw reference estimate |
-| `skew-t-200d-nuts` | 200-dimensional skew-t at ν=3; DCS-BW/PBW vs. BlackJAX NUTS | 50 chains; 20 seconds per chain; 10M-draw reference estimate |
-| `skew-t-100d-baselines` | 100-dimensional skew-t at ν=3; DCS-BW/PBW, Gaussian RWM, symmetric α-stable RWM (α=0.5), BlackJAX NUTS | 50 chains; 10 seconds per chain; 10M-draw reference estimate |
-
-Further details, including the exact module and output diagnostics, are in
-[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md).
-
-## Repository layout
-
-```text
-experiments/            Descriptive experiment modules; run through the CLI
-configs/presets.json    `quick` overrides and the empty `paper` profile
-data/raw/garch11.json   Bundled PosteriorDB GARCH(1,1) data
-figures/archival/       Original supplied figures, retained as archival assets
-docs/                   Reproduction, data provenance, and validation notes
-run_experiment.py       Public entry point
-run_*.py                Descriptive one-experiment convenience entry points
-reproducibility.py      Shared artifact/provenance helpers
-```
-
-Descriptive `run_*.py` convenience entry points are provided for direct
-execution. For reproducible work, prefer `run_experiment.py` and the stable
-identifiers above because that path records the selected preset and run
-metadata.
-
-## Terminology and comparability
-
-The original working scripts used several overlapping labels (for example,
-`DCS-BW`, `PBW`, `DCS-RWM`, `PHR`, and `HnR`).  This cleanup preserves the
-algorithms and uses cautious combined labels such as **DCS-BW/PBW** and
-**projected slice/HnR** where the source did not establish a single canonical
-expansion.  Before publication, replace these combined labels with the exact
-notation and definition adopted by the paper.
-
-Timing policy is target-specific.  The synthetic time-budget experiments
-exclude reference generation, optimizer fitting, adaptation/warmup, and JIT
-compilation; the Eight Schools and GARCH modules instead time NumPyro MCMC
-construction, warmup, and draws, then use that average as the projected
-sampler's per-chain budget.  Every module records its policy in
-`configuration.json`.  Hardware, library versions, CPU/GPU backend, and
-parallel-worker count can materially affect wall-clock comparisons.  See
-[docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) for a reporting checklist.
-
-## Data and archival figures
-
-The GARCH data are bundled at `data/raw/garch11.json`, with source and
-integrity information in [data/README.md](data/README.md).  The supplied PNG
-files were moved to `figures/archival/` and renamed descriptively; they are not
-claimed to be regenerable from the current repository until the validation
-checks are completed.
-
-## Before making the repository public
-
-- Resolve the required items in [docs/VALIDATION.md](docs/VALIDATION.md).
-- Record the exact PosteriorDB model, data, and reference-posterior identifiers
-  and repository revision for every experiment.
-- Replace [CITATION.cff.template](CITATION.cff.template) with manuscript
-  authors, title, version, repository URL, and DOI when available.
-- Choose and add a license.  [LICENSE-CHOICE.md](LICENSE-CHOICE.md) explains
-  why this has intentionally not been guessed.
-- Record the exact environment used for final figures and archive the matching
-  `results/` directories.
-
-## Contributing
-
-Please read [CONTRIBUTING.md](CONTRIBUTING.md).  In particular, do not alter a
-target density, reference generator, benchmark budget, or reported metric
-without documenting the change and rerunning the affected configuration.
+Code is [MIT licensed](LICENSE). Bundled third-party materials retain their upstream license; see [THIRD_PARTY.md](THIRD_PARTY.md). Citation metadata are in `CITATION.cff`. A publication release should archive the exact code and successful paper result directories together; add the archive DOI to the citation when it exists.

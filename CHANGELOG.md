@@ -1,15 +1,15 @@
-# Changelog
+# Changes
 
-All notable repository-level changes are documented here.
+## 0.2.0 — corrected experimental implementation
 
-## Unreleased
+- Centralized targets, ball/cap transforms, tuning and kernels; retained thin compatibility entry points.
+- Corrected GARCH prior, shared constrained-coordinate handling and posterior reference provenance.
+- Matched paper settings: d=200 RWM comparison, ν=3 fixed-step comparison, symmetric ν=0.5 target, 30-second logistic budget.
+- Replaced the skew-t coordinate reference generator, used analytic radial references, and added bounded directional checks.
+- Replaced pooled logistic references with independently generated NUTS references and diagnostic gates for paper use.
+- Froze adaptation after warmup, removed artificial density clipping/cutoffs, synchronized timing and reported complete setup costs.
+- Saved per-chain draws, seeds, tuning, work, failures and diagnostics; corrected RMSE aggregation; added plot-only and resume workflows.
+- Pinned the full Python 3.12 CPU dependency closure, added mathematical tests and end-to-end CI, finalized MIT licensing and citation metadata.
+- Added Windows/macOS launchers and a local browser interface for setup, running, resuming and viewing results without typing commands.
 
-- Reorganized the original scripts into descriptive experiment modules with
-  clearly named `run_*.py` convenience entry points.
-- Added a public runner, quick/paper presets, saved figures, summaries, and
-  runtime provenance manifests.
-- Bundled and documented the GARCH(1,1) data instead of relying on a
-  machine-specific path.
-- Added static tests, GitHub Actions checks, contributor guidance, data
-  provenance, and scientific-validation notes.
-- Corrected the 200-dimensional BlackJAX NUTS worker to use its adapted state.
+Previous manuscript figures remain archival. Version 0.2.0 requires new production simulations; it does not preserve old performance numbers.

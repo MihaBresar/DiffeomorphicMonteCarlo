@@ -1,0 +1,28 @@
+# Python build and test artifacts
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Local environments and editors
+.venv
+.venv-*
+github_release/
+venv/
+.env
+.DS_Store
+.idea/
+.vscode/
+
+# Generated experiment artifacts; retain the placeholder directory.
+/results/*
+!/results/.gitkeep
+
+# Large optional raw chain dumps and local profiling traces
+*.npy
+*.npz
+*.prof

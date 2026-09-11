@@ -1,0 +1,16 @@
+# Manuscript updates required after the corrected runs
+
+The code changes do not require empirical examples to satisfy the main theorem assumptions. Keep logistic regression as a general empirical example.
+
+1. Replace all five figures and the two posterior table rows using `RERUN.md`; reassess comparisons and numerical ratios from the new results.
+2. Replace the d=200, ν=3 analytic constants with 0.0291914455 and 19.5196857147. Coordinate-reference descriptions must use the normal-CDF sign-after-t-mixture construction.
+3. The RWM comparison now really uses d=200; the fixed-iteration SCS comparison uses ν=3; the infinite-mean experiment really uses α=0, zero location and identity/zero shifts; logistic production budgets are 30 seconds.
+4. GARCH has four parameters including μ and a fixed initial variance. Include μ in the likelihood and report the matching flat physical prior. Remove the unsupported assertion that the finite-recursion variances grow as ω/(1-α-β) near the stationarity boundary. Its data are simulated PosteriorDB benchmark data.
+5. Eight Schools now uses log τ for both samplers, with the correct Jacobian. State the coordinate transform rather than the old signed-τ regularization. Posterior DCS uses the identity affine map and β=1.
+6. Describe a separate warmup and frozen production kernel. DCS and SCS scales are adapted before retention. Map fitting now uses a fixed independent reverse-KL training sample, a smooth bounded shift parameterization and no target clipping. Symmetric examples optimize scale only. Both synthetic projection families initialize scale by matching the known radial median; document this initialization. These are implementation changes, not merely renamed scripts.
+7. State maximum NUTS depth 10 and target acceptance 0.8 for comparisons, plus the independently tuned reference settings. Report compilation/fitting/warmup separately, one sequential CPU worker, actual production times, and batch overshoot. Posterior equal-time budgets now exclude setup.
+8. Describe posterior reference draws as high-accuracy estimates, with reported MCSE, not exact truth. Table RMSE is `sqrt(mean_{chains,coordinates} (chain_estimate-reference)^2)`. The old metric based on a pooled chain mean measured a different quantity.
+9. Logistic Q–Q axes now use independent reference marginal quantiles. Shading is the empirical 2.5–97.5% range of chain quantile estimates, not a CLT confidence band. Remove the claim that marginal Q–Q plots establish a CLT. This is distinct from, and does not question, using examples beyond theorem assumptions.
+10. Norm-based MSE bootstrap intervals are descriptive with ν=3; stronger calibration claims need bounded functionals and a separate estimator-level calibration experiment. The new supplementary directional figures provide bounded checks of skewness.
+
+The larger tail/dimension/β study, geometry ablation, independent fitting replications, formal Monte Carlo interval-calibration experiment and non-centered NUTS comparison suggested in the review are additional research designs. They are not silently substituted for the seven repaired manuscript experiments.

@@ -1,0 +1,142 @@
+{
+  "checked_utc": "2026-09-11T02:31:10.626534+00:00",
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "python": "3.12.14",
+  "numerical_tests_passed": 15,
+  "pip_check": "passed",
+  "bytecode_compilation": "passed",
+  "experiments": [
+    {
+      "experiment": "eight-schools",
+      "status": "complete",
+      "production_chains": 4,
+      "figures_png": 1,
+      "fingerprint": "1d5ee0d9f106feca0bc38ef75c12b92960cd4ea919875e680791b91154ea1146"
+    },
+    {
+      "experiment": "garch11",
+      "status": "complete",
+      "production_chains": 4,
+      "figures_png": 1,
+      "fingerprint": "4a9043768872171a23762a697e40c3564284448836b21047b3cb46ee32f92385"
+    },
+    {
+      "experiment": "logistic-regression",
+      "status": "complete",
+      "production_chains": 8,
+      "figures_png": 1,
+      "fingerprint": "0941351b81532b86ce0ce0e2484c37037940a184cd52f1c576f0dcd706d86b4f"
+    },
+    {
+      "experiment": "skew-t-100d-fixed",
+      "status": "complete",
+      "production_chains": 6,
+      "figures_png": 2,
+      "fingerprint": "44279969c64dfa19273d9aab8ce169165f6632de823ae06df1a9ec32dd7e43f3"
+    },
+    {
+      "experiment": "skew-t-200d-baselines",
+      "status": "complete",
+      "production_chains": 8,
+      "figures_png": 2,
+      "fingerprint": "8dd2b8c2a61854ddc1c1afe31025b0b59b0862bfda9ab4cd70f20fa170ab6321"
+    },
+    {
+      "experiment": "skew-t-200d-nuts",
+      "status": "complete",
+      "production_chains": 4,
+      "figures_png": 2,
+      "fingerprint": "d5e57ec3743f67b4c4e7f96d4eb50ad28e1ec4f43d85f2379c55e654772e372d"
+    },
+    {
+      "experiment": "skew-t-50d-nu-0.5",
+      "status": "complete",
+      "production_chains": 6,
+      "figures_png": 2,
+      "fingerprint": "7ec10561351c1dc3a0b6fa41b08b6828cf839d319f232d7d11430fb8469e7313"
+    }
+  ],
+  "independent_logistic_reference_smoke_chains": 8,
+  "full_length_map_fits": {
+    "skew-t-200d-nuts/0/ball": {
+      "steps": 1500,
+      "seconds": 2.740054916999725,
+      "final_loss": -246.16520277104448,
+      "scale": 1.3780006179403328
+    },
+    "skew-t-100d-fixed/0/ball": {
+      "steps": 1500,
+      "seconds": 2.0334710419992916,
+      "final_loss": -86.6751002971445,
+      "scale": 1.4331813893729763
+    },
+    "skew-t-100d-fixed/0/sphere": {
+      "steps": 1500,
+      "seconds": 1.3854108750001615,
+      "final_loss": -85.34084273861525,
+      "scale": 1.294832868187714
+    },
+    "skew-t-50d-nu-0.5/0/ball": {
+      "steps": 1000,
+      "seconds": 0.5596064170003956,
+      "final_loss": -26.427864822733692,
+      "scale": 5.541614648898551e-10
+    },
+    "skew-t-50d-nu-0.5/0/sphere": {
+      "steps": 1000,
+      "seconds": 0.47190341699933924,
+      "final_loss": -26.55253093992368,
+      "scale": 1.2044808016567516
+    },
+    "logistic-regression/0/ball": {
+      "steps": 4000,
+      "seconds": 4.274973958000373,
+      "final_loss": 15.642957444702395,
+      "scale": 5.688525444371274
+    },
+    "logistic-regression/0/sphere": {
+      "steps": 4000,
+      "seconds": 3.35613820799972,
+      "final_loss": 50.05115471823207,
+      "scale": 0.25094809622576547
+    },
+    "logistic-regression/1/ball": {
+      "steps": 4000,
+      "seconds": 4.194502500000453,
+      "final_loss": 19.18663877086826,
+      "scale": 4.133242006496721
+    },
+    "logistic-regression/1/sphere": {
+      "steps": 4000,
+      "seconds": 3.3427515839994157,
+      "final_loss": 53.880477115867166,
+      "scale": 0.21388228821703892
+    }
+  },
+  "resume_checkpoint_hashes_unchanged": 40,
+  "plot_only_all_seven": "passed",
+  "source_hashes": {
+    "dcs_bench/transforms.py": "c98b2438407202a794ff604dffc4bbf61700435476e4006d58a8f9820ac4f875",
+    "dcs_bench/targets.py": "e29e24edfe3211b5adfbe89bd6974724a4ececbecc2ea5543c1d88e71250b85f",
+    "dcs_bench/references.py": "a95734c645b3239c243d2970c2213abdd0e71cbaffe9cc758d5af80ab1b6af43",
+    "dcs_bench/plotting.py": "d03b227867baafc69deeb7f5d0a20e3ebdcb2352fb2afdc6eea5fbb988067696",
+    "dcs_bench/__init__.py": "824e883a0dfde9241e0b7742f2bc61aba10cd82a49576de89c96f6f4450cb8bd",
+    "dcs_bench/api.py": "ff37bc553e37f62cd177770fd3437a3fdb35cbb788e079c63b63c5234fd72fc7",
+    "dcs_bench/engine.py": "e3dcc622bd8557655bb90122e33961a743cc5da1c749012efd96270c89c011e1",
+    "dcs_bench/tuning.py": "edabaf150fe3b6949bce1120a7b04efb111de29ab5c8f5cc74c6bb48fc716687",
+    "dcs_bench/samplers.py": "4e0a53621fb9e2387cfecf31501c3a835f2590bdf91fec85955a257615d1620a",
+    "configs/skew-t-200d-nuts.json": "4979c63738e4b3905d28d23abfb099e3b6011d8743561aaaac680434c0dca0b0",
+    "configs/skew-t-50d-nu-0.5.json": "d875ce1a6eb2015d83fe304adff65ef4fa069fcff567a3a3be6e171baf4c7de8",
+    "configs/garch11.json": "2aee3ae248eee6cee8daaabd6c1e0c1ecf8b4fcda52631c8903b4f58612dad9b",
+    "configs/presets.json": "b3ad87baf7fc4f241ac9738a30a5737727993b2d26fe1cc32a1644a059d2021e",
+    "configs/skew-t-100d-fixed.json": "93089248a92e3801e0eb8c6ada07d14a1b061a2ca187b66011ed6a0b38e70d11",
+    "configs/eight-schools.json": "747e8598c63fa8d1f9d89c1a2c84df6406db3922f362a7f7e787cb321ab242c1",
+    "configs/logistic-regression.json": "258a6126d9a515866083cd99c2ec792c91015d4dc84c3e81923878d8400272a8",
+    "configs/skew-t-200d-baselines.json": "bfe8e85f343971e02a52e126c4ed2e1b3257a3bdadaee02eb0251482d0206a72",
+    "run_experiment.py": "17b6c67f8004569e943de87bc67eb1e4b7f3ec775765a45ed7556001158e544f",
+    "prepare_reference.py": "6f40c42d0596a6cc019dc2b54f1e9c927610ded95cd38a54c2853167af741097",
+    "requirements-cpu.txt": "b583516a2068933982a64a45374bbe2d9522657575b11144f7f8f4434a74e2ee",
+    "data/posteriordb/manifest.json": "cddd76b97321f6a63cc95fd0c690d303d6a853945af013120757ec852468179e"
+  },
+  "scope": "Execution and mathematical checks only. Full paper production chains and high-accuracy logistic reference runs have not been run."
+}

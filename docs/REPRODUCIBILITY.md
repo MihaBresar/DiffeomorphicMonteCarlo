@@ -1,66 +1,25 @@
-# Reproducing and reporting an experiment
+# Reproducibility and timing policy
 
-## Recommended workflow
+All paper inputs are explicit JSON files. The manifest records their resolved values, scientific source hashes, Git commit/status when available, Python and package versions, OS/CPU count, JAX devices, float64/CPU policy and numerical-library thread settings. A run made from a dirty or uncommitted checkout records that fact; use a tagged clean checkout for the publication archive.
 
-1. Start from a fresh clone and a clean Python 3.11 virtual environment.
-2. Install `requirements-cpu.txt` and record `python -m pip freeze` in the run
-   archive for every final figure.
-3. Run the static checks:
+Benchmarks run sequentially with one worker. The command line establishes CPU JAX and defaults common numerical-library thread counts to one, while recording environment overrides. Setting `--workers` to another value is rejected. Hardware sharing, thermal throttling and other active processes still affect wall-time experiments. The common log-density work counts are complementary to timing; a target evaluation is not assumed to cost the same as a gradient evaluation.
 
-   ```bash
-   python -m unittest discover -s tests -v
-   python -m compileall -q .
-   ```
+Map fitting, NUTS compilation and warmup happen before the production clock. JAX batches are synchronized at each timing boundary. NumPyro warmup and production loops are compiled separately, without discarding an entire extra production run. BlackJAX timed sampling uses batches of 16 iterations at paper scale; it completes the last batch and reports the resulting overshoot. Metropolis/slice timing can overrun by its last transition. For a paper comparison, inspect overshoots relative to the stated budgets and report actual measured sampling time.
 
-   The GitHub Actions workflow also installs and imports the documented CPU
-   stack, but intentionally does not run a costly scientific benchmark.
+All proposal adaptation stops at the end of warmup. The fixed-iteration experiment retains samples from 500,000 subsequent steps with thinning 50. Other paper runs thin by 10; every retained physical-coordinate draw is saved. Thinning is storage policy, not an efficiency claim. ESS and MCSE refer to retained draws. NUTS uses target acceptance 0.8 and maximum depth 10 in the benchmark; reference NUTS uses stricter settings. These replace inconsistent hidden caps/defaults in the older scripts.
 
-4. Run `--preset quick` first.  Inspect `run.log`, `summary.json`, and the
-   saved figures before spending resources on a paper-scale run.
-5. Run `--preset paper` with an explicit `--output-dir`, retaining the entire
-   result directory and the terminal command used.
+Synthetic map fitting is shared across chains and the resulting results are conditional on that fit. Optimizer seeds, settings, all training losses and fitted map parameters are saved. For per-method total-cost reporting, the full corresponding fit/compilation cost is amortized over that method's chains. Fitting once is not equivalent to independently rerunning the entire fitting pipeline for every replicate.
 
-## Determinism and machine dependence
+Posterior DCS receives the mean **production** time of the fixed-count NUTS runs; setup is reported separately for both. The quick profile alone imposes a one-second minimum DCS budget to ensure a useful execution check. Quick posterior comparisons therefore do not represent an equal-time experiment.
 
-The synthetic reference generators use fixed JAX seeds.  Chain workers use
-deterministic, script-defined seed sequences.  Bitwise identity is not
-promised across JAX/JAXLIB versions, CPU architectures, accelerator backends,
-or parallel execution strategies.  `manifest.json` captures the JAX backend,
-devices, selected scientific-package versions, Python version, platform,
-outer CLI invocation, child module command, and `HEAVY_TAILS_*` overrides so a
-comparison can be interpreted in context.
+`summary.json` and `chain_metrics.csv` report production cost and amortized complete cost. NUTS work counters count integrator steps (gradient evaluations inside trajectories); initialization, warmup and compilation are reported separately and are not silently included in that count. NumPyro's tree-saturation flag detects a full tree through its recorded step count; it is not an exact count of every trajectory that entered the final doubling level.
 
-For timing experiments, report all of the following:
+The mean estimator is formed within each chain first. MSE is the mean of those chains' squared errors, and RMSE its square root. Posterior table RMSE additionally averages squared errors over physical coordinates before taking the square root. The coordinate-wise values are also saved because parameters have different units. PosteriorDB and logistic references have finite Monte Carlo uncertainty and are not labelled exact. Approximate MSE bootstrap intervals describe variability across the available runs; they do not establish reliable heavy-tail asymptotics, especially for unbounded functions without fourth moments.
 
-- CPU/GPU model, operating system, and number of physical/logical cores;
-- Python, JAX/JAXLIB, NumPyro, BlackJAX, NumPy, SciPy, and ArviZ versions;
-- selected backend and worker count;
-- whether timings include warmup, adaptation, optimization, reference
-  generation, compilation, and data loading;
-- wall-clock elapsed time as well as any aggregate ESS-derived throughput.
+Multichain diagnostics use a common prefix of length equal to the shortest chain and record that length. Estimator means and per-chain diagnostics use all retained draws. A constant functional within a chain yields unavailable MCSE/ESS rather than a reassuring zero. Rank R-hat is not computed from a single chain.
 
-The synthetic time-budget modules intentionally exclude most setup work.  In
-contrast, Eight Schools and GARCH measure NumPyro MCMC construction, warmup,
-and draws, then use the average NUTS elapsed time as the projected
-slice/HnR per-chain budget.  An ESS/sec value that aggregates over chains is a
-throughput diagnostic, not a substitute for a full end-to-end wall-clock
-benchmark.
+Atomic per-chain NPZ files allow restart after process interruption. Resume validates the source/configuration fingerprint and every checkpoint; an incomplete chain is restarted from its seed. Plot-only always reads the saved run's configuration/reference, with no simulation. A wall-time run is not bitwise deterministic across machines; fixed-step runs with the same environment and seeds are more strictly reproducible.
 
-## Quick versus paper profiles
+Before release, archive source plus the successful paper result directories, tag the version, and record the archive DOI. Do not commit `.venv`, temporary execution results, or a duplicate `github_release` repository tree. None of the supplied commands publishes to GitHub or Zenodo.
 
-`quick` deliberately shrinks values in `configs/presets.json`; it may change
-optimization quality and estimator variability.  Never substitute a quick run
-for a paper result.  `paper` leaves the source defaults intact, including
-large synthetic reference sizes and lengthy chains.  Estimate resource use on
-your hardware before starting it.
-
-## Final release bundle
-
-For each published figure/table, preserve:
-
-- the Git commit SHA and a clean `git status` output;
-- the exact CLI command and full `results/<experiment>/<timestamp>/` directory;
-- `python -m pip freeze` and relevant hardware/backend details;
-- data checksums and any externally acquired posterior reference draws;
-- the completed target/reference validation record from
-  [`VALIDATION.md`](VALIDATION.md).
+Storage grows with retained draws: an n-by-d float64 chain uses 8nd bytes before compression. The largest paper runs can produce several gigabytes in total, although only one chain needs to be sampled in memory at a time. The affordable profile reduces chain counts, budgets and reference sizes. Resume also verifies the runtime environment to prevent mixing hardware or dependency conditions within a wall-time comparison.
