@@ -66,21 +66,34 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 The **DCS map** selector offers **Möbius map**, which fits R, centre and Möbius
 parameters by VI, and **Vanilla map**, which uses untuned R=1, centre=0 and
 Möbius=0. Both keep the experiment's β and the same proposal-scale warmup.
+This selector changes DCS only; the main experiments still fit the SCS map.
 
 The additional **100D: DCS/SCS map and tuning audit** experiment compares both
 versions automatically, including step sizes chosen on separate pilot chains.
 Use Quick check first, then Full paper settings for 20 chains of 500,000
 production iterations in each diagnostic case. Its exact-value tables and
 all-case plots appear automatically. See [what this audit measures](FIXED_STEP_AUDIT.md).
-Select one choice and start a fresh run; repeat with the other choice and the
+
+To switch off map fitting for both methods, select **100D symmetric t: untuned
+maps and step tuning**. This separate audit includes both fully untuned maps
+and scale-only VI controls, with step sizes pretuned by ordinary warmup or pilots
+targeting either five functions or the paper's two radial functions. Full
+settings run 20 chains of 500,000 production iterations in each of 12 cases.
+Choose Quick check first, then Full paper settings. No map selection or commands
+are needed. See [the symmetric audit](SYMMETRIC_T_AUDIT.md).
+
+For the main experiments, select one DCS map choice and start a fresh run; repeat with the other choice and the
 same experiment, run size and worker count for an ablation. The figures and
 exact-value tables identify the chosen map. SCS fitting and the identity maps
 in Eight Schools and GARCH are unchanged. Fixed R=√d is no longer offered.
 
-Selecting 32 workers does not change the number of chains. A smaller reproduction
-uses at most eight workers, a quick check two, and logistic reference preparation
-four. Full paper experiments use at most 20 or 50 chains depending on the design.
-The launcher displays the applicable production limit.
+Selecting 32 workers does not change the number of chains. In the main
+experiments, a smaller reproduction uses at most eight workers, a quick check
+two, and logistic reference preparation four. Full paper experiments use at
+most 20 or 50 chains depending on the design. The two diagnostic audits queue
+cases together and can use more workers: the symmetric quick check has 24
+production jobs, and its full run has 240. Hardware capacity and the selected
+worker count still apply. The launcher displays the applicable production limit.
 
 Full paper runs can take many hours and several gigabytes. Keep the computer
 plugged in, awake, and available for the benchmark. Independent chains can run on

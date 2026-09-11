@@ -1,5 +1,12 @@
 # What must be rerun
 
+**Symmetric Student-t control with both maps untuned:** select **100D symmetric
+t: untuned maps and step tuning** in the launcher and start a fresh run.
+It generates all 12 map/step controls automatically, including radial-focused
+pilot tuning. Use Full paper settings for the reported design; Quick check
+tests execution only. The original experiments and their saved plots are
+unchanged by this additional diagnostic.
+
 **Möbius versus fully untuned vanilla, and the fixed-step tuning audit:** start
 a fresh run with the desired **DCS map** choice, or select the separate
 **100D: DCS/SCS map and tuning audit** to run all diagnostic comparisons.

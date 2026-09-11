@@ -36,6 +36,7 @@ jobs:
       - run: python run_experiment.py --plot-only results/ci
       - run: python run_experiment.py skew-t-200d-nuts --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci --resume
       - run: python scripts/audit_fixed_steps.py --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-audit
+      - run: python scripts/audit_symmetric_t.py --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-symmetric
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -44,3 +45,4 @@ jobs:
             results/ci
             results/ci-reference
             results/ci-audit
+            results/ci-symmetric

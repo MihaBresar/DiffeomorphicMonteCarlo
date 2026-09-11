@@ -23,7 +23,8 @@ ROOT = Path(__file__).resolve().parent
 RUNS = ROOT/'results'/'click-runs'
 PRESETS = ('quick', 'reproduce', 'paper')
 EXPERIMENTS = ('all', 'skew-t-200d-nuts', 'skew-t-200d-baselines', 'skew-t-100d-fixed',
-               'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression', 'fixed-step-audit')
+               'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression',
+               'fixed-step-audit', 'symmetric-t-audit')
 
 
 def environment_python():
@@ -80,10 +81,11 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
             raise ValueError('Choose a listed DCS map policy')
     py = str(environment_python())
     directory = Path(directory)
-    if experiment == 'fixed-step-audit':
+    audits = {'fixed-step-audit': 'audit_fixed_steps.py', 'symmetric-t-audit': 'audit_symmetric_t.py'}
+    if experiment in audits:
         if resume or plot_only:
             raise ValueError('The tuning audit starts from scratch in a new results folder.')
-        return [[py, '-u', str(ROOT/'scripts/audit_fixed_steps.py'), '--preset', preset,
+        return [[py, '-u', str(ROOT/'scripts'/audits[experiment]), '--preset', preset,
                  '--workers', str(workers), '--output-dir', str(directory/experiment)]]
     if experiment == 'all':
         command = [py, '-u', str(ROOT/'scripts/reproduce_all.py'), '--preset', preset, '--output-root', str(directory)]

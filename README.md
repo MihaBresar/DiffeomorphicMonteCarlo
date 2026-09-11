@@ -91,13 +91,6 @@ the exact stored numbers. See [the figure guide](docs/FIGURES.md).
 The **DCS map** selector offers **Möbius map** (the default VI fit of R, centre
 and Möbius parameters) and **Vanilla map** (fully untuned R=1, centre=0 and
 Möbius=0). Vanilla retains the experiment's β and skips map fitting entirely.
-
-For a controlled comparison of map fitting and proposal tuning, select
-**100D: DCS/SCS map and tuning audit** in the launcher. It compares both map
-versions, historical tuning schedules, and settings chosen on independent
-pilots, with equal production lengths. See the [full-length audit and exact
-results](docs/FIXED_STEP_AUDIT.md). This separate diagnostic does not replace
-the original fixed-time or fixed-step experiments.
 Both choices keep proposal-scale warmup and freezing unchanged; SCS keeps its
 existing fit. They create separate experimental configurations, labelled in the
 figures and exact-value tables. The two PosteriorDB experiments keep their
@@ -105,6 +98,18 @@ identity maps. For command-line runs use `--ball-map-policy mobius` or
 `--ball-map-policy vanilla`. Fixed R=√d has been removed from new runs; saved
 results can still be replotted. See [the implementation audit](docs/IMPLEMENTATION_AUDIT.md)
 for earlier tuning comparisons and their limits.
+
+For a controlled skew-target comparison of map fitting and proposal tuning,
+select **100D: DCS/SCS map and tuning audit** in the launcher. See the
+[full-length audit and exact results](docs/FIXED_STEP_AUDIT.md).
+
+To remove map pretuning from **both** methods, select
+**100D symmetric t: untuned maps and step tuning**. This uses exactly symmetric
+Student-t₃ targets. Every proposal step is pretuned, using warmup or one of two
+independent-pilot selection rules, then frozen. Scale-only VI controls separate
+fitting R from proposal tuning.
+See [the symmetric comparison](docs/SYMMETRIC_T_AUDIT.md). Both audits are
+separate from the original fixed-time and fixed-step experiments.
 
 ## Use the sampler on another target
 
