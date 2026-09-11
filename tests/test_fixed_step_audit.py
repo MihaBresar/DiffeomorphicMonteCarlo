@@ -1,11 +1,14 @@
 """Keep the diagnostic bridge faithful to its declared production protocols."""
 import hashlib
+import ast
 import json
 from pathlib import Path
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stdout, redirect_stderr
 import io
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 from scripts import audit_fixed_steps as audit
@@ -16,6 +19,45 @@ from dcs_bench.transforms import BallMap, SphereMap
 
 
 class FixedStepAuditTests(unittest.TestCase):
+    def test_main_prints_original_vi_banner_with_cp1252_redirected_streams(self):
+        class StopBeforeOptimization(Exception):
+            pass
+
+        def stop_at_jit(function):
+            raise StopBeforeOptimization()
+
+        # Execute the unmodified historical VI function, stopping at its first
+        # JIT decorator after its real Unicode banner; no optimizer is needed.
+        tree = ast.parse(LEGACY.read_text(encoding='utf-8'))
+        node = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                    and node.name == 'optimize_prwm_hyperparameters')
+        namespace = {'jax': SimpleNamespace(jit=stop_at_jit)}
+        exec(compile(ast.Module(body=[node], type_ignores=[]), str(LEGACY), 'exec'), namespace)
+
+        def original_banner(*unused):
+            try:
+                namespace['optimize_prwm_hyperparameters']()
+            except StopBeforeOptimization:
+                import sys
+                print('Diagnostic parameter delta: δ', file=sys.stderr)
+                raise
+
+        stdout_bytes, stderr_bytes = io.BytesIO(), io.BytesIO()
+        stdout = io.TextIOWrapper(stdout_bytes, encoding='cp1252', errors='strict', write_through=True)
+        stderr = io.TextIOWrapper(stderr_bytes, encoding='cp1252', errors='strict', write_through=True)
+        with tempfile.TemporaryDirectory() as directory:
+            with redirect_stdout(stdout), redirect_stderr(stderr), \
+                    patch.object(audit, 'environment', return_value={}), \
+                    patch.object(audit, 'prepare', side_effect=original_banner):
+                with self.assertRaises(StopBeforeOptimization):
+                    audit.main(['--output-dir', directory, '--workers', '1'])
+        stdout.flush()
+        stderr.flush()
+        self.assertIn('Location μ, Scale R, Möbius Shift δ', stdout_bytes.getvalue().decode('utf-8'))
+        self.assertIn('Diagnostic parameter delta: δ', stderr_bytes.getvalue().decode('utf-8'))
+        stdout.close()
+        stderr.close()
+
     def test_original_input_bytes_preserved(self):
         self.assertEqual(hashlib.sha256(LEGACY.read_bytes()).hexdigest(),
                          '72831b9d8b669f2a8705eb0e3fd3c03cb5f2d87a1660b1b2036d6d51601c8a70')

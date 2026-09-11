@@ -342,6 +342,12 @@ def summarize(root):
 
 
 def main(argv=None):
+    # PYTHONIOENCODING in os.environ affects child processes, not streams that
+    # Python already opened. Legacy VI prints Greek map parameters on Windows
+    # too, including when stdout/stderr are redirected to the launcher's log.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='backslashreplace')
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--preset', choices=tuple(PRESETS), default='quick')
