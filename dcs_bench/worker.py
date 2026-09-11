@@ -5,8 +5,28 @@ import os
 from pathlib import Path
 import signal
 import sys
+import time
 
 from .cpu import THREAD_VARIABLES, pin_current_process, worker_environment
+
+
+def pending_chains(job):
+    """Atomic claims let a free worker take another chain immediately.
+
+    A fresh queue is created on each launch. Failed claims do not remove any
+    completed checkpoint; resume rebuilds the queue from missing checkpoints.
+    """
+    if 'queue_directory' not in job:
+        yield from job['chains']
+        return
+    queue = Path(job['queue_directory'])
+    for path in sorted(queue.glob('*.pending.json')):
+        claimed = path.with_name(path.name.replace('.pending.', f'.worker-{job["worker_slot"]}.'))
+        try:
+            path.rename(claimed)
+        except FileNotFoundError:
+            continue  # Another worker claimed this chain.
+        yield json.loads(claimed.read_text(encoding='utf-8'))
 
 
 def main():
@@ -31,7 +51,12 @@ def main():
     family = 'sphere' if algorithm == 'SCS' else 'ball'
     params = job.get('maps', {}).get(family) if algorithm == 'SCS' or algorithm.startswith('DCS') else None
     mapping = (SphereMap if family == 'sphere' else BallMap)(**params) if params else None
-    for chain in job['chains']:
+    if 'queue_directory' in job:
+        queue = Path(job['queue_directory'])
+        (queue/f'worker-{job["worker_slot"]}.ready').touch()
+        while not (queue/'start.ready').exists():
+            time.sleep(.05)
+    for chain in pending_chains(job):
         started = datetime.now(timezone.utc).isoformat()
         print(f'Worker {job["worker_slot"]+1}: {algorithm}, chain {chain["index"]+1} starting', flush=True)
         if runner is not None:

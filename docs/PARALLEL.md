@@ -5,10 +5,23 @@ allows up to four independent chains to run concurrently. The initial selection
 is at most four workers and leaves one detected slot free when possible. Select
 **1 — sequential** for a single worker. More workers also require more RAM.
 
+Click **Use all CPU threads** to select every thread available to the process.
+The AMD Ryzen 9 9950X3D has [16 cores and 32 threads](https://www.amd.com/en/products/processors/desktops/ryzen/9000-series/amd-ryzen-9-9950x3d.html).
+With SMT enabled and all threads available to Python, the launcher permits **32
+workers**. The old cap at one worker per physical core has been removed. This
+option fills available threads while sufficient independent chains remain;
+it does not promise 100% CPU activity during every stage or a 2× speedup over 16.
+
 Run **Quick check** first. Its production configuration has two chains per
 method, so it uses at most two workers even if you select a larger count. The
 four-chain logistic reference can use up to four. Full paper experiments have
 20 or 50 production chains per method and can use the larger selected count.
+The smaller reproduction has eight chains and therefore uses at most eight
+workers. This can account for low CPU utilization even with 16 or 32 workers
+selected. Fitting, plotting, reference preparation and the final incomplete
+batch can use fewer threads. We do not add chains merely to fill the CPU, since
+that would change the specified experiment. Sixteen workers may give better
+per-chain throughput than 32 if SMT contention dominates; measure on your CPU.
 
 The terminal equivalent is `--workers 4`, accepted by `run_experiment.py`,
 `prepare_reference.py` and `scripts/reproduce_all.py`. Their default remains 1.
@@ -17,8 +30,9 @@ production experiments. Worker counts above the detected capacity are rejected.
 
 ## What runs concurrently
 
-Each chain runs in a separate Python process. Within a method, chain `i` is
-assigned to worker `i % min(workers, chains)`. Seeds depend on experiment seed,
+Each chain runs in a separate Python process. Workers claim the next pending
+chain from a shared queue as soon as they finish. Atomic claims prevent duplicate
+execution, and faster workers can process more chains. Seeds depend on experiment seed,
 scenario, method index and chain index; worker count does not alter them.
 Fixed-iteration Metropolis chains have been checked against direct sequential
 execution for identical saved draws. Timed chains can retain different numbers
@@ -32,21 +46,24 @@ The four independent logistic reference chains also run in parallel.
 
 Workers start fresh Python interpreters instead of forking a live JAX runtime.
 NumPy/JAX imports occur after each worker's CPU assignment. A worker compiles its
-NUTS functions once and reuses them for its assigned chains. Draw arrays are
+NUTS functions once and reuses them for subsequent chains. All workers finish
+imports and compilation before warmup/sampling starts, so one chain's production
+does not compete with another worker's initial compilation. Draw arrays are
 written directly to separate atomic checkpoint files instead of being copied
 back through a process pool.
 
 ## CPU allocation and timing
 
-- **Linux:** workers are pinned to distinct available physical cores, selecting
-  one logical CPU per core within the coordinator's allowed CPU set. If physical
+- **Linux:** workers are pinned to distinct allowed logical CPUs, first selecting
+  one thread on every physical core, then SMT siblings. If physical
   topology is unavailable, the fallback uses allowed logical CPUs and records
   that limitation.
-- **Windows:** workers are pinned to distinct physical cores in the current
+- **Windows:** workers are pinned to distinct logical CPUs in the current
   processor group. On machines with more than 64 logical CPUs, this implementation
   uses only that group. If the native affinity APIs fail, parallel capacity is
   restricted to one rather than silently claiming pinned execution.
-- **macOS:** worker count is limited using the physical core count when available.
+  Assignment uses one thread per physical core first, then SMT siblings.
+- **macOS:** all reported logical CPU slots are available to workers.
   Core assignment remains under the OS scheduler; strict CPU pinning is not
   provided. Performance and efficiency cores may have different speeds.
 
@@ -84,8 +101,8 @@ valid; interrupted chains restart from their recorded seed.
 
 Resume uses the **original saved worker count**, even if you change the selector.
 It checks the original code, configuration and execution environment. To change
-worker count, start a new run. After updating from the earlier sequential-only
-release, start a **new results folder**; existing results can still be replotted,
+worker count, start a new run. After updating from an earlier execution or kernel
+implementation, start a **new results folder**; existing results can still be replotted,
 but cannot be resumed with changed scientific source files.
 
 Do not update the code or move the project while an experiment is running.

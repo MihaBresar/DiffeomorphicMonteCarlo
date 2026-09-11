@@ -71,11 +71,13 @@ def environment_ready():
         return False
 
 
-def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1):
+def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1, ball_scale_policy='fit'):
     if preset not in PRESETS or experiment not in EXPERIMENTS:
         raise ValueError('Choose a listed preset and experiment')
     if not plot_only:
         validate_workers(workers)
+        if ball_scale_policy not in ('fit', 'sqrt-d'):
+            raise ValueError('Choose a listed DCS map scale policy')
     py = str(environment_python())
     directory = Path(directory)
     if experiment == 'all':
@@ -85,7 +87,7 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
         elif resume:
             command.append('--resume')
         if not plot_only:
-            command += ['--workers', str(workers)]
+            command += ['--workers', str(workers), '--ball-scale-policy', ball_scale_policy]
         return [command]
     result = directory/experiment
     if plot_only:
@@ -98,7 +100,8 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
             command.append('--resume')
         commands.append(command)
     command = [py, '-u', str(ROOT/'run_experiment.py'), experiment, '--preset', preset,
-               '--output-dir', str(result), '--reference-dir', str(reference), '--workers', str(workers)]
+               '--output-dir', str(result), '--reference-dir', str(reference), '--workers', str(workers),
+               '--ball-scale-policy', ball_scale_policy]
     if resume and (result/'manifest.json').exists():
         command.append('--resume')
     commands.append(command)
@@ -198,7 +201,7 @@ class Controller:
                 raise RuntimeError('Environment validation failed; see installation output above')
         self.start_job(work, 'Setting up the environment…')
 
-    def run(self, preset='quick', experiment='all', run_id=None, plot_only=False, workers=1):
+    def run(self, preset='quick', experiment='all', run_id=None, plot_only=False, workers=1, ball_scale_policy='fit'):
         if not self.ready:
             raise ValueError('Click Set up environment first')
         if run_id:
@@ -208,13 +211,16 @@ class Controller:
             saved = json.loads((directory/'launcher-run.json').read_text())
             preset, experiment = saved['preset'], saved['experiment']
             workers = saved.get('workers', 1)
+            ball_scale_policy = saved.get('ball_scale_policy', 'fit')
         else:
             run_id = datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'-'+preset
             directory = RUNS/run_id
-        commands = commands_for_run(preset, experiment, directory, resume=bool(run_id and directory.exists()), plot_only=plot_only, workers=workers)
+        commands = commands_for_run(preset, experiment, directory, resume=bool(run_id and directory.exists()),
+                                    plot_only=plot_only, workers=workers, ball_scale_policy=ball_scale_policy)
         def work():
             directory.mkdir(parents=True, exist_ok=True)
-            (directory/'launcher-run.json').write_text(json.dumps({'preset': preset, 'experiment': experiment, 'workers': workers}, indent=2)+'\n')
+            (directory/'launcher-run.json').write_text(json.dumps({'preset': preset, 'experiment': experiment,
+                'workers': workers, 'ball_scale_policy': ball_scale_policy}, indent=2)+'\n')
             self.current_run = run_id
             with (directory/'launcher.log').open('a', encoding='utf-8') as logfile:
                 for command in commands:
@@ -273,12 +279,16 @@ def make_handler(controller, token):
                 if controller.current_run:
                     folder = RUNS/controller.current_run
                     for p in sorted(folder.rglob('*')):
-                        if p.is_file() and (p.suffix in ('.png', '.pdf', '.tex') or p.name == 'posteriordb_rmse.csv'):
-                            links.append({'name': p.relative_to(folder).as_posix(), 'url': '/artifact/'+p.relative_to(RUNS).as_posix()})
+                        if p.is_file() and (p.suffix in ('.png', '.pdf', '.tex', '.csv') or p.name == 'paper_values.html'):
+                            group = ('Supplementary diagnostics' if 'supplementary' in p.parts else
+                                     'Exact numbers and tables' if p.suffix in ('.csv', '.html', '.tex') else 'Original figures and sample counts')
+                            links.append({'name': p.relative_to(folder).as_posix(), 'group': group,
+                                          'url': '/artifact/'+p.relative_to(RUNS).as_posix()})
                 return self.respond(links)
             if path.startswith('/artifact/'):
                 p = (RUNS/path[len('/artifact/'):]).resolve()
-                if not p.is_relative_to(RUNS.resolve()) or p.suffix not in ('.png', '.pdf', '.csv', '.tex') or not p.is_file():
+                allowed = p.suffix in ('.png', '.pdf', '.csv', '.tex') or p.name == 'paper_values.html'
+                if not p.is_relative_to(RUNS.resolve()) or not allowed or not p.is_file():
                     return self.respond({'error': 'File not available'}, 404)
                 return self.respond(p.read_bytes(), content_type=mimetypes.guess_type(str(p))[0] or 'application/octet-stream')
             return self.respond({'error': 'Not found'}, 404)
@@ -290,7 +300,8 @@ def make_handler(controller, token):
                 if not 0 <= size <= 4096: raise ValueError('Invalid request size')
                 data = json.loads(self.rfile.read(size) or b'{}')
                 if self.path == '/setup': controller.setup()
-                elif self.path == '/run': controller.run(data.get('preset', 'quick'), data.get('experiment', 'all'), workers=data.get('workers', 1))
+                elif self.path == '/run': controller.run(data.get('preset', 'quick'), data.get('experiment', 'all'),
+                    workers=data.get('workers', 1), ball_scale_policy=data.get('ball_scale_policy', 'fit'))
                 elif self.path == '/resume': controller.run(run_id=data['id'])
                 elif self.path == '/replot': controller.run(run_id=data['id'], plot_only=True)
                 elif self.path == '/show':

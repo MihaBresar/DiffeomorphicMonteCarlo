@@ -13,3 +13,16 @@ These checks establish implementation consistency and executable workflows. They
 Constant functional traces receive null MCSE/ESS with an explanation; they are not reported as successful zero-error diagnostics. High-accuracy logistic reference preparation rejects failed diagnostic screens for paper use. PosteriorDB reference MCSE is reported rather than treating the finite draws as exact values.
 
 Fixed sufficient theorem assumptions are not enforced on empirical examples. The logistic benchmark intentionally remains a test beyond those assumptions. Larger sensitivity, ablation, calibration and non-centered-baseline studies remain additional research designs, as distinguished in [MANUSCRIPT_CHANGES.md](MANUSCRIPT_CHANGES.md).
+# Restored figures, CPU scheduling and VI update
+
+The September 11 follow-up passed **30 tests**, all seven end-to-end quick
+experiments with two workers, and full replot/resume checks with **58 NPZ files
+unchanged**. Browser checks covered all-thread selection, restoring a saved run's
+figures, supplementary grouping and full-precision numerical tables. A synthetic
+16-core/32-thread topology test checks Ryzen-style allocation; the local machine
+is macOS, so actual Ryzen performance remains to be measured on that machine.
+See [`validation/plots_cpu_checks.json`](../validation/plots_cpu_checks.json) and
+[the implementation audit](IMPLEMENTATION_AUDIT.md). GitHub Actions validates
+native Linux/Windows execution separately.
+
+The earlier validation records below describe their original code revisions.

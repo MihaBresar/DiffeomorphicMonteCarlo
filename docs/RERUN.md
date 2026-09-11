@@ -1,5 +1,18 @@
 # What must be rerun
 
+**For the restored plot layouts and exact-number tables, no new sampling is
+needed.** In the launcher select a completed saved run, click **Rebuild figures**,
+then **Show figures and tables**. All original plot families are available again;
+see [the figure guide](FIGURES.md).
+
+**To measure the faster kernels, new CPU scheduling, a different worker count,
+or fixed-R tuning, start a new run.** Select **Full paper settings**, the desired
+worker count, and **Start new run**. Keep old results folders for comparison.
+Do not resume an old run with these changed execution conditions. Full paper
+figures have not been precomputed on your Ryzen; they must come from that run.
+
+## Earlier scientific corrections
+
 **Regenerate all five manuscript figures and both rows of the PosteriorDB table.** The previous aggregate-only outputs cannot repair changes to targets, adaptation, references, or timing. Original PNGs remain archival assets and are not updated results.
 
 From the repository root, activate the Python 3.12 environment and install `requirements-cpu.txt`. The command below runs everything in the correct order with the default single worker. Add `--workers 4` for four parallel chains, or choose CPU workers in the launcher. Keep the same worker setting when resuming. See [parallel execution](PARALLEL.md); updating from the sequential-only code requires a new run directory.

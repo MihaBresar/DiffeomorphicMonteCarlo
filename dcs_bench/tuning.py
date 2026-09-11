@@ -1,7 +1,8 @@
 """Pilot-only map fitting and proposal-scale adaptation.
 
-Map fitting minimizes a Monte Carlo reverse KL objective on independent base
-draws. No fitted parameter changes after retained sampling starts.
+Map fitting minimizes a Monte Carlo reverse KL objective on fresh independent
+base draws at every step, as in the original experiments. No fitted parameter
+changes after retained sampling starts.
 """
 import time
 import numpy as np
@@ -26,6 +27,13 @@ def fit_map(target, config, family, seed):
     start = time.perf_counter()
     d, beta = target.d, config['beta']
     latitude = config.get('latitude', 1.1)
+    scale_policy = config.get('ball_scale_policy', 'fit')
+    if scale_policy not in ('fit', 'sqrt-d'):
+        raise ValueError('ball_scale_policy must be fit or sqrt-d')
+    fixed_scale = family == 'ball' and scale_policy == 'sqrt-d'
+    batch_policy = config.get('vi_batch_policy', 'fresh')
+    if batch_policy not in ('fresh', 'fixed'):
+        raise ValueError('vi_batch_policy must be fresh or fixed')
     # Posterior experiments use the paper's identity affine map, in the
     # canonical unconstrained coordinates documented in TARGETS.md.
     if target.kind in ('garch', 'eight_schools'):
@@ -51,6 +59,8 @@ def fit_map(target, config, family, seed):
         else:
             mapped_radius = np.linalg.norm(base[:, :-1], axis=1)*latitude/(latitude-1-base[:, -1])
         initial_scale = radial_median/np.median(mapped_radius)
+    if fixed_scale:
+        initial_scale = np.sqrt(d)
     base = jnp.asarray(base)
     symmetric = target.kind == 'skew_t' and not np.any(target.alpha)
     limit = .999 if family == 'ball' else .999*np.sqrt(1-(latitude-1)**2)
@@ -60,15 +70,15 @@ def fit_map(target, config, family, seed):
         raw = jnp.zeros(d) if symmetric else p[d:2*d]
         # Smooth at zero; maps R^d strictly inside the admissible ball.
         shift = limit*raw/jnp.sqrt(1+jnp.sum(raw*raw))
-        return mu, shift, jnp.exp(p[-1])
+        return mu, shift, jnp.asarray(initial_scale) if fixed_scale else jnp.exp(p[-1])
 
-    def objective(p):
+    def objective(p, base):
         mu, shift, scale = unpack(p)
         if family == 'ball':
             w, lj = mobius(base, shift, jnp)
             logeps = jnp.log(-jnp.expm1(beta*jnp.log(jnp.linalg.norm(w, axis=1))))
             x = mu+scale*w/jnp.exp(logeps/beta)[:, None]
-            lj = lj+d*p[-1]-(1+d/beta)*logeps
+            lj = lj+d*jnp.log(scale)-(1+d/beta)*logeps
         else:
             ell = base[:, -1]+1
             m = (latitude-ell)/latitude
@@ -84,7 +94,9 @@ def fit_map(target, config, family, seed):
     m, v = jnp.zeros_like(p), jnp.zeros_like(p)
     history = []
     for i in range(1, config['optimizer_steps']+1):
-        loss, grad = value_grad(p)
+        if i > 1 and batch_policy == 'fresh':
+            base = jnp.asarray(uniform_ball(rng, n, d) if family == 'ball' else uniform_cap(rng, n, d, latitude))
+        loss, grad = value_grad(p, base)
         loss = float(loss)
         if not np.isfinite(loss) or not np.all(np.isfinite(grad)):
             raise FloatingPointError(f'{family} map fit became nonfinite at step {i}')
@@ -100,7 +112,10 @@ def fit_map(target, config, family, seed):
     return mapping, {'seconds': time.perf_counter()-start, 'steps': config['optimizer_steps'],
                      'training_draws': n, 'seed': seed, 'loss': history,
                      'initial_scale': initial_scale, 'scale_initialization': config.get('map_scale_initialization', 'unit'),
-                     'objective': 'reverse KL on fixed independent base draws', 'symmetric_constraints': symmetric}
+                     'scale_policy': 'fixed sqrt(d)' if fixed_scale else 'VI-fitted',
+                     'objective': 'reverse KL on independent base draws', 'batch_policy': batch_policy,
+                     'total_training_draws': n*max(1, config['optimizer_steps']) if batch_policy == 'fresh' else n,
+                     'symmetric_constraints': symmetric}
 
 
 class DualAveraging:

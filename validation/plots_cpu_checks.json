@@ -1,0 +1,152 @@
+{
+  "date": "2026-09-11",
+  "source_hashes": {
+    "dcs_bench/worker.py": "b2c4fb54de978b4e2c5d542c8021fc6b8092b3f1e95237d3b2c599e919d23666",
+    "dcs_bench/transforms.py": "fb7161b32cd5430c7e899e9927a588cfddefb7511411360820f679bcab99efaa",
+    "dcs_bench/targets.py": "19d8dbabf4cdac998739c735fec8ee8946b79b7c8de2e25c095542f156bc9a63",
+    "dcs_bench/references.py": "a95734c645b3239c243d2970c2213abdd0e71cbaffe9cc758d5af80ab1b6af43",
+    "dcs_bench/plotting.py": "ab35d1e7af2cf24719bb4c697f2c6c1f6f2a5c3222214e73d8bce0b59ae3d42c",
+    "dcs_bench/cpu.py": "b7193c8ee964e6859d6f80d18efeb9d28eae4633dc1158697f50da0eb08ccef4",
+    "dcs_bench/__init__.py": "824e883a0dfde9241e0b7742f2bc61aba10cd82a49576de89c96f6f4450cb8bd",
+    "dcs_bench/api.py": "ff37bc553e37f62cd177770fd3437a3fdb35cbb788e079c63b63c5234fd72fc7",
+    "dcs_bench/engine.py": "caa49dfc69fa0429e1c2b1f8dfbd87367675cdef12fecd99f72d335ec62b58e4",
+    "dcs_bench/tuning.py": "0e284d421858462bdcf7cdb55ed919b354c5d2ad344c534081e341f6d4cd516f",
+    "dcs_bench/parallel.py": "1b3c56daefc0d0fd8ffbcf7def29972cb80030eabe1bfde0845c5f6946e1c7ca",
+    "dcs_bench/samplers.py": "865aebf200c6d748e9a9ba8c903488585d22e44730d200eaeb2cd0c852361f09",
+    "configs/skew-t-200d-nuts.json": "4979c63738e4b3905d28d23abfb099e3b6011d8743561aaaac680434c0dca0b0",
+    "configs/skew-t-50d-nu-0.5.json": "d875ce1a6eb2015d83fe304adff65ef4fa069fcff567a3a3be6e171baf4c7de8",
+    "configs/garch11.json": "2aee3ae248eee6cee8daaabd6c1e0c1ecf8b4fcda52631c8903b4f58612dad9b",
+    "configs/presets.json": "b3ad87baf7fc4f241ac9738a30a5737727993b2d26fe1cc32a1644a059d2021e",
+    "configs/skew-t-100d-fixed.json": "93089248a92e3801e0eb8c6ada07d14a1b061a2ca187b66011ed6a0b38e70d11",
+    "configs/eight-schools.json": "747e8598c63fa8d1f9d89c1a2c84df6406db3922f362a7f7e787cb321ab242c1",
+    "configs/logistic-regression.json": "258a6126d9a515866083cd99c2ec792c91015d4dc84c3e81923878d8400272a8",
+    "configs/skew-t-200d-baselines.json": "bfe8e85f343971e02a52e126c4ed2e1b3257a3bdadaee02eb0251482d0206a72",
+    "run_experiment.py": "189220c1b4e0476b3d3003fa0a7dc1cf1eb2fab0cceeb45b86ef83644f4da6b9",
+    "prepare_reference.py": "1bd863afeecfc2cfb2ef314e62cc8d18e143fac6e48e2fee5708c4e0c33ad726",
+    "requirements-cpu.txt": "b583516a2068933982a64a45374bbe2d9522657575b11144f7f8f4434a74e2ee",
+    "data/posteriordb/manifest.json": "cddd76b97321f6a63cc95fd0c690d303d6a853945af013120757ec852468179e"
+  },
+  "unit_tests": {
+    "passed": 30,
+    "log_sha256": "5e566bc79c1387cea1a46ad90051beb3a7174d9a97f8475f559861762b9687a7"
+  },
+  "end_to_end_quick": {
+    "eight-schools": {
+      "status": "complete",
+      "fingerprint": "d410ecf61c72198ce0908b294f1e65fd170c657efec651345227abbe214e8020",
+      "workers": 2
+    },
+    "garch11": {
+      "status": "complete",
+      "fingerprint": "87679e2a83d679da05339b9738eb2350881fabca839afbbf63303c95f72606d0",
+      "workers": 2
+    },
+    "logistic-regression": {
+      "status": "complete",
+      "fingerprint": "35a7488abe41366a892fa4bbea2917cbff235703fb3726ff24a9f26cf0dbe4b6",
+      "workers": 2
+    },
+    "skew-t-100d-fixed": {
+      "status": "complete",
+      "fingerprint": "5ec4dfd3cd254021840aef9f8d50fc9bd9da7cd709039212dfc786ae3dfd9f39",
+      "workers": 2
+    },
+    "skew-t-200d-baselines": {
+      "status": "complete",
+      "fingerprint": "879772d23608a340860f423a5746dffae3e61aff91823761bf698b38af6c55ce",
+      "workers": 2
+    },
+    "skew-t-200d-nuts": {
+      "status": "complete",
+      "fingerprint": "ba439f625f2ff44d9c9fa605d75359e4cc4704df4a29832db5143790901b3e28",
+      "workers": 2
+    },
+    "skew-t-50d-nu-0.5": {
+      "status": "complete",
+      "fingerprint": "96ffd914aee92e0c71a3e8ea9811b128a897bd81121d59f577191cced33c3258",
+      "workers": 2
+    }
+  },
+  "replot_resume": {
+    "npz_files": 58,
+    "all_unchanged_after_replot_and_resume": true,
+    "sha256": {
+      "results/fresh-vi-validation/eight-schools/scenario-0/chains/DCS-HnR-000.npz": "d1d2bc6c9ffeade3e351028e8de48f71ddb06e09345f89cff769b3cd203a6cb9",
+      "results/fresh-vi-validation/eight-schools/scenario-0/chains/DCS-HnR-001.npz": "05822c393862cb74aecb095a1117b6dbc13044eb5dc2bb37157c07c64b92c54e",
+      "results/fresh-vi-validation/eight-schools/scenario-0/chains/NUTS-000.npz": "e45d37595808b098d2e68a364bf9a6f97e921698292c454485a35daf5cf255c1",
+      "results/fresh-vi-validation/eight-schools/scenario-0/chains/NUTS-001.npz": "c7b7d3e9a654224ed83771bd3e3bcba92ba67ceb4e73962b0cc1264acc9054d6",
+      "results/fresh-vi-validation/eight-schools/scenario-0/reference.npz": "63c3ec79150510978582360ae1895fca74f57074231ca3e6da83e56885a042e2",
+      "results/fresh-vi-validation/garch11/scenario-0/chains/DCS-HnR-000.npz": "cbe6db9d122e84b958c02964290d14c2e4deb2e88e92191b9471e4df64af0201",
+      "results/fresh-vi-validation/garch11/scenario-0/chains/DCS-HnR-001.npz": "2121bc7e59f8d370729845110c1c60c9bd37a4b4f783cacfe003677d1e765438",
+      "results/fresh-vi-validation/garch11/scenario-0/chains/NUTS-000.npz": "391c2661bb1fdf057e4295a6ca9fe17509f6509b9649f7de36392ae33bea0616",
+      "results/fresh-vi-validation/garch11/scenario-0/chains/NUTS-001.npz": "501297b65b3c94f563958be265b8edd8bf9e2a251a15ad2b9b89ec7cb70ef89f",
+      "results/fresh-vi-validation/garch11/scenario-0/reference.npz": "74d9321a15433e7ea5073612c96c0c90cd2f09bc576bd119693160e42bd8cab9",
+      "results/fresh-vi-validation/logistic-reference/nu-4-chains/0.npz": "5a0756d38cc1cfcd364997654a922ba9864e1fd12566c2ca6dbcc1026a39dd52",
+      "results/fresh-vi-validation/logistic-reference/nu-4-chains/1.npz": "57422c18c693c45e3ce8b0cabb6f0eda1caf308dca28eccc5349cbe7ea1667ad",
+      "results/fresh-vi-validation/logistic-reference/nu-4-chains/2.npz": "dbd546773e0cff75aa7f8350a190bc3531411cf57e4a2980765eb049f9022778",
+      "results/fresh-vi-validation/logistic-reference/nu-4-chains/3.npz": "8a114542baeea4575fb5024d3f69e03169723ffa17b5ddebc572a45146cfa992",
+      "results/fresh-vi-validation/logistic-reference/nu-4.npz": "663db78895f741fc2bb63473ef7e4d2865d7b06264db4dcbb33131c99bd8314a",
+      "results/fresh-vi-validation/logistic-reference/nu-6-chains/0.npz": "34fcc8d7f0ceb10637fcbc2b18ab9ae333b082c7b050c052e66ae1ec3c8b8a46",
+      "results/fresh-vi-validation/logistic-reference/nu-6-chains/1.npz": "cf786b49581bf4172cd058e917d24123d8c0c8f8f40db490a7dc576bdf435ff8",
+      "results/fresh-vi-validation/logistic-reference/nu-6-chains/2.npz": "7e95c4501d9999537b57efa4c7938328b0048494c37032fe2d1d127b46df3a45",
+      "results/fresh-vi-validation/logistic-reference/nu-6-chains/3.npz": "0943db874d54148edef596db29322d4dab85b2a6d1dc582a5e168e68e8585ae6",
+      "results/fresh-vi-validation/logistic-reference/nu-6.npz": "d0016b01b6a321f6bb7bfdc12d91cbcc273b582205399416955c010d3f605481",
+      "results/fresh-vi-validation/logistic-regression/scenario-0/chains/DCS-BW-000.npz": "7afbc04f2b7f0b905a82bcce23fbf15f3b7c71b92b9b5881bbfbd83dcdc947b7",
+      "results/fresh-vi-validation/logistic-regression/scenario-0/chains/DCS-BW-001.npz": "bf67676607ac8978cd862570a6fae92970320c5321529bdb02efcc3c4e51a90a",
+      "results/fresh-vi-validation/logistic-regression/scenario-0/chains/SCS-000.npz": "eb204c02cf372309c281d6bbf40309988dd757fe76e312589ce4444441183fd6",
+      "results/fresh-vi-validation/logistic-regression/scenario-0/chains/SCS-001.npz": "f2d5149473fd9b0532fe1831015a618e121f6b8522174e46260be7b90ab8c719",
+      "results/fresh-vi-validation/logistic-regression/scenario-0/reference.npz": "663db78895f741fc2bb63473ef7e4d2865d7b06264db4dcbb33131c99bd8314a",
+      "results/fresh-vi-validation/logistic-regression/scenario-1/chains/DCS-BW-000.npz": "765b9320e9f2811b27a4e6e8422f93a480db8728af21c756879fb3f376c90801",
+      "results/fresh-vi-validation/logistic-regression/scenario-1/chains/DCS-BW-001.npz": "23b01a6fb98f6c275835f5c8f7ff9c22d5a45857c408c7626a78ce0489dc1d60",
+      "results/fresh-vi-validation/logistic-regression/scenario-1/chains/SCS-000.npz": "c06228124e1f11386755c091ea5ee720af7527fbe662b9e803edb5f504a20319",
+      "results/fresh-vi-validation/logistic-regression/scenario-1/chains/SCS-001.npz": "a2f2db9899369278ad354cd80e9303b1da85064a3366695e2d3c498aa6568850",
+      "results/fresh-vi-validation/logistic-regression/scenario-1/reference.npz": "d0016b01b6a321f6bb7bfdc12d91cbcc273b582205399416955c010d3f605481",
+      "results/fresh-vi-validation/skew-t-100d-fixed/scenario-0/chains/DCS-BW-000.npz": "759c2cf4da3aeee91f9bbbe48773d9d074a6121465302dfcdbc242c8a035315b",
+      "results/fresh-vi-validation/skew-t-100d-fixed/scenario-0/chains/DCS-BW-001.npz": "4ad55f1dd8ab4a9c689b4f3cf0a549690ccbcd21ee247ca6bef828c3a1651b64",
+      "results/fresh-vi-validation/skew-t-100d-fixed/scenario-0/chains/DCS-RWM-000.npz": "d2235f013d6f59733fa772c3904e5b30373dd9dc43ebeb851a01a41e442fe1d1",
+      "results/fresh-vi-validation/skew-t-100d-fixed/scenario-0/chains/DCS-RWM-001.npz": "a7fe2e0e052d306a68807c56bed15e6cebb7516f5f5eb25228598f118ca371f1",
+      "results/fresh-vi-validation/skew-t-100d-fixed/scenario-0/chains/SCS-000.npz": "adade66dee7f341d9d9ec90966f4e127a84f328a0bb8bd81c31e6ca4125290bd",
+      "results/fresh-vi-validation/skew-t-100d-fixed/scenario-0/chains/SCS-001.npz": "a35fa92b65efd3a73371e62a8ad11d541ba891c17853973698d1a94df240d31c",
+      "results/fresh-vi-validation/skew-t-100d-fixed/scenario-0/reference.npz": "de409726583f6943ccc52bee77a1f1939cb3eb38789a436ccc3cc16319176786",
+      "results/fresh-vi-validation/skew-t-200d-baselines/scenario-0/chains/DCS-BW-000.npz": "d4c67b7c2716d6f0e7237d8bfadeda990c30ff79cfd8b1881be3b273f86a5a48",
+      "results/fresh-vi-validation/skew-t-200d-baselines/scenario-0/chains/DCS-BW-001.npz": "87e0c541540669ce0e7769ba6e76fe4ea8cbf9719360738b7c5c033394f8274c",
+      "results/fresh-vi-validation/skew-t-200d-baselines/scenario-0/chains/NUTS-000.npz": "4cafabc74a2f9f9266c02a16b2c428f54dc18a134d35b7fe8dba2de56f0b620c",
+      "results/fresh-vi-validation/skew-t-200d-baselines/scenario-0/chains/NUTS-001.npz": "16ad639b341a2f0b1191ba6187b2f96df94261934938a6edd6f060cd64ee5974",
+      "results/fresh-vi-validation/skew-t-200d-baselines/scenario-0/chains/RWM-Gaussian-000.npz": "ae3d06ddc92e4024889a72f7bd9d214f43103acf98c4e8bbcead75fe8ceebdfa",
+      "results/fresh-vi-validation/skew-t-200d-baselines/scenario-0/chains/RWM-Gaussian-001.npz": "321e8d864aeddd2658ea0caeae35f46b9781d549146d4adb0d4266d1500e6aea",
+      "results/fresh-vi-validation/skew-t-200d-baselines/scenario-0/chains/RWM-stable-000.npz": "0efa500cffd091868f35bcbfc167008135b2e4970c0432e7b8b912fbbff1b9d6",
+      "results/fresh-vi-validation/skew-t-200d-baselines/scenario-0/chains/RWM-stable-001.npz": "b744bcdfa90dde7f31282ab1b1f02bb9205a140aa31700019ef4098d2dd9a46b",
+      "results/fresh-vi-validation/skew-t-200d-baselines/scenario-0/reference.npz": "53b19cf27aed5013922287994a826758439a16247792a579de4e3d5741c0de9b",
+      "results/fresh-vi-validation/skew-t-200d-nuts/scenario-0/chains/DCS-BW-000.npz": "312c1325f933e411c65d3ea87fa79b7e2534c2a9c39daf6d78ee40b788eb319b",
+      "results/fresh-vi-validation/skew-t-200d-nuts/scenario-0/chains/DCS-BW-001.npz": "5247ad7dafa21029877e2b2600c6c50add63c63f9604cc8e9e584afb173a866e",
+      "results/fresh-vi-validation/skew-t-200d-nuts/scenario-0/chains/NUTS-000.npz": "90f6cd9b04dd92faf6bdfa76c8891837d08bbe591b3612ef57a8b1a918109787",
+      "results/fresh-vi-validation/skew-t-200d-nuts/scenario-0/chains/NUTS-001.npz": "ea35586934c39716a1d7e817aaec67b97bcb66b5ad1c8c3ad6338c73826b188c",
+      "results/fresh-vi-validation/skew-t-200d-nuts/scenario-0/reference.npz": "53b19cf27aed5013922287994a826758439a16247792a579de4e3d5741c0de9b",
+      "results/fresh-vi-validation/skew-t-50d-nu-0.5/scenario-0/chains/DCS-BW-000.npz": "87690c76b03e753c7286793c26acbb4e03ed5f159295e853c560eff2d44447e4",
+      "results/fresh-vi-validation/skew-t-50d-nu-0.5/scenario-0/chains/DCS-BW-001.npz": "17073d8e5e27f7ff0ba843aa24680814133a39540ddd9cc6289c2297fe760b27",
+      "results/fresh-vi-validation/skew-t-50d-nu-0.5/scenario-0/chains/DCS-RWM-000.npz": "f34d2a9d53015cf8390924abd679bc5ed974dd3cacd56c2819d182589092ee66",
+      "results/fresh-vi-validation/skew-t-50d-nu-0.5/scenario-0/chains/DCS-RWM-001.npz": "426c0a7a3c0da35c3f282dd62be6d1abae6205bce0f324da895c85b8c9cbce50",
+      "results/fresh-vi-validation/skew-t-50d-nu-0.5/scenario-0/chains/SCS-000.npz": "e51f48bf7b8e118c85d0838d4458f2a40e64d7ebc18d661376b366586c346de3",
+      "results/fresh-vi-validation/skew-t-50d-nu-0.5/scenario-0/chains/SCS-001.npz": "ee2402eda8bd403905d708ab203401cc198777fc5f72c65ba056bb37e0409222",
+      "results/fresh-vi-validation/skew-t-50d-nu-0.5/scenario-0/reference.npz": "e42c6f8f6d6f583339fe693bdfd028b4544b7d6bbf55b680948f4a89c2eed619"
+    }
+  },
+  "fixed_scale_end_to_end": "complete",
+  "launcher_checks": [
+    "All-thread button selects all 12 detected local CPU slots",
+    "Paper concurrency hint distinguishes 20-chain and 50-chain designs",
+    "Rebuild figures completed through launcher on saved seven-experiment run",
+    "Original figures, exact-number tables and collapsed supplementary diagnostics displayed",
+    "Full-precision MSE/sample table opened and verified in browser"
+  ],
+  "cpu_topology_checks": [
+    "Synthetic 16-core/32-thread layout assigns all 32 unique CPUs, physical cores first",
+    "Local real-process queue test compares every fixed-step draw with direct sequential execution",
+    "Worker failure terminates sibling processes"
+  ],
+  "limitations": [
+    "No direct execution on the user's Ryzen hardware",
+    "Quick runs test execution only",
+    "See GitHub Actions for native Windows and Linux CI outcomes"
+  ]
+}

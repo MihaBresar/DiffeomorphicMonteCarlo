@@ -27,7 +27,7 @@ jobs:
       - run: python -m pip install -r requirements-cpu.txt
       - run: python -m pip check
       - run: python scripts/fetch_posteriordb.py
-      - name: Choose workers within the runner's physical CPU allocation
+      - name: Choose workers within the runner's available CPU allocation
         run: python -c "from dcs_bench.cpu import cpu_info; import os; info=cpu_info(); print(info); open(os.environ['GITHUB_ENV'], 'a').write('BENCH_WORKERS='+str(min(2, info['capacity']))+'\n')"
       - run: python -m unittest discover -s tests -v
       - run: python -m examples.basic_sampler

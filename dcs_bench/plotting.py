@@ -1,6 +1,8 @@
-"""Rebuild every figure and table using saved chains; no simulation occurs here."""
+"""Original paper figures and supplementary diagnostics from saved chains."""
 import csv
+import html
 import json
+from fractions import Fraction
 from pathlib import Path
 import numpy as np
 import matplotlib
@@ -9,7 +11,9 @@ import matplotlib.pyplot as plt
 from .targets import Target
 from .references import functional_draws, mcmc_diagnostics
 
-COLORS = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00']
+COLORS = ['#9370DB', '#FF8C00', '#228B22', '#FF1493', '#4682B4']
+METHOD_COLORS = {'DCS-BW': '#9370DB', 'DCS-RWM': '#FF8C00', 'DCS-HnR': '#9370DB',
+                 'SCS': '#FF1493', 'RWM-Gaussian': '#4682B4', 'RWM-stable': '#228B22', 'NUTS': '#FF8C00'}
 LABELS = {'tail_probability': r'$P(\|X\|\geq50)$', 'mean_norm': r'$E\|X\|$',
           'mean_log10_one_plus_norm': r'$E\log_{10}(1+\|X\|)$'}
 
@@ -27,12 +31,206 @@ def mse_summary(estimates, reference, seed=44):
 
 
 def save_figure(fig, folder, name, quick=False):
+    folder.mkdir(parents=True, exist_ok=True)
     if quick:
-        fig.suptitle('QUICK CHECK — not publication results', fontsize=11, color='#9C2F00')
+        title = fig._suptitle.get_text()+'\n' if fig._suptitle else ''
+        fig.suptitle(title+'QUICK CHECK — not publication results', fontsize=14)
     fig.tight_layout()
     for suffix in ('png', 'pdf'):
         fig.savefig(folder/f'{name}.{suffix}', dpi=220, bbox_inches='tight')
     plt.close(fig)
+
+
+def number(value):
+    """Shortest decimal which round-trips to the stored binary64 value."""
+    if value is None:
+        return 'unavailable'
+    if isinstance(value, (int, np.integer)):
+        return str(value)
+    return repr(float(value))
+
+
+def write_csv(path, rows):
+    if not rows:
+        return
+    with Path(path).open('w', newline='', encoding='utf-8') as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def method_labels(algorithms, config):
+    scale_note = ', R=√d' if config.get('ball_scale_policy') == 'sqrt-d' else ''
+    return [f'{a} (β={config["beta"]:g}{scale_note})' if a.startswith('DCS') else
+            f'SCS (l₀={config["latitude"]:.2f})' if a == 'SCS' else
+            'RWM Stable (α=0.5)' if a == 'RWM-stable' else a.replace('-', ' ')
+            for a in algorithms]
+
+
+def bar_panel(ax, algorithms, heights, config, title, ylabel):
+    """Original linear bars, with every plotted height printed without rounding."""
+    values = [np.nan if h is None else h for h in heights]
+    bars = ax.bar(np.arange(len(algorithms)), values,
+                  color=[METHOD_COLORS[a] for a in algorithms], alpha=.8, edgecolor='black')
+    ax.set(title=title, ylabel=ylabel)
+    ax.set_xticks(np.arange(len(algorithms)), method_labels(algorithms, config), rotation=15, ha='right')
+    ax.grid(axis='y', linestyle='--', alpha=.6)
+    ax.set_axisbelow(True)
+    finite = [v for v in values if np.isfinite(v)]
+    ax.set_ylim(0, max(finite)*1.18 if finite and max(finite) > 0 else 1)
+    for bar, value in zip(bars, heights):
+        ax.annotate(number(value), (bar.get_x()+bar.get_width()/2, value or 0),
+                    xytext=(0, 4), textcoords='offset points', ha='center', va='bottom', fontsize=8)
+
+
+def radial_boxplots(target, ref, data, config, labels):
+    algorithms = list(data)
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    fig.suptitle(f'Ergodic Averages across {config["runs"]} Chains (d={target.d}, ν={target.nu:.1f})',
+                 fontsize=16, fontweight='bold')
+    for k, ax in enumerate(axes):
+        boxes = ax.boxplot([data[a]['estimates'][:, k] for a in algorithms], patch_artist=True,
+                           tick_labels=method_labels(algorithms, config), showmeans=True, meanline=True)
+        for patch, a in zip(boxes['boxes'], algorithms):
+            patch.set_facecolor(METHOD_COLORS[a])
+            patch.set_alpha(.6)
+        ax.axhline(ref['functional_truth'][k], color='red', ls='--', lw=2,
+                   label=f'Reference = {number(ref["functional_truth"][k])}')
+        ax.set_title(labels[ref['functional_names'][k]], fontsize=14)
+        ax.set_ylabel('Independent-chain ergodic average')
+        ax.grid(axis='y', ls=':', alpha=.7)
+        ax.tick_params(axis='x', rotation=15)
+        ax.legend(fontsize=9)
+    return fig
+
+
+def qq_reference(target, ref, config):
+    """Recover the original four QQ coordinates without rerunning MCMC.
+
+    Coordinates with zero skew coefficient have exactly Student-t marginals.
+    Existing saved quantiles remain authoritative for the first two coordinates.
+    A nonzero skew coefficient in an unsaved coordinate needs deterministic IID
+    reference draws only, using the recorded seed and batching.
+    """
+    from scipy.stats import t
+    from .references import skew_t_iid
+    dims = min(4, target.d)
+    saved = np.asarray(ref['quantiles'])
+    result = np.empty((len(config['q_levels']), dims))
+    keep = min(saved.shape[1], dims)
+    result[:, :keep] = saved[:, :keep]
+    sources = ['saved independent reference']*keep
+    missing = list(range(keep, dims))
+    skewed = [dim for dim in missing if target.alpha[dim] != 0]
+    if skewed:
+        rng = np.random.default_rng(ref['seed'])
+        values, remaining = [], ref['draws']
+        while remaining:
+            n = min(remaining, config['reference_batch_size'])
+            values.append(skew_t_iid(target, rng, n)[:, skewed])
+            remaining -= n
+        qs = np.quantile(np.concatenate(values), config['q_levels'], axis=0)
+    for dim in missing:
+        result[:, dim] = qs[:, skewed.index(dim)] if dim in skewed else t.ppf(config['q_levels'], target.nu)
+        sources.append('replayed independent IID reference' if dim in skewed else 'analytic Student-t marginal')
+    return result, sources
+
+
+def skew_figures(target, ref, data, config, labels, folder, quick):
+    name, algorithms = config['figure'], list(data)
+    reference, sources = qq_reference(target, ref, config)
+    fig, axes = plt.subplots(1, reference.shape[1], figsize=(20, 5), squeeze=False)
+    fig.suptitle(f'Marginal Q–Q Diagnostics: Skew-t (d={target.d}, ν={target.nu:g})', fontsize=16)
+    qq_rows = []
+    for dim, ax in enumerate(axes[0]):
+        truth = reference[:, dim]
+        ax.plot([truth.min(), truth.max()], [truth.min(), truth.max()], 'k--', alpha=.5, label='y = x')
+        for a in algorithms:
+            low, median, high = np.quantile(data[a]['quantiles'][:, :, dim], [.05, .5, .95], axis=0)
+            ax.plot(truth, median, 'o-', ms=4, color=METHOD_COLORS[a], label=a, alpha=.8)
+            ax.fill_between(truth, low, high, color=METHOD_COLORS[a], alpha=.15)
+            for q, x, y, lo, hi in zip(config['q_levels'], truth, median, low, high):
+                qq_rows.append(dict(coordinate=dim+1, algorithm=a, probability=q,
+                    reference=x, reference_source=sources[dim], median=y, across_chains_05=lo, across_chains_95=hi))
+        ax.set(title=f'$x_{dim+1}$', xlabel='Independent Reference Quantiles', ylabel='Estimated Quantiles')
+        ax.grid(ls=':', alpha=.6)
+        if dim == 0:
+            ax.legend(fontsize=9)
+    save_figure(fig, folder, name+'_marginal_qq', quick)
+    write_csv(folder/(name+'_marginal_qq.csv'), qq_rows)
+    is_nuts = config['experiment'] == 'skew-t-200d-nuts'
+    save_figure(radial_boxplots(target, ref, data, config, labels), folder,
+                name if is_nuts else name+'_ergodic_averages', quick)
+    third = ('total_coordinate_bulk_ess' if is_nuts else 'mean_sampling_seconds'
+             if config['mode'] == 'iterations' else 'mean_iterations')
+    ncols = 2 if config['experiment'] == 'skew-t-200d-baselines' else 3
+    fig, axes = plt.subplots(1, ncols, figsize=(16 if ncols == 2 else 18, 6))
+    title = ('Performance & Mean Squared Error Comparison' if config['mode'] == 'iterations'
+             else f'Sampling Efficiency & MSE ({config["time_budget"]:.1f}s Budget)')
+    fig.suptitle(title, fontsize=16, fontweight='bold')
+    for k, ax in enumerate(axes[:2]):
+        bar_panel(ax, algorithms, [data[a]['summary']['mse'][k] for a in algorithms], config,
+                  f'MSE of {labels[ref["functional_names"][k]]}', 'Mean Squared Error')
+    if ncols == 3:
+        heading, units = {'total_coordinate_bulk_ess': ('Total Effective Sample Size (ESS)', 'Sum of chain mean bulk ESS, first 10 coordinates'),
+                          'mean_sampling_seconds': ('Average Runtime (s)', 'Production Seconds'),
+                          'mean_iterations': ('Average Iterations Generated', 'Production Iterations / Chain')}[third]
+        bar_panel(axes[2], algorithms, [data[a]['summary'][third] for a in algorithms], config, heading, units)
+    save_figure(fig, folder, name+'_mse_and_ess' if is_nuts else name, quick)
+
+    # Explicitly distinguish generated iterations from retained (thinned) draws.
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    fig.suptitle('Sampling Output and Runtime', fontsize=16, fontweight='bold')
+    for ax, metric, heading, units in zip(axes,
+            ['mean_iterations', 'mean_retained_draws', 'mean_sampling_seconds'],
+            ['Average Iterations Generated', 'Average Samples Retained', 'Average Runtime (s)'],
+            ['Production Iterations / Chain', 'Retained Draws / Chain', 'Production Seconds']):
+        bar_panel(ax, algorithms, [data[a]['summary'][metric] for a in algorithms], config, heading, units)
+    save_figure(fig, folder, name+'_sample_counts', quick)
+
+
+def export_paper_values(output, config, all_summary):
+    """Full precision machine-readable and browser-readable plotted values."""
+    rows, count_rows = [], []
+    for s, scenario in enumerate(all_summary):
+        ref = scenario['reference']
+        for a, summary in scenario['algorithms'].items():
+            counts = dict(experiment=config['experiment'], preset=config['preset'], scenario=s,
+                ball_scale_policy=config.get('ball_scale_policy', 'fit'),
+                algorithm=a, chains=config['runs'], total_iterations=summary['total_iterations'],
+                mean_iterations=summary['mean_iterations'], mean_iterations_exact=str(Fraction(summary['total_iterations'], config['runs'])),
+                total_retained_samples=summary['total_retained_draws'], mean_retained_samples=summary['mean_retained_draws'],
+                mean_retained_samples_exact=str(Fraction(summary['total_retained_draws'], config['runs'])),
+                thin=config['thin'], mean_production_seconds=summary['mean_sampling_seconds'],
+                total_coordinate_bulk_ess=summary.get('total_coordinate_bulk_ess'))
+            count_rows.append(counts)
+            for k, functional in enumerate(ref['functional_names']):
+                rows.append(dict(counts, functional=functional, reference=ref['functional_truth'][k],
+                    reference_mcse=ref['functional_reference_mcse'][k], mse=summary['mse'][k], rmse=summary['rmse'][k],
+                    mse_bootstrap_95_low=summary['mse_bootstrap_95_interval'][0][k],
+                    mse_bootstrap_95_high=summary['mse_bootstrap_95_interval'][1][k]))
+    write_csv(output/'paper_values.csv', rows)
+    write_csv(output/'sample_counts.csv', count_rows)
+    # No rounding or JavaScript number formatting: copy the exact stored decimals.
+    columns = ['scenario', 'algorithm', 'functional', 'mse', 'reference', 'mean_iterations',
+               'mean_retained_samples', 'total_iterations', 'total_retained_samples', 'mean_production_seconds']
+    content = ''.join('<tr>'+''.join('<td>'+html.escape(number(row[c]) if isinstance(row[c], (float, int)) else str(row[c]))+'</td>'
+                                  for c in columns)+'</tr>' for row in rows)
+    page = ('<!doctype html><meta charset="utf-8"><title>Exact plotted values</title>'
+            '<style>body{font:15px system-ui;margin:32px;color:#253047}table{border-collapse:collapse}'
+            'th,td{padding:9px;border:1px solid #ccd4e0;text-align:left;white-space:nowrap}th{background:#eef1f7}'
+            '.scroll{overflow:auto}td{font-variant-numeric:tabular-nums}</style>'
+            f'<h1>{html.escape(config["experiment"])}: exact plotted values</h1>'
+            f'<p>Run size: <strong>{html.escape(config["preset"])}</strong>. '
+            f'DCS map scale policy: <strong>{html.escape(config.get("ball_scale_policy", "fit"))}</strong>. '
+            'MSE is the average of independent-chain squared errors. Iterations include repeats after rejection; '
+            'retained samples are after warmup and thinning. These are finite numerical estimates, '
+            'printed at round-trip floating-point precision, not exact population quantities.</p>'
+            '<p><a href="paper_values.csv">Download all values (CSV)</a> · '
+            '<a href="sample_counts.csv">Sample counts and exact mean fractions (CSV)</a></p>'
+            '<div class="scroll"><table><thead><tr>'+''.join('<th>'+c.replace('_', ' ')+'</th>' for c in columns)+
+            '</tr></thead><tbody>'+content+'</tbody></table></div>')
+    (output/'paper_values.html').write_text(page, encoding='utf-8')
 
 
 def rebuild(output):
@@ -57,7 +255,7 @@ def rebuild(output):
             chains, records = list(zip(*pairs))
             functions = [functional_draws(target, x, config['threshold']) for x in chains]
             estimates = np.array([f.mean(axis=0) for f in functions])
-            quantiles = np.array([np.quantile(x[:, :2], config['q_levels'], axis=0) for x in chains])
+            quantiles = np.array([np.quantile(x[:, :4], config['q_levels'], axis=0) for x in chains])
             # Unequal wall-time runs retain unequal lengths. Only multichain
             # diagnostics use an explicitly recorded common prefix.
             length = min(map(len, functions))
@@ -78,6 +276,18 @@ def rebuild(output):
                 mean_seconds_including_setup=float(np.mean(totals)),
                 setup_cost_charging='Shared fit and summed worker compilation durations amortized over this method\'s runs; not total elapsed wall time',
                 records=list(records))
+            for field in ('iterations', 'retained_draws'):
+                total = sum(int(r[field]) for r in records)
+                algo_summary['total_'+field] = total
+                algo_summary['mean_'+field] = total/len(records)
+            if target.kind == 'skew_t':
+                coord_names = target.names[:10]
+                coordinate_ess = [mcmc_diagnostics(x[None, :, :10], coord_names)['ess_bulk'] for x in chains]
+                values = [v for entry in coordinate_ess for v in entry.values()]
+                algo_summary['chain_coordinate_bulk_ess'] = coordinate_ess
+                algo_summary['total_coordinate_bulk_ess'] = (float(np.sum(values)/len(coord_names))
+                    if all(v is not None for v in values) else None)
+                algo_summary['coordinate_ess_definition'] = 'Sum over chains of the mean bulk ESS of the first min(10,d) coordinates; unavailable if any coordinate ESS is unavailable'
             if target.kind in ('garch', 'eight_schools'):
                 algo_summary['first_moment_rmse_across_chains_and_coordinates'] = float(np.sqrt(np.mean((estimates[:, :target.d]-ref['functional_truth'][:target.d])**2)))
                 algo_summary['second_moment_rmse_across_chains_and_coordinates'] = float(np.sqrt(np.mean((estimates[:, target.d:]-ref['functional_truth'][target.d:])**2)))
@@ -101,33 +311,41 @@ def rebuild(output):
         writer.writeheader()
         writer.writerows(csv_rows)
     quick = config['preset'] == 'quick'
+    export_paper_values(output, config, all_summary)
     if config['experiment'] == 'logistic-regression':
-        fig, axes = plt.subplots(len(all_data), len(config['algorithms']), figsize=(10, 8), squeeze=False)
+        fig, axes = plt.subplots(len(all_data), len(config['algorithms']), figsize=(12, 10), squeeze=False)
+        fig.suptitle(r'Q–Q Plot of $\beta_1$ in Robust Logistic Regression'+
+                     ('\nFixed R=√d comparison' if config.get('ball_scale_policy') == 'sqrt-d' else ''), fontsize=16)
+        qq_rows = []
         for row, (target, ref, data) in enumerate(all_data):
             truth = np.array(ref['quantiles'])[:, 0]
             for col, (algorithm, values) in enumerate(data.items()):
                 ax = axes[row, col]
                 qs = values['quantiles'][:, :, 0]
-                low, median, high = np.quantile(qs, [.025, .5, .975], axis=0)
-                ax.fill_between(truth, low, high, color=COLORS[col], alpha=.18, label='2.5–97.5% across chains')
-                ax.plot(truth, median, 'o-', color=COLORS[col], ms=3, label='Median chain quantile')
-                limits = [min(truth.min(), low.min()), max(truth.max(), high.max())]
-                ax.plot(limits, limits, '--', color='.4', lw=1)
-                ax.set(title=f'{algorithm}, prior ν={target.nu:g}', xlabel='Independent reference quantile of β₁', ylabel='Estimated quantile of β₁')
+                low, median, high = np.quantile(qs, [.05, .5, .95], axis=0)
+                ax.plot([truth.min(), truth.max()], [truth.min(), truth.max()], 'k-.', alpha=.5, label='y = x')
+                ax.fill_between(truth, low, high, color=METHOD_COLORS[algorithm], alpha=.15, label='5–95% across chains')
+                ax.plot(truth, median, 'o-', color=METHOD_COLORS[algorithm], ms=4, label=algorithm)
+                ax.set_title(f'{algorithm}, ν={target.nu:g}')
+                ax.grid(ls=':', alpha=.6)
+                if row == len(all_data)-1:
+                    ax.set_xlabel('Independent Reference Quantiles')
+                if col == 0:
+                    ax.set_ylabel('Sampler Quantiles')
+                for q, x, y, lo, hi in zip(config['q_levels'], truth, median, low, high):
+                    qq_rows.append(dict(prior_nu=target.nu, algorithm=algorithm, probability=q,
+                        reference=x, median=y, across_chains_05=lo, across_chains_95=hi))
         axes[0, 0].legend(fontsize=8)
+        write_csv(folder/(config['figure']+'.csv'), qq_rows)
         save_figure(fig, folder, config['figure'], quick)
     else:
         target, ref, data = all_data[0]
         algorithms = list(data)
-        if target.kind == 'skew_t' and config['experiment'] == 'skew-t-200d-nuts':
-            fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-            for k, ax in enumerate(axes):
-                ax.boxplot([data[a]['estimates'][:, k] for a in algorithms], labels=algorithms, showmeans=True)
-                ax.axhline(ref['functional_truth'][k], color='#B2182B', ls='--', lw=1.2)
-                ax.set_title(labels.get(ref['functional_names'][k], ref['functional_names'][k]))
-                ax.set_ylabel('Independent-chain ergodic average')
-        elif target.kind == 'skew_t':
+        if target.kind == 'skew_t':
+            skew_figures(target, ref, data, config, labels, folder, quick)
+            # Retain the newer overview as an explicitly supplementary plot.
             fig, axes = plt.subplots(1, 3, figsize=(14, 4))
+            fig.suptitle('Supplementary: MSE uncertainty and sampling output')
             runtime = config['mode'] == 'iterations'
             metric = 'sampling_seconds' if runtime else 'iterations'
             axes[0].bar(algorithms, [np.mean([r[metric] for r in data[a]['records']]) for a in algorithms], color=COLORS[:len(algorithms)])
@@ -156,16 +374,22 @@ def rebuild(output):
                 summ = data[a]['summary']
                 rows.append(f'{a} & {summ["first_moment_rmse_across_chains_and_coordinates"]:.6g} & {summ["second_moment_rmse_across_chains_and_coordinates"]:.6g} \\\\')
             (output/'posterior_table.tex').write_text('% RMSE across independent chains and physical coordinates; reference is estimated.\n'+'\n'.join(rows)+'\n')
-        save_figure(fig, folder, config['figure'], quick)
+        save_figure(fig, folder/'supplementary' if target.kind == 'skew_t' else folder,
+                    config['figure']+'_mse_uncertainty' if target.kind == 'skew_t' else config['figure'], quick)
         if target.kind == 'skew_t':
             fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+            fig.suptitle('Supplementary directional checks: positive-side probability and bounded projection mean')
             for k, ax in enumerate(axes, 2):
-                ax.boxplot([data[a]['estimates'][:, k] for a in algorithms], labels=algorithms, showmeans=True)
+                ax.boxplot([data[a]['estimates'][:, k] for a in algorithms], tick_labels=algorithms, showmeans=True)
                 ax.axhline(ref['functional_truth'][k], color='#B2182B', ls='--')
                 mcse = ref['functional_reference_mcse'][k]
                 if mcse:
                     ax.axhspan(ref['functional_truth'][k]-1.96*mcse, ref['functional_truth'][k]+1.96*mcse, color='#B2182B', alpha=.1)
                 ax.set_title(ref['functional_names'][k].replace('_', ' '))
                 ax.tick_params(axis='x', rotation=20)
-            save_figure(fig, folder, config['figure']+'_directional', quick)
+            save_figure(fig, folder/'supplementary', config['figure']+'_directional', quick)
+            # Retire only the old generated location, so stale diagnostics do
+            # not remain mixed in with the restored original figure collection.
+            for suffix in ('png', 'pdf'):
+                (folder/(config['figure']+'_directional.'+suffix)).unlink(missing_ok=True)
     return output/'summary.json'

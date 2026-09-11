@@ -10,6 +10,13 @@ from dcs_bench.cpu import cpu_info
 
 
 class LauncherTests(unittest.TestCase):
+    def test_scale_policy_reaches_production_not_reference_generation(self):
+        commands = launcher.commands_for_run('paper', 'logistic-regression', Path('results/test'), ball_scale_policy='sqrt-d')
+        self.assertNotIn('--ball-scale-policy', commands[0])
+        self.assertEqual(commands[1][commands[1].index('--ball-scale-policy')+1], 'sqrt-d')
+        with self.assertRaises(ValueError):
+            launcher.commands_for_run('paper', 'all', Path('results/test'), ball_scale_policy='invalid')
+
     def test_logistic_reference_precedes_sampling_and_resumes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

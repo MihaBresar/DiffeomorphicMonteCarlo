@@ -13,7 +13,9 @@ and choose **Run → Run Module** (F5).
 
 In the browser, click **Set up environment**, then **Start new run** with
 **Quick check** selected. Choose **CPU workers** to run independent chains in
-parallel (start with 2–4). Once that succeeds, choose **Full paper settings**
+parallel (start with 2–4, or click **Use all CPU threads** for the maximum).
+The Ryzen 9 9950X3D can use 32 workers when all its threads are available.
+Once that succeeds, choose **Full paper settings**
 for the publication runs. Buttons also resume saved runs, rebuild figures,
 and open results. See the [step-by-step click-to-run guide](docs/CLICK_TO_RUN.md)
 for installation, moving to another computer, and troubleshooting. These
@@ -79,6 +81,18 @@ Each run saves `configuration.json`, `manifest.json`, `summary.json`, `chain_met
 Summary files report chain estimates, MSE/RMSE and descriptive bootstrap intervals, functional MCSE, bulk/tail ESS, rank R-hat, NUTS divergences, tree saturation indicators, work counts, frozen tuning and timings. Unavailable diagnostics are null with an explanation. MSE is averaged over independent-chain squared errors. Posterior references remain finite Monte Carlo estimates, with their uncertainty reported.
 
 Each skew-t run also creates a supplementary `*_directional` figure. Radial functions cannot assess whether skewness is sampled correctly, so these check a bounded directional probability and a bounded directional mean against independent references.
+
+The original Q–Q, radial boxplot and linear MSE figure families are restored,
+including both fixed-time and fixed-iteration comparisons. Additional directional
+and MSE-uncertainty plots live in `figures/supplementary`. Bars show full-precision
+values; `paper_values.html`, `paper_values.csv` and `sample_counts.csv` expose
+the exact stored numbers. See [the figure guide](docs/FIGURES.md).
+
+The optional **DCS map scale** selector compares fixing R=√d while fitting the
+centre and Möbius parameters against the default VI fit of all three. It creates
+a separate experimental configuration; it does not change the identity maps
+used for the two PosteriorDB experiments. See [the implementation audit](docs/IMPLEMENTATION_AUDIT.md)
+for measured speed improvements, tuning comparisons and their limits.
 
 ## Use the sampler on another target
 

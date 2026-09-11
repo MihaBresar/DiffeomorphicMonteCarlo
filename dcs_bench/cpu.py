@@ -19,6 +19,12 @@ def _windows_api():
     return api
 
 
+def _ordered_slots(cores):
+    """Use one thread on every core before assigning SMT siblings."""
+    return [core[layer] for layer in range(max(map(len, cores)))
+            for core in cores if layer < len(core)]
+
+
 def _windows_cores():
     api = _windows_api()
     allowed, system = ctypes.c_size_t(), ctypes.c_size_t()
@@ -41,7 +47,7 @@ def _windows_cores():
         entry = Entry.from_buffer(buffer, offset)
         mask = entry.mask & allowed.value
         if entry.relationship == 0 and mask:  # RelationProcessorCore
-            cores.append((mask & -mask).bit_length()-1)
+            cores.append([cpu for cpu in range(ctypes.sizeof(ctypes.c_size_t)*8) if mask & (1 << cpu)])
     if not cores:
         raise OSError('No usable Windows physical cores found')
     return sorted(cores)
@@ -57,21 +63,26 @@ def cpu_info():
                 topology = Path(f'/sys/devices/system/cpu/cpu{cpu}/topology')
                 key = ((topology/'physical_package_id').read_text().strip(),
                        (topology/'core_id').read_text().strip())
-                physical.setdefault(key, cpu)
-            slots, basis = sorted(physical.values()), 'physical cores within process affinity'
+                physical.setdefault(key, []).append(cpu)
+            cores = sorted(physical.values())
+            slots, basis = _ordered_slots(cores), 'all allowed CPU threads, physical cores first, then SMT siblings'
+            physical_count = len(cores)
         except OSError:
             slots, basis = allowed, 'allowed logical CPUs; physical topology unavailable'
+            physical_count = None
         return {'logical_cpus': logical, 'capacity': len(slots), 'cpu_ids': slots,
-                'pinning': 'linux', 'basis': basis}
+                'physical_cores': physical_count, 'pinning': 'linux', 'basis': basis}
     if os.name == 'nt':
         try:
-            slots = _windows_cores()
+            cores = _windows_cores()
+            slots = _ordered_slots(cores)
             return {'logical_cpus': logical, 'capacity': len(slots), 'cpu_ids': slots,
-                    'pinning': 'windows', 'basis': 'physical cores in the current Windows processor group'}
+                    'physical_cores': len(cores), 'pinning': 'windows',
+                    'basis': 'all allowed threads in the current Windows processor group, physical cores first'}
         except OSError as error:
             # Fail closed instead of promising independent CPU allocations.
             return {'logical_cpus': logical, 'capacity': 1, 'cpu_ids': [None],
-                    'pinning': 'unavailable', 'basis': str(error)}
+                    'physical_cores': None, 'pinning': 'unavailable', 'basis': str(error)}
     physical = logical
     basis = 'logical CPU count; physical topology unavailable; OS-managed scheduling'
     if sys.platform == 'darwin':
@@ -80,7 +91,7 @@ def cpu_info():
             basis = 'physical core count; the OS schedules workers without CPU pinning'
         except (OSError, ValueError, subprocess.SubprocessError):
             pass
-    return {'logical_cpus': logical, 'capacity': max(1, physical), 'cpu_ids': [None]*max(1, physical),
+    return {'logical_cpus': logical, 'physical_cores': physical, 'capacity': logical, 'cpu_ids': [None]*logical,
             'pinning': 'os-managed', 'basis': basis}
 
 
@@ -98,7 +109,7 @@ def execution_plan(workers, chains):
     return {'requested_workers': workers, 'max_concurrent_chains': count,
             'cpu_ids': info['cpu_ids'][:count], 'hardware': info,
             'threads_per_worker': 1, 'start_method': 'fresh Python subprocess',
-            'schedule': 'one method at a time; chain index modulo worker count'}
+            'schedule': 'one method at a time; workers claim the next pending chain from a shared queue'}
 
 
 def worker_environment():

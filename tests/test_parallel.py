@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 import numpy as np
-from dcs_bench.cpu import cpu_info, execution_plan, validate_workers
+from dcs_bench.cpu import cpu_info, execution_plan, validate_workers, _ordered_slots
 from dcs_bench.engine import chain_seed, environment, load_config, read_chain
 from dcs_bench.parallel import launch_chains
 from dcs_bench.samplers import run_metropolis
@@ -16,6 +16,17 @@ from dcs_bench.transforms import BallMap
 
 
 class ParallelTests(unittest.TestCase):
+    def test_ryzen_16_core_32_thread_allocation(self):
+        cores = [[2*i, 2*i+1] for i in range(16)]
+        slots = _ordered_slots(cores)
+        self.assertEqual(slots[:16], list(range(0, 32, 2)))
+        self.assertEqual(slots[16:], list(range(1, 32, 2)))
+        info = {'capacity': 32, 'cpu_ids': slots, 'physical_cores': 16}
+        with patch('dcs_bench.cpu.cpu_info', return_value=info):
+            plan = execution_plan(32, 50)
+        self.assertEqual(len(set(plan['cpu_ids'])), 32)
+        self.assertEqual(plan['max_concurrent_chains'], 32)
+
     def test_worker_failure_stops_and_reaps_siblings(self):
         if cpu_info()['capacity'] < 2:
             self.skipTest('Two CPU slots are required')
@@ -53,13 +64,13 @@ class ParallelTests(unittest.TestCase):
     def test_two_processes_preserve_seeds_draws_and_checkpoints(self):
         workers = min(2, cpu_info()['capacity'])
         config = load_config('skew-t-100d-fixed', 'quick',
-                             {'workers': workers, 'iterations': 400, 'warmup': 30, 'runs': 2, 'thin': 1})
+                             {'workers': workers, 'iterations': 12000, 'warmup': 30, 'runs': 5, 'thin': 1})
         spec = {'kind': 'skew_t', 'dimension': 3, 'nu': 3, 'alpha': {}}
         target = Target(spec)
-        plan = execution_plan(workers, 2)
+        plan = execution_plan(workers, 5)
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            chains = [{'index': i, 'seed': chain_seed(config, 0, 0, i), 'path': str(root/f'{i}.npz')} for i in range(2)]
+            chains = [{'index': i, 'seed': chain_seed(config, 0, 0, i), 'path': str(root/f'{i}.npz')} for i in range(5)]
             # Even when a fitted map exists, an ordinary RWM baseline must ignore it.
             job = {'target': spec, 'config': config, 'algorithm': 'RWM-Gaussian',
                    'maps': {'ball': BallMap(3, beta=2).parameters()},
@@ -71,13 +82,17 @@ class ParallelTests(unittest.TestCase):
                 expected, _ = run_metropolis(target, 'RWM-Gaussian', None, config, chain['seed'])
                 np.testing.assert_array_equal(draws, expected)
                 self.assertEqual(record['seed'], chain['seed'])
-                self.assertEqual(record['execution']['worker_slot'], chain['index'] % workers)
+                self.assertIn(record['execution']['worker_slot'], range(workers))
                 self.assertEqual(record['execution']['threads']['OMP_NUM_THREADS'], '1')
                 if plan['hardware']['pinning'] in ('linux', 'windows'):
                     self.assertTrue(record['execution']['pinned'])
-                    self.assertEqual(record['execution']['cpu_id'], plan['cpu_ids'][chain['index'] % workers])
+                    self.assertEqual(record['execution']['cpu_id'], plan['cpu_ids'][record['execution']['worker_slot']])
                 records.append(record)
             self.assertEqual(len({r['execution']['pid'] for r in records}), workers)
+            # Every submitted chain was claimed exactly once, including a final
+            # unbalanced batch and a resume containing sparse chain indices.
+            claims = list((root/'jobs').glob('*-queue/*.worker-*.json'))
+            self.assertEqual(sorted(json.loads(p.read_text())['index'] for p in claims), list(range(5)))
             # No pending chains must not spawn processes or modify checkpoints.
             before = {p.name: p.read_bytes() for p in root.glob('*.npz')}
             launch_chains(job, [], root/'jobs', plan)

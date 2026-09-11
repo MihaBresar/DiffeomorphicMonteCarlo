@@ -20,6 +20,7 @@ def main():
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--plot-only', action='store_true')
     parser.add_argument('--workers', type=int, default=1)
+    parser.add_argument('--ball-scale-policy', choices=['fit', 'sqrt-d'], default='fit')
     args = parser.parse_args()
     output = (args.output_root or ROOT/'results'/args.preset).resolve()
     reference = output/'logistic-reference'
@@ -35,7 +36,8 @@ def main():
         if args.plot_only:
             command += ['--plot-only', str(directory)]
         else:
-            command += [name, '--preset', args.preset, '--output-dir', str(directory), '--reference-dir', str(reference), '--workers', str(args.workers)]
+            command += [name, '--preset', args.preset, '--output-dir', str(directory), '--reference-dir', str(reference),
+                        '--workers', str(args.workers), '--ball-scale-policy', args.ball_scale_policy]
             if args.resume and (directory/'manifest.json').exists():
                 command.append('--resume')
         print(' '.join(command), flush=True)

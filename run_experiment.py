@@ -36,6 +36,8 @@ def parser():
         p.add_argument('--'+name, type=int)
     p.add_argument('--time-budget', type=float)
     p.add_argument('--nuts-target-accept', type=float)
+    p.add_argument('--ball-scale-policy', choices=['fit', 'sqrt-d'],
+                   help='Fit DCS scale by VI, or fix R=sqrt(d) while fitting centre and Möbius parameters')
     return p
 
 

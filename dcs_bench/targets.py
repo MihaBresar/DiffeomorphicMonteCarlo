@@ -84,6 +84,31 @@ class Target:
             x[:] = 1.
         return x
 
+    def bind_log_prob(self):
+        """Cache target-only constants for repeated scalar NumPy evaluations."""
+        if self.kind == 'skew_t':
+            nu, d, alpha = self.nu, self.d, self.alpha.copy()
+            exponent = (nu+d)/2
+            constant = special.gammaln(exponent)-special.gammaln(nu/2)-d/2*np.log(nu*np.pi)
+            skewed = bool(np.any(alpha))
+            def evaluate(x):
+                r2 = np.dot(x, x)
+                lp = constant-exponent*np.log1p(r2/nu)
+                if skewed:
+                    lp += np.log(2.)+special.log_ndtr((x@alpha)*np.sqrt((nu+d)/(nu+r2)))
+                return lp
+            return evaluate
+        if self.kind == 'logistic':
+            nu, scale = self.nu, self.spec['prior_scale']
+            constant = self.d*(special.gammaln((nu+1)/2)-special.gammaln(nu/2)-np.log(scale*np.sqrt(nu*np.pi)))
+            signs = 2*self.y-1
+            def evaluate(x):
+                eta = self.design@x
+                return (constant-(nu+1)/2*np.log1p((x/scale)**2/nu).sum()
+                        -np.sum(np.logaddexp(0., -signs*eta)))
+            return evaluate
+        return self.log_prob
+
     def log_prob(self, x, backend='numpy'):
         xp, sp = modules(backend)
         x = xp.asarray(x)

@@ -34,6 +34,11 @@ def cap_stepout(z, proposed, latitude):
 class MetropolisKernel:
     def __init__(self, target, algorithm, mapping=None, seed=0):
         self.target, self.algorithm, self.mapping = target, algorithm, mapping
+        if mapping is not None:
+            self.log_density = (mapping.bind_log_density(target) if hasattr(mapping, 'bind_log_density')
+                                else lambda x: mapping.log_density(target, x))
+        else:
+            self.log_density = target.bind_log_prob() if hasattr(target, 'bind_log_prob') else target.log_prob
         self.rng = np.random.default_rng(seed)
         self.state = target.initial() if mapping is None else mapping.inverse(target.initial())
         self.evaluations = 0
@@ -44,7 +49,7 @@ class MetropolisKernel:
     def evaluate(self, x):
         self.evaluations += 1
         with np.errstate(over='ignore', invalid='ignore', divide='ignore', under='ignore'):
-            value = self.target.log_prob(x) if self.mapping is None else self.mapping.log_density(self.target, x)
+            value = self.log_density(x)
         return float(value) if np.isfinite(value) else -np.inf
 
     def draw(self):
@@ -129,6 +134,7 @@ def run_metropolis(target, algorithm, mapping, config, seed, seconds=None):
     if not np.all(np.isfinite(draws)):
         raise FloatingPointError('Nonfinite retained draws')
     return draws, {'algorithm': algorithm, 'seed': seed, 'iterations': iterations,
+                   'implementation': 'NumPy with frozen target and map constants',
                    'retained_draws': len(draws), 'thin': config['thin'], 'warmup_iterations': config['warmup'],
                    'warmup_seconds': warmup_seconds, 'sampling_seconds': elapsed,
                    'requested_seconds': seconds, 'budget_overshoot_seconds': max(0., elapsed-seconds) if seconds else 0.,

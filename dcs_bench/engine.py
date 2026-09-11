@@ -48,6 +48,8 @@ def load_config(name, preset='quick', overrides=None):
     if unused:
         raise ValueError(f'Overrides not used by {name}: {unused}')
     config.update({k: v for k, v in (overrides or {}).items() if v is not None})
+    if config.get('ball_scale_policy', 'fit') not in ('fit', 'sqrt-d'):
+        raise ValueError('Unknown ball scale policy')
     for field in ('runs', 'warmup', 'thin', 'iterations', 'nuts_samples', 'nuts_batch_size', 'reference_samples', 'reference_batch_size', 'optimizer_samples'):
         if config[field] <= 0:
             raise ValueError(f'{field} must be positive')

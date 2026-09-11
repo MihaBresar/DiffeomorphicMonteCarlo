@@ -21,6 +21,53 @@ jax.config.update('jax_enable_x64', True)
 
 
 class ScientificTests(unittest.TestCase):
+    def test_cached_densities_match_canonical_and_stable_formulas(self):
+        rng = np.random.default_rng(178)
+        for name in experiment_names():
+            c = load_config(name, 'quick')
+            target = Target(c['targets'][0])
+            fast_target = target.bind_log_prob()
+            for x in target.initial()+rng.normal(scale=.2, size=(8, target.d)):
+                assert_allclose(fast_target(x), target.log_prob(x), rtol=2e-12, atol=2e-10)
+            if target.kind not in ('skew_t', 'logistic'):
+                continue
+            shift = np.r_[.15, np.zeros(target.d-1)]
+            maps = [(BallMap(target.d, c['beta'], scale=.8, delta=shift), uniform_ball(rng, 80, target.d)),
+                    (SphereMap(target.d, scale=.8, observer=shift), uniform_cap(rng, 80, target.d, 1.1))]
+            for mapping, points in maps:
+                fast = mapping.bind_log_density(target)
+                for z in points:
+                    assert_allclose(fast(z), mapping.log_density(target, z), rtol=3e-12, atol=2e-10)
+            self.assertEqual(maps[0][0].bind_log_density(target)(np.ones(target.d)), -np.inf)
+
+    def test_cached_kernels_preserve_acceptance_and_draws(self):
+        target = Target({'kind': 'skew_t', 'dimension': 5, 'nu': 3, 'alpha': {'0': 2}})
+        for algorithm, mapping, scale in [('DCS-BW', BallMap(5, delta=[.1, 0, 0, 0, 0]), .15),
+                                          ('SCS', SphereMap(5), .1)]:
+            fast = MetropolisKernel(target, algorithm, mapping, seed=190)
+            oracle = MetropolisKernel(target, algorithm, mapping, seed=190)
+            oracle.log_density = lambda z: mapping.log_density(target, z)
+            oracle.lp = oracle.evaluate(oracle.state)
+            for _ in range(1200):
+                actual, expected = fast.step(scale), oracle.step(scale)
+                self.assertEqual(actual[1], expected[1])
+                assert_allclose(actual[0], expected[0], atol=1e-12)
+                np.testing.assert_array_equal(fast.state, oracle.state)
+
+    def test_fixed_sqrt_dimension_scale_still_fits_centre_and_mobius(self):
+        from dcs_bench.tuning import fit_map
+        target = Target({'kind': 'skew_t', 'dimension': 3, 'nu': 3, 'alpha': {'0': 2}})
+        config = load_config('skew-t-100d-fixed', 'quick', {'optimizer_steps': 5, 'ball_scale_policy': 'sqrt-d'})
+        mapping, metadata = fit_map(target, config, 'ball', 581)
+        self.assertEqual(mapping.scale, np.sqrt(3))
+        self.assertGreater(np.linalg.norm(mapping.mu), 0)
+        self.assertGreater(np.linalg.norm(mapping.delta), 0)
+        self.assertEqual(metadata['scale_policy'], 'fixed sqrt(d)')
+        self.assertEqual(metadata['batch_policy'], 'fresh')
+        self.assertEqual(metadata['total_training_draws'], 5*config['optimizer_samples'])
+        repeated, _ = fit_map(target, config, 'ball', 581)
+        self.assertEqual(mapping.parameters(), repeated.parameters())
+
     def test_public_api_returns_fixed_kernel_draws(self):
         draws, info = sample(lambda x: -2.5*np.log1p(x@x/3), np.zeros(2), draws=200, warmup=100, seed=18)
         self.assertEqual(draws.shape, (200, 2))

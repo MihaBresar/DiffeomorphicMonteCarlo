@@ -39,7 +39,8 @@ def main():
         target = Target(spec)
         seed = 918274  # Separate stream from all production and optimization seeds.
         hashes = source_hashes()
-        fingerprint = hashlib.sha256(json.dumps([spec, config, seed, hashes, context_key, plan], sort_keys=True).encode()).hexdigest()
+        scientific_hashes = {k: v for k, v in hashes.items() if k != 'dcs_bench/plotting.py'}
+        fingerprint = hashlib.sha256(json.dumps([spec, config, seed, scientific_hashes, context_key, plan], sort_keys=True).encode()).hexdigest()
         checkpoint_dir = root/f'nu-{target.nu:g}-chains'
         records, draws = [], []
         pending = []

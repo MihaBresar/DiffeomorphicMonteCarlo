@@ -53,6 +53,45 @@ class BallMap:
             raise FloatingPointError('Initial point maps onto the floating-point boundary')
         return z
 
+    def bind_log_density(self, target):
+        """Freeze map invariants once; retain the validated algebraic density."""
+        from scipy.special import gammaln, log_ndtr
+        d, beta, scale = self.d, self.beta, self.scale
+        mu, delta = self.mu.copy(), self.delta.copy()
+        delta2 = float(delta@delta)
+        logscale, logdelta = d*np.log(scale), d*np.log1p(-delta2)
+        target_lp = target.bind_log_prob() if hasattr(target, 'bind_log_prob') else target.log_prob
+        skew_t = target.kind == 'skew_t'
+        if skew_t:
+            nu, alpha = target.nu, target.alpha.copy()
+            skewed = bool(np.any(alpha))
+            constant = gammaln((nu+d)/2)-gammaln(nu/2)+nu/2*np.log(nu)-d/2*np.log(np.pi)
+        def evaluate(z):
+            r2 = z@z
+            if r2 >= 1:
+                return -np.inf
+            if delta2:
+                dot = z@delta
+                denominator = 1+2*dot+delta2*r2
+                w = ((1-delta2)*z+(1+2*dot+r2)*delta)/denominator
+                logmo = logdelta-d*np.log(denominator)
+            else:
+                w, logmo = z, 0.
+            rho = np.linalg.norm(w)
+            if rho >= 1:
+                return -np.inf
+            logeps = 0. if rho == 0 else np.log(-np.expm1(beta*np.log(rho)))
+            e = np.exp(logeps/beta)
+            if skew_t:
+                scaled_x = mu*e+scale*w
+                s = nu*e*e+scaled_x@scaled_x
+                lp = constant+(nu/beta-1)*logeps+logscale-(nu+d)/2*np.log(s)+logmo
+                if skewed:
+                    lp += np.log(2.)+log_ndtr((alpha@scaled_x)*np.sqrt((nu+d)/s))
+                return lp
+            return target_lp(mu+scale*w/e)+logscale-(1+d/beta)*logeps+logmo
+        return evaluate
+
     def log_density(self, target, z):
         # Evaluate t target after algebraic cancellation, keeping the same
         # normalization as direct log_prob + log|J| for validation.
@@ -125,3 +164,22 @@ class SphereMap:
             return float(lp) if np.isfinite(lp) else -np.inf
         except (FloatingPointError, ValueError, OverflowError):
             return -np.inf
+
+    def bind_log_density(self, target):
+        """Apply the same constant-caching optimization to the SCS comparator."""
+        d, scale, lo = self.d, self.scale, self.latitude
+        mu, observer = self.mu.copy(), self.observer.copy()
+        constant = d*np.log(scale)-np.log(lo)
+        target_lp = target.bind_log_prob() if hasattr(target, 'bind_log_prob') else target.log_prob
+        def evaluate(z):
+            ell = z[-1]+1
+            if ell >= lo:
+                return -np.inf
+            m = (lo-ell)/lo
+            yhat = (z[:-1]-(ell/lo)*observer)/m
+            v = yhat-observer
+            numerator = m*np.dot(v, v)+np.dot(v, observer)+lo-lo*lo*(1-m)
+            if numerator <= 0:
+                return -np.inf
+            return target_lp(mu+scale*yhat)+constant+np.log(numerator)-d*np.log(m)
+        return evaluate

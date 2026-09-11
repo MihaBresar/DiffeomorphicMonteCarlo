@@ -52,11 +52,24 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
    selected, choose **CPU workers** (start with 2–4), and click **Start new run**. This checks that the computer can run
    the complete pipeline. Quick-check graphs are not publication results.
 3. After the quick check succeeds, select **Full paper settings** and click
-   **Start new run** again. This regenerates all five main figures, the extra
-   directional plots, and the combined Eight Schools/GARCH table. You can also
+   **Use all CPU threads**, then **Start new run** again. On the Ryzen 9 9950X3D
+   this allows up to 32 workers with SMT enabled. This regenerates all original
+   figures, supplementary plots, and the combined Eight Schools/GARCH table. You can also
    select one experiment at a time.
 4. After completion, click **Show figures and tables**. Click a PNG or PDF link
    to view a graph. All files remain in **results → click-runs → dated folder**.
+   Under **Exact numbers and tables**, open `paper_values.html` to read or copy
+   the full-precision MSE and sample-count values. Supplementary diagnostics
+   appear in a separate collapsed section.
+
+The **DCS map scale** selector also lets you compare the proposed fixed R=√d
+fit with the default fit of R. Each choice starts a separate configuration;
+the fixed-R experiment is not the default manuscript setting.
+
+Selecting 32 workers does not change the number of chains. A smaller reproduction
+uses at most eight workers, a quick check two, and logistic reference preparation
+four. Full paper experiments use at most 20 or 50 chains depending on the design.
+The launcher displays the applicable production limit.
 
 Full paper runs can take many hours and several gigabytes. Keep the computer
 plugged in, awake, and available for the benchmark. Independent chains can run on
