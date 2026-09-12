@@ -11,6 +11,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from .targets import Target
 from .processing import process_chains
+from .radial_reporting import compact_radial_report, process_radial_chains
 from .cpu import cpu_info
 from .display import number, cell, figure_ticks
 
@@ -161,30 +162,8 @@ def qq_reference(target, ref, config):
 
 def skew_figures(target, ref, data, config, labels, folder, quick):
     name, algorithms = config['figure'], list(data)
-    reference, sources = qq_reference(target, ref, config)
-    # Historical summaries contain only the two QQ coordinates then plotted.
-    # Display those cached values instead of inventing unrecorded quantiles.
-    available = min(reference.shape[1], *(data[a]['quantiles'].shape[2] for a in algorithms))
-    reference, sources = reference[:, :available], sources[:available]
-    fig, axes = plt.subplots(1, reference.shape[1], figsize=(20, 5), squeeze=False)
-    fig.suptitle(f'Marginal Q–Q Diagnostics: Skew-t (d={target.d}, ν={target.nu:g})', fontsize=16)
-    qq_rows = []
-    for dim, ax in enumerate(axes[0]):
-        truth = reference[:, dim]
-        ax.plot([truth.min(), truth.max()], [truth.min(), truth.max()], 'k--', alpha=.5, label='y = x')
-        for a in algorithms:
-            low, median, high = np.quantile(data[a]['quantiles'][:, :, dim], [.05, .5, .95], axis=0)
-            ax.plot(truth, median, 'o-', ms=4, color=METHOD_COLORS[a], label=a, alpha=.8)
-            ax.fill_between(truth, low, high, color=METHOD_COLORS[a], alpha=.15)
-            for q, x, y, lo, hi in zip(config['q_levels'], truth, median, low, high):
-                qq_rows.append(dict(coordinate=dim+1, algorithm=a, probability=q,
-                    reference=x, reference_source=sources[dim], median=y, across_chains_05=lo, across_chains_95=hi))
-        ax.set(title=f'$x_{dim+1}$', xlabel='Independent Reference Quantiles', ylabel='Estimated Quantiles')
-        ax.grid(ls=':', alpha=.6)
-        if dim == 0:
-            ax.legend(fontsize=9)
-    save_figure(fig, folder, name+'_marginal_qq', quick)
-    write_csv(folder/(name+'_marginal_qq.csv'), qq_rows)
+    if not compact_radial_report(config):
+        skew_qq_figure(target, ref, data, config, folder, quick)
     is_nuts = config['experiment'] == 'skew-t-200d-nuts'
     save_figure(radial_boxplots(target, ref, data, config, labels), folder,
                 name if is_nuts else name+'_ergodic_averages', quick)
@@ -217,6 +196,34 @@ def skew_figures(target, ref, data, config, labels, folder, quick):
     save_figure(fig, folder, name+'_sample_counts', quick)
 
 
+def skew_qq_figure(target, ref, data, config, folder, quick):
+    name, algorithms = config['figure'], list(data)
+    reference, sources = qq_reference(target, ref, config)
+    # Historical summaries contain only the two QQ coordinates then plotted.
+    # Display those cached values instead of inventing unrecorded quantiles.
+    available = min(reference.shape[1], *(data[a]['quantiles'].shape[2] for a in algorithms))
+    reference, sources = reference[:, :available], sources[:available]
+    fig, axes = plt.subplots(1, reference.shape[1], figsize=(20, 5), squeeze=False)
+    fig.suptitle(f'Marginal Q–Q Diagnostics: Skew-t (d={target.d}, ν={target.nu:g})', fontsize=16)
+    qq_rows = []
+    for dim, ax in enumerate(axes[0]):
+        truth = reference[:, dim]
+        ax.plot([truth.min(), truth.max()], [truth.min(), truth.max()], 'k--', alpha=.5, label='y = x')
+        for a in algorithms:
+            low, median, high = np.quantile(data[a]['quantiles'][:, :, dim], [.05, .5, .95], axis=0)
+            ax.plot(truth, median, 'o-', ms=4, color=METHOD_COLORS[a], label=a, alpha=.8)
+            ax.fill_between(truth, low, high, color=METHOD_COLORS[a], alpha=.15)
+            for q, x, y, lo, hi in zip(config['q_levels'], truth, median, low, high):
+                qq_rows.append(dict(coordinate=dim+1, algorithm=a, probability=q,
+                    reference=x, reference_source=sources[dim], median=y, across_chains_05=lo, across_chains_95=hi))
+        ax.set(title=f'$x_{dim+1}$', xlabel='Independent Reference Quantiles', ylabel='Estimated Quantiles')
+        ax.grid(ls=':', alpha=.6)
+        if dim == 0:
+            ax.legend(fontsize=9)
+    save_figure(fig, folder, name+'_marginal_qq', quick)
+    write_csv(folder/(name+'_marginal_qq.csv'), qq_rows)
+
+
 def export_paper_values(output, config, all_summary):
     """Full-precision CSV values and a table with readable numerical labels."""
     rows, count_rows = [], []
@@ -234,17 +241,23 @@ def export_paper_values(output, config, all_summary):
                 thin=config['thin'], mean_production_seconds=summary['mean_sampling_seconds'],
                 total_coordinate_bulk_ess=summary.get('total_coordinate_bulk_ess'))
             counts.update(burnin_counts(summary['records']))
+            if compact_radial_report(config):
+                counts.pop('total_coordinate_bulk_ess', None)
             count_rows.append(counts)
             for k, functional in enumerate(ref['functional_names']):
                 rows.append(dict(counts, functional=functional, reference=ref['functional_truth'][k],
                     reference_mcse=ref['functional_reference_mcse'][k], mse=summary['mse'][k], rmse=summary['rmse'][k],
                     mse_bootstrap_95_low=summary['mse_bootstrap_95_interval'][0][k],
                     mse_bootstrap_95_high=summary['mse_bootstrap_95_interval'][1][k]))
+                if compact_radial_report(config):
+                    rows[-1]['estimate'] = float(np.mean(np.asarray(summary['chain_functional_estimates'])[:, k]))
     write_csv(output/'paper_values.csv', rows)
     write_csv(output/'sample_counts.csv', count_rows)
     # Display formatting is separate from the full-precision CSV exports.
     columns = ['scenario', 'algorithm', 'functional', 'mse', 'reference', 'mean_iterations',
                'mean_retained_samples', 'total_iterations', 'total_retained_samples', 'mean_production_seconds']
+    if compact_radial_report(config):
+        columns.insert(3, 'estimate')
     if any('total_burnin_iterations' in row for row in rows):
         columns += ['total_burnin_iterations', 'total_estimation_iterations', 'mean_burnin_iterations', 'mean_estimation_iterations']
     burn_note = ('Separate step tuning precedes sampling. Recorded sampling burn-in is included in generated counts and excluded from estimation counts. Retained samples follow tuning, sampling burn-in and thinning. '
@@ -261,6 +274,9 @@ def export_paper_values(output, config, all_summary):
             'MSE is the average of independent-chain squared errors. Iterations include repeats after rejection; '
             +burn_note+'These are finite numerical estimates, '
             'displayed with two decimals, using scientific notation for small values. CSV and JSON retain full precision.</p>'
+            +('<p>Estimates are averages of independent-chain estimates. This report contains only the norm moment, '
+              'tail probability, MSE, sample counts and timing. No ESS, R-hat, coordinate quantiles or directional diagnostics are computed.</p>'
+              if compact_radial_report(config) else '')+
             '<p><a href="paper_values.csv">Download all values (CSV)</a> · '
             '<a href="sample_counts.csv">Sample counts and exact mean fractions (CSV)</a></p>'
             '<div class="scroll"><table><thead><tr>'+''.join('<th>'+c.replace('_', ' ')+'</th>' for c in columns)+
@@ -273,27 +289,37 @@ def rebuild(output):
     started = perf_counter()
     output = Path(output)
     config = json.loads((output/'configuration.json').read_text())
+    radial_only = compact_radial_report(config)
     labels = dict(LABELS)
     labels['tail_probability'] = rf'$P(\|X\|\geq {config["threshold"]:g})$'
     manifest = json.loads((output/'manifest.json').read_text())
     folder = output/'figures'
     folder.mkdir(exist_ok=True)
     all_summary, csv_rows, all_data = [], [], []
-    print('Sampling is complete. Processing saved chains and convergence diagnostics.', flush=True)
+    print('Sampling is complete. Collecting moment and tail estimates, MSE, sample counts and timing.'
+          if radial_only else 'Sampling is complete. Processing saved chains and convergence diagnostics.', flush=True)
     for s, spec in enumerate(config['targets']):
         target = Target(spec)
         directory = output/f'scenario-{s}'
         ref = json.loads((directory/'reference.json').read_text())
+        if radial_only:
+            # Historical references also contain optional directional/QQ values.
+            # Keep their first two radial values without rewriting the reference.
+            ref = dict(ref, **{key: ref[key][:2] for key in
+                       ('functional_names', 'functional_truth', 'functional_reference_mcse')})
         setup = json.loads((directory/'setup.json').read_text())
         summary = {'target': spec, 'reference': ref, 'algorithms': {}}
         data = {}
         for algorithm in config['algorithms']:
-            processed = process_chains(
-                [directory/'chains'/f'{algorithm}-{i:03d}.npz' for i in range(config['runs'])],
-                target, config['threshold'], config['q_levels'], ref['functional_names'],
-                expected=manifest['fingerprint'], temporary_parent=output,
-                diagnostic_workers=min(4, config.get('workers', 1), cpu_info()['capacity']),
-                label=f'Scenario {s}, {algorithm}', progress=lambda message: print(message, flush=True))
+            paths = [directory/'chains'/f'{algorithm}-{i:03d}.npz' for i in range(config['runs'])]
+            arguments = dict(expected=manifest['fingerprint'], label=f'Scenario {s}, {algorithm}',
+                             progress=lambda message: print(message, flush=True))
+            if radial_only:
+                processed = process_radial_chains(paths, target, config['threshold'], **arguments)
+            else:
+                processed = process_chains(paths, target, config['threshold'], config['q_levels'],
+                    ref['functional_names'], temporary_parent=output,
+                    diagnostic_workers=min(4, config.get('workers', 1), cpu_info()['capacity']), **arguments)
             estimates, quantiles, records = (processed[key] for key in ('estimates', 'quantiles', 'records'))
             length, diagnostics, indiv = (processed[key] for key in ('length', 'diagnostics', 'indiv'))
             errors = mse_summary(estimates, ref['functional_truth'])
@@ -312,12 +338,15 @@ def rebuild(output):
                 mean_seconds_including_setup=float(np.mean(totals)),
                 setup_cost_charging='Shared fit and summed worker compilation durations amortized over this method\'s runs; not total elapsed wall time',
                 records=list(records))
+            if radial_only:
+                for key in ('cross_chain_diagnostics', 'diagnostic_draws_per_chain', 'independent_chain_diagnostics'):
+                    algo_summary.pop(key)
             algo_summary.update(burnin_counts(records))
             for field in ('iterations', 'retained_draws'):
                 total = sum(int(r[field]) for r in records)
                 algo_summary['total_'+field] = total
                 algo_summary['mean_'+field] = total/len(records)
-            if target.kind == 'skew_t':
+            if target.kind == 'skew_t' and not radial_only:
                 coord_names = target.names[:10]
                 coordinate_ess = processed['coordinate_ess']
                 values = [v for entry in coordinate_ess for v in entry.values()]
@@ -330,15 +359,17 @@ def rebuild(output):
                 algo_summary['second_moment_rmse_across_chains_and_coordinates'] = float(np.sqrt(np.mean((estimates[:, target.d:]-ref['functional_truth'][target.d:])**2)))
             summary['algorithms'][algorithm] = algo_summary
             data[algorithm] = {'estimates': estimates, 'quantiles': quantiles, 'records': records, 'summary': algo_summary}
-            for i, (est, record, diag) in enumerate(zip(estimates, records, indiv)):
+            for i, (est, record) in enumerate(zip(estimates, records)):
                 for k, name in enumerate(ref['functional_names']):
-                    ess = diag['ess_bulk'][name]
                     csv_rows.append(dict(scenario=s, algorithm=algorithm, chain=i, seed=record['seed'], functional=name,
                         estimate=est[k], reference=ref['functional_truth'][k], squared_error=(est[k]-ref['functional_truth'][k])**2,
-                        mcse=diag['mcse_mean'][name], ess_bulk=ess, ess_tail=diag['ess_tail'][name],
-                        ess_per_sampling_second=None if ess is None else ess/record['sampling_seconds'],
                         sampling_seconds=record['sampling_seconds'], seconds_including_setup=totals[i],
                         iterations=record['iterations'], retained_draws=record['retained_draws']))
+                    if not radial_only:
+                        diag = indiv[i]
+                        ess = diag['ess_bulk'][name]
+                        csv_rows[-1].update(mcse=diag['mcse_mean'][name], ess_bulk=ess, ess_tail=diag['ess_tail'][name],
+                            ess_per_sampling_second=None if ess is None else ess/record['sampling_seconds'])
                     if 'burnin_iterations' in record or 'discarded_iterations' in record:
                         burn = record.get('burnin_iterations', record.get('discarded_iterations'))
                         csv_rows[-1].update(burnin_iterations=burn,
@@ -352,13 +383,15 @@ def rebuild(output):
         writer.writeheader()
         writer.writerows(csv_rows)
     diagnostic_seconds = perf_counter()-started
-    print('Convergence diagnostics complete. Saving tables and figures.', flush=True)
+    print('Estimates collected. Saving tables and figures.' if radial_only else
+          'Convergence diagnostics complete. Saving tables and figures.', flush=True)
     rendered = _render_prepared(output, config, all_summary, all_data, labels)
     write_json(output/'processing.json', dict(
         schema_version=1, statistics_seconds=diagnostic_seconds,
         tables_and_figures_seconds=perf_counter()-started-diagnostic_seconds,
         total_seconds=perf_counter()-started,
         sampling_clock_includes_result_processing=False,
+        diagnostics_computed=not radial_only,
         diagnostic_subsampling=False))
     print(f'Result processing finished in {perf_counter()-started:.2f} seconds.', flush=True)
     return rendered
@@ -368,6 +401,7 @@ def render_saved_summary(output):
     """Refresh display only, using cached statistics without reading chains."""
     output = Path(output)
     config = json.loads((output/'configuration.json').read_text())
+    radial_only = compact_radial_report(config)
     saved = json.loads((output/'summary.json').read_text())
     all_summary, all_data = saved['scenarios'], []
     labels = dict(LABELS)
@@ -375,6 +409,9 @@ def render_saved_summary(output):
     for scenario in all_summary:
         target, reference = Target(scenario['target']), scenario['reference']
         reference.setdefault('functional_reference_mcse', [None]*len(reference['functional_names']))
+        if radial_only:
+            for key in ('functional_names', 'functional_truth', 'functional_reference_mcse'):
+                reference[key] = reference[key][:2]
         for result in scenario['algorithms'].values():
             # Older summaries saved exact per-chain counts but not totals.
             # Recover only these bookkeeping aggregates; never recalculate ESS.
@@ -382,7 +419,13 @@ def render_saved_summary(output):
                 total = sum(int(record[field]) for record in result['records'])
                 result.setdefault('total_'+field, total)
                 result.setdefault('mean_'+field, total/len(result['records']))
-            result.setdefault('total_coordinate_bulk_ess', None)
+            if radial_only:
+                for key in ('mse', 'rmse'):
+                    result[key] = result[key][:2]
+                for key in ('chain_functional_estimates', 'mse_bootstrap_95_interval'):
+                    result[key] = [row[:2] for row in result[key]]
+            else:
+                result.setdefault('total_coordinate_bulk_ess', None)
             result.update(burnin_counts(result['records']))
         data = {algorithm: {'estimates': np.asarray(result['chain_functional_estimates']),
                             'quantiles': np.asarray(result['chain_quantiles']),
@@ -429,6 +472,8 @@ def _render_prepared(output, config, all_summary, all_data, labels):
         algorithms = list(data)
         if target.kind == 'skew_t':
             skew_figures(target, ref, data, config, labels, folder, quick)
+            if compact_radial_report(config):
+                return output/'summary.json'
             # Retain the newer overview as an explicitly supplementary plot.
             fig, axes = plt.subplots(1, 3, figsize=(14, 4))
             fig.suptitle('Supplementary: MSE uncertainty and sampling output')

@@ -96,6 +96,11 @@ def _run_and_save_chain(job, chain, target, config, algorithm, runner, mapping, 
         for field in ('producing_source_fingerprint', 'producing_source_hashes'):
             if field in job:
                 record[field] = job[field]
+        from .radial_reporting import compact_radial_report, summarize_radial
+        if compact_radial_report(config):
+            print(f'Worker {job["worker_slot"]+1}: {algorithm}, chain {chain["index"]+1} '
+                  f'summarizing tail probability and radial moment from {len(draws):,} retained draws', flush=True)
+            record['radial_summary'] = summarize_radial(draws, target, config['threshold'])
         print(f'Worker {job["worker_slot"]+1}: {algorithm}, chain {chain["index"]+1} '
               f'sampling complete ({record["sampling_seconds"]:.2f} s); '
               f'saving {len(draws):,} retained draws ({draws.nbytes/1_000_000:.2f} MB)', flush=True)

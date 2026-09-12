@@ -82,9 +82,21 @@ def mcmc_diagnostics(chains, names, *, metrics=('ess_bulk', 'ess_tail', 'mcse_me
 
 
 def make_reference(target, config, directory, logistic_reference=None):
+    from .radial_reporting import compact_radial_report
+
     directory.mkdir(parents=True, exist_ok=True)
     q = np.asarray(config['q_levels'])
-    if target.kind == 'skew_t':
+    if target.kind == 'skew_t' and compact_radial_report(config):
+        # Skewing changes signs but not the radial law. These two reference
+        # values need neither simulated reference draws nor coordinate quantiles.
+        names, truth, errors = radial_truth(target, config['threshold'])
+        metadata = {'source': 'Analytic Student-t radial law (unchanged by sign skewing)',
+            'seed': None, 'draws': 0, 'exact': target.nu > 1,
+            'functional_names': names, 'functional_truth': truth.tolist(),
+            'functional_numerical_error': errors, 'functional_reference_mcse': [0., 0.],
+            'radial_truth_exact_except_numerical_evaluation': True,
+            'quantiles': [], 'reporting': 'radial'}
+    elif target.kind == 'skew_t':
         rng = np.random.default_rng(config['reference_seed'])
         selected, directional = [], []
         remaining = config['reference_samples']

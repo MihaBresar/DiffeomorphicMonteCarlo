@@ -17,7 +17,13 @@ keep their identity maps. Old fixed-R=√d results retain their historical label
 | `SuperInfiniteFirstTest` | Linear MSE bars for tail probability, mean log norm, then average runtime at equal iterations |
 | `QQ-regresssion` | Two-by-two marginal Q–Q plots for β₁, with ν=4 and ν=6 |
 
-Every skew-t experiment also saves the original four-coordinate marginal Q–Q
+The compact **200D random-walk baselines** report keeps just `VsRWM_NUTS`
+(two MSE panels), `VsRWM_NUTS_ergodic_averages` (tail and norm estimates), and
+`VsRWM_NUTS_sample_counts` (generated samples, retained samples and runtime).
+It does not compute marginal quantiles, directional checks or ESS/R-hat.
+Its HTML/CSV tables also include the average estimate across chains.
+
+The other generic skew-t experiments also save the original four-coordinate marginal Q–Q
 plots (`*_marginal_qq`) and radial boxplots (`*_ergodic_averages`, or the main
 `NUTS_PBW_vs` file). The DCS/NUTS run restores `*_mse_and_ess`: two MSE panels
 and aggregate ESS. ESS is the sum over chains of each chain's mean bulk ESS in
@@ -48,7 +54,8 @@ No MCMC is run to rebuild figures.
 
 Directional checks and the newer logarithmic MSE plots with bootstrap intervals
 are in `figures/supplementary`. The launcher puts them in a collapsed
-**Supplementary diagnostics** section. They supplement all the original plots.
+**Supplementary diagnostics** section. The compact 200D baseline report skips
+these supplementary outputs.
 
 ## Exact numerical values
 
@@ -68,7 +75,7 @@ Each experiment saves:
   accompany means so non-integer means are never silently rounded down.
 - **`chain_metrics.csv`**: individual-chain estimates, squared errors and work
   counts, sufficient to reconstruct the reported MSE independently.
-- **`*_marginal_qq.csv`** and **`QQ-regresssion.csv`**: the plotted quantiles and bands.
+- **`*_marginal_qq.csv`** and **`QQ-regresssion.csv`**: the plotted quantiles and bands, where that experiment includes them.
 
 Generated iterations include repeated states after rejected proposals. Retained
 samples exclude warmup and reflect thinning. Neither is an effective sample size.

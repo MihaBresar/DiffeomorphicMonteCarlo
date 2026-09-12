@@ -52,6 +52,7 @@
   "mode": "time",
   "figure": "VsRWM_NUTS",
   "experiment": "skew-t-200d-baselines",
+  "reporting": "radial",
   "preset": "paper",
   "map_scale_initialization": "radial_median"
 }

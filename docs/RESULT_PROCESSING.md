@@ -16,6 +16,32 @@ construction take place outside that clock. The existing
 it is not the elapsed time until the entire report is ready. The run manifest
 also records total invocation wall time.
 
+## Compact 200D random-walk report
+
+The `skew-t-200d-baselines` experiment uses `reporting: radial` in all presets.
+It reports only mean norm, tail probability, their MSEs across independent
+chains, generated/retained sample counts and timing. Workers calculate these
+two estimates once in bounded blocks after the recorded one-third burn-in,
+outside the production clock, and include them in the saved chain metadata.
+The report reads that metadata without reopening the large draw arrays.
+Every retained draw contributes; estimates are not truncated to a common
+chain length. The report includes the average of the chain estimates, with
+MSE calculated from the individual chain errors rather than the pooled mean.
+
+Both reference values follow directly from the Student-t radial law, which
+sign skewing preserves. No million-draw IID reference is needed. There are
+no individual/cross-chain ESS, MCSE or R-hat calculations, coordinate quantile
+sorts, directional checks or temporary functional traces for this experiment.
+The original radial boxplots, MSE bars and sample-count/runtime figures remain.
+Other experiments keep their existing reporting. NUTS's built-in counters and
+sampling operations are unchanged.
+
+Older 200D baseline checkpoints can also be summarized without diagnostics:
+if their small cached estimates are absent or incompatible, the processor
+reads one physical chain at a time and calculates just the two radial means.
+A saved completed summary can regenerate the compact figures without loading
+chains. Existing generated figures are not deleted when an old run is replotted.
+
 ## Why Eight Schools exposed the bottleneck
 
 The default 100D BW/RWM/SCS comparison calculates its two radial means online
@@ -57,7 +83,7 @@ random sequence. NUTS scalar traces use separate small buffers. These limits
 bound output buffers; numerical runtimes, current batches and reporting have
 additional memory requirements.
 
-## Current implementation
+## Full diagnostic reports
 
 - Reporting reads one physical chain at a time. Exact means and quantiles and
   individual-chain diagnostics use all retained draws, as before.

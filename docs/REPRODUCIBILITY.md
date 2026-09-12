@@ -40,6 +40,14 @@ Posterior DCS receives the mean **production** time of the fixed-count NUTS runs
 
 The mean estimator is formed within each chain first. MSE is the mean of those chains' squared errors, and RMSE its square root. Posterior table RMSE additionally averages squared errors over physical coordinates before taking the square root. The coordinate-wise values are also saved because parameters have different units. PosteriorDB and logistic references have finite Monte Carlo uncertainty and are not labelled exact. Approximate MSE bootstrap intervals describe variability across the available runs; they do not establish reliable heavy-tail asymptotics, especially for unbounded functions without fourth moments.
 
+The 200D random-walk baseline experiment reports only the two radial estimates,
+their MSEs, sample counts and timing. It uses analytic radial reference values
+and skips individual/cross-chain diagnostics, coordinate quantiles and
+directional checks. Workers cache means over all retained draws after burn-in;
+reporting reads these small records. This does not change production timing,
+sample selection, the sampler or tuning. The diagnostic rules below apply to
+the other generic experiments.
+
 Multichain diagnostics use a common prefix of length equal to the shortest chain and record that length. Estimator means and per-chain diagnostics use all retained draws. Reporting streams one chain at a time and stages functional values on disk; cross-chain diagnostics process one functional at a time. This changes memory use, not the diagnostic definitions or sample selection. A constant functional within a chain yields unavailable MCSE/ESS rather than a reassuring zero. Rank R-hat is not computed from a single chain.
 
 Atomic per-chain NPZ files allow restart after process interruption. Resume validates the source/configuration fingerprint and every checkpoint; an incomplete chain is restarted from its seed. Plot-only uses the saved run's completed summary when available, with no simulation or diagnostic recomputation. Add `--recompute-diagnostics` to `--plot-only SAVED_RUN` to rebuild all statistics from the original retained chains. A missing summary is rebuilt automatically. A wall-time run is not bitwise deterministic across machines; fixed-step runs with the same environment and seeds are more strictly reproducible.

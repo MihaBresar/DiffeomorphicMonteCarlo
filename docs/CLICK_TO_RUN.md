@@ -1,5 +1,9 @@
 # Run experiments without typing commands
 
+The **200D skew-t: random-walk baselines** choice produces a compact report:
+mean norm, tail probability, MSE, sample counts and time. It skips the lengthy
+individual and cross-chain diagnostics automatically for every run size.
+
 The launcher runs the experiments on **your computer**. GitHub stores the code;
 it does not run the full paper experiments for you. An internet connection is
 needed for the initial package installation. The reference data are bundled.
