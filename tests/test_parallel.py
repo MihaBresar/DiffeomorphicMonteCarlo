@@ -51,6 +51,7 @@ class ParallelTests(unittest.TestCase):
             with patch('dcs_bench.parallel.subprocess.Popen', side_effect=tracked):
                 with self.assertRaisesRegex(RuntimeError, 'worker.*failed'):
                     launch_chains(job, chains, Path(tmp)/'jobs', plan)
+            self.assertEqual(list(Path(tmp).glob('.draws-*')), [])
         self.assertEqual(len(children), 2)
         self.assertTrue(all(child.poll() is not None for child in children))
 
@@ -87,10 +88,13 @@ class ParallelTests(unittest.TestCase):
                 self.assertEqual(record['seed'], chain['seed'])
                 self.assertIn(record['execution']['worker_slot'], range(workers))
                 self.assertEqual(record['execution']['threads']['OMP_NUM_THREADS'], '1')
+                self.assertEqual(record['draw_collection']['collection_buffer_bytes'], 8*1024*1024)
+                self.assertEqual(record['draw_collection']['collection_rows'], config['iterations']//config['thin'])
                 if plan['hardware']['pinning'] in ('linux', 'windows'):
                     self.assertTrue(record['execution']['pinned'])
                     self.assertEqual(record['execution']['cpu_id'], plan['cpu_ids'][record['execution']['worker_slot']])
                 records.append(record)
+            self.assertEqual(list(root.glob('.draws-*')), [])
             self.assertEqual(len({r['execution']['pid'] for r in records}), workers)
             # Every submitted chain was claimed exactly once, including a final
             # unbalanced batch and a resume containing sparse chain indices.

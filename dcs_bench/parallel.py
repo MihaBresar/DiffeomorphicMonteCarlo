@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import time
 import uuid
@@ -26,12 +27,17 @@ def launch_chains(job, chains, directory, plan):
     batch = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')+'-'+uuid.uuid4().hex[:8]
     queue = directory/f'{job["algorithm"]}-{batch}-queue'
     queue.mkdir()
+    # Keep temporary draw paths short on Windows and separate from completed
+    # checkpoints. The parent owns cleanup even if a worker is terminated.
+    draw_directory = directory.parent/('.draws-'+uuid.uuid4().hex[:12])
+    draw_directory.mkdir()
     for chain in chains:
         (queue/f'{chain["index"]:06d}.pending.json').write_text(json.dumps(chain)+'\n', encoding='utf-8')
     processes = []
     try:
         for slot in range(count):
             request = dict(job, queue_directory=str(queue.resolve()), worker_slot=slot,
+                           draw_directory=str(draw_directory.resolve()),
                            cpu_id=plan['cpu_ids'][slot], execution_plan=plan)
             path = directory/f'{job["algorithm"]}-{batch}-worker-{slot}.json'
             path.write_text(json.dumps(request, allow_nan=False)+'\n', encoding='utf-8')
@@ -60,6 +66,10 @@ def launch_chains(job, chains, directory, plan):
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait()
+        try:
+            shutil.rmtree(draw_directory)
+        except OSError as error:
+            print(f'Could not remove temporary draw storage {draw_directory}: {error}', file=sys.stderr, flush=True)
 
 
 def compilation_summary(directory, algorithm='NUTS'):

@@ -31,6 +31,8 @@ def parser():
     p.add_argument('--reference-dir', type=Path, default=Path('results/references/logistic-paper'))
     p.add_argument('--resume', action='store_true')
     p.add_argument('--plot-only', type=Path, metavar='SAVED_RUN')
+    p.add_argument('--recompute-diagnostics', action='store_true',
+                   help='With --plot-only, recalculate statistics from saved chains instead of using the completed summary')
     p.add_argument('--dry-run', action='store_true')
     for name in ('runs', 'iterations', 'warmup', 'thin', 'nuts-samples', 'nuts-max-depth', 'nuts-batch-size', 'optimizer-steps', 'optimizer-samples', 'reference-samples', 'reference-batch-size', 'seed', 'workers'):
         p.add_argument('--'+name, type=int)
@@ -45,6 +47,8 @@ def parser():
 def main(argv=None):
     p = parser()
     args = p.parse_args(argv)
+    if args.recompute_diagnostics and not args.plot_only:
+        p.error('--recompute-diagnostics requires --plot-only SAVED_RUN')
     if args.list:
         print('\n'.join(experiment_names()))
         return 0
@@ -56,6 +60,11 @@ def main(argv=None):
                 from scripts.scs_100d_figures import render_report
                 render_report(args.plot_only, summary)
                 print(args.plot_only.resolve())
+                return 0
+            if 'scenarios' in summary and not args.recompute_diagnostics:
+                from dcs_bench.plotting import render_saved_summary
+                print('Rendering figures from saved statistics (no diagnostic recomputation).', flush=True)
+                print(render_saved_summary(args.plot_only))
                 return 0
         from dcs_bench.plotting import rebuild
         print(rebuild(args.plot_only))
@@ -84,7 +93,7 @@ def main(argv=None):
         return single_main(command)
     if args.experiment in ALIASES:
         print(f'Legacy name {args.experiment} now resolves to {ALIASES[args.experiment]} (d=200).', file=sys.stderr)
-    overrides = {k: v for k, v in vars(args).items() if k not in ('experiment', 'list', 'preset', 'output_dir', 'reference_dir', 'resume', 'plot_only', 'dry_run')}
+    overrides = {k: v for k, v in vars(args).items() if k not in ('experiment', 'list', 'preset', 'output_dir', 'reference_dir', 'resume', 'plot_only', 'recompute_diagnostics', 'dry_run')}
     config = load_config(args.experiment, args.preset, overrides)
     output = args.output_dir or Path('results')/config['experiment']/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
     if args.dry_run:

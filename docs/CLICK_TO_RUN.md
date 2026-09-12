@@ -57,22 +57,22 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 4. After completion, links to figures and tables appear automatically below the
    progress log. Click a PNG or PDF link to view a graph. All files remain in
    **results → click-runs → dated folder**. Under **Exact numbers and tables**,
-   open `paper_values.html` to read or copy the full-precision estimates, MSE,
-   sample counts and timing values.
+   open `paper_values.html` to read estimates, MSE, sample counts and timing
+   values. The page uses two decimals; its CSV downloads retain full precision.
 
 See [the full protocol](SCS_100D.md) for the original DCS adaptation, author SCS code, and separate timing clocks.
 
 The default comparison contains exactly **DCS-RWM, DCS-BW and SCS** on one
 100D skewed Student-t target with **3 degrees of freedom**. Each method runs
-for the same number of production iterations:
+for the same production sampling time:
 
-| Run size | Chains per method | Production iterations per chain |
+| Run size | Chains per method | Sampling seconds per chain |
 | --- | ---: | ---: |
-| Quick check | 2 | 500 |
-| Smaller reproduction | 20 | 25,000 |
-| Full paper settings | 50 | 500,000 |
+| Quick check | 2 | 0.05 |
+| Smaller reproduction | 20 | 2.00 |
+| Full paper settings | 50 | 20.00 |
 
-The figures report elapsed sampling time, mean-norm and tail-probability
+The figures report generated iteration counts, mean-norm and tail-probability
 estimates, MSE, and the observed bias/variance decomposition across chains.
 The comparison includes its specified original DCS map fitting and proposal-step
 adaptation automatically, so the **DCS map** selector is disabled for it.
@@ -85,6 +85,11 @@ The other original experiments remain in the Experiment menu. **All seven
 experiments + posterior table** runs the full collection. The former map and
 step-size diagnostic audits are no longer launcher choices; their existing
 scripts, documentation and saved results remain available for reference.
+
+For large posterior runs, the log distinguishes sampling, saving and
+convergence diagnostics. A chain can finish sampling before its file and
+report are ready. These stages now use bounded memory and report their
+progress; see [result processing](RESULT_PROCESSING.md).
 
 For the other experiments, the **DCS map** selector offers **Möbius map**, which
 fits R, centre and Möbius parameters by VI, and **Vanilla map**, which uses

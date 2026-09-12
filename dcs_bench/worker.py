@@ -42,7 +42,7 @@ def main():
     allocation = pin_current_process(job['cpu_id'])
     if hasattr(signal, 'SIGBREAK'):
         signal.signal(signal.SIGBREAK, signal.default_int_handler)
-    from .engine import save_chain, write_json
+    from .engine import write_json
     from .targets import Target
     from .transforms import BallMap, SphereMap
     from .samplers import BlackJAXRunner, NumPyroRunner, run_metropolis, make_metropolis_runner
@@ -68,15 +68,23 @@ def main():
         while not (queue/'start.ready').exists():
             time.sleep(.05)
     for chain in pending_chains(job):
+        _run_and_save_chain(job, chain, target, config, algorithm, runner, mapping, allocation)
+
+
+def _run_and_save_chain(job, chain, target, config, algorithm, runner, mapping, allocation):
+    from .draw_storage import DiskDrawCollector
+    from .engine import save_chain
+    directory = job.get("draw_directory", str(Path(chain["path"]).parent))
+    with DiskDrawCollector(target.d, directory=directory) as collector:
         started = datetime.now(timezone.utc).isoformat()
         print(f'Worker {job["worker_slot"]+1}: {algorithm}, chain {chain["index"]+1} starting', flush=True)
         if runner is not None:
             if algorithm == 'NUTS' and (job.get('reference') or config['mode'] == 'nuts_matched_time'):
-                draws, record = runner.run(chain['seed'])
+                draws, record = runner.run(chain['seed'], collector=collector)
             else:
-                draws, record = runner.run(chain['seed'], seconds=job['seconds'])
+                draws, record = runner.run(chain['seed'], seconds=job['seconds'], collector=collector)
         else:
-            draws, record = run_metropolis(target, algorithm, mapping, config, chain['seed'], job['seconds'])
+            draws, record = run_metropolis(target, algorithm, mapping, config, chain['seed'], job['seconds'], collector=collector)
         from .burnin import discard_burnin
         draws, record = discard_burnin(draws, record, config)
         record.update(fingerprint=job['fingerprint'], scenario=job['scenario'], chain=chain['index'],
@@ -88,8 +96,14 @@ def main():
         for field in ('producing_source_fingerprint', 'producing_source_hashes'):
             if field in job:
                 record[field] = job[field]
-        save_chain(Path(chain['path']), draws, record)
-        print(f'Worker {job["worker_slot"]+1}: {algorithm}, chain {chain["index"]+1} saved', flush=True)
+        print(f'Worker {job["worker_slot"]+1}: {algorithm}, chain {chain["index"]+1} '
+              f'sampling complete ({record["sampling_seconds"]:.2f} s); '
+              f'saving {len(draws):,} retained draws ({draws.nbytes/1_000_000:.2f} MB)', flush=True)
+        storage = save_chain(Path(chain['path']), draws, record, temporary_directory=collector.directory)
+        print(f'Worker {job["worker_slot"]+1}: {algorithm}, chain {chain["index"]+1} '
+              f'saved in {storage["save_seconds"]:.2f} s '
+              f'({storage["archive_bytes"]/1_000_000:.2f} MB)', flush=True)
+        del draws, record, storage
 
 
 if __name__ == '__main__':

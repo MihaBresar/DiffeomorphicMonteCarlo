@@ -57,8 +57,11 @@ def posterior_reference(target):
         'exact': False, 'chains': len(chains), 'draws_per_chain': chains.shape[1]}
 
 
-def mcmc_diagnostics(chains, names):
+def mcmc_diagnostics(chains, names, *, metrics=('ess_bulk', 'ess_tail', 'mcse_mean', 'rhat')):
     import arviz as az
+    available = {'ess_bulk', 'ess_tail', 'mcse_mean', 'rhat'}
+    if not set(metrics) <= available:
+        raise ValueError('Unknown MCMC diagnostic requested')
     # ArviZ expects (chain,draw) for each variable, not one 3-D ndarray.
     valid = [i for i in range(len(names)) if np.all(np.ptp(chains[:, :, i], axis=1) > 0)]
     payload = {names[i]: chains[:, :, i] for i in valid}
@@ -68,6 +71,8 @@ def mcmc_diagnostics(chains, names):
                     ('ess_tail', lambda: az.ess(idata, method='tail')),
                     ('mcse_mean', lambda: az.mcse(idata, method='mean')),
                     ('rhat', lambda: az.rhat(idata, method='rank'))]:
+        if key not in metrics:
+            continue
         if idata is None or (key == 'rhat' and len(chains) < 2):
             result[key] = dict.fromkeys(names)
             continue

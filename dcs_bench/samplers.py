@@ -1,4 +1,5 @@
 """Frozen production kernels; adaptation and compilation have separate clocks."""
+from contextlib import ExitStack
 import time
 import numpy as np
 from .tuning import DualAveraging
@@ -101,7 +102,7 @@ class MetropolisKernel:
         return probability, accepted
 
 
-def run_numpy_metropolis(target, algorithm, mapping, config, seed, seconds=None):
+def run_numpy_metropolis(target, algorithm, mapping, config, seed, seconds=None, *, collector=None):
     kernel = MetropolisKernel(target, algorithm, mapping, seed)
     scale = config.get('initial_scale', .1)
     adapter = DualAveraging(scale)
@@ -126,12 +127,20 @@ def run_numpy_metropolis(target, algorithm, mapping, config, seed, seconds=None)
         accepted += did_accept
         iterations += 1
         if iterations % config['thin'] == 0:
-            draws.append(kernel.draw().copy())
+            value = kernel.draw()
+            if collector is None:
+                draws.append(value.copy())
+            else:
+                collector.append(value[None, :])
+    if collector is not None:
+        collector.flush()
     elapsed = time.perf_counter()-start
+    if collector is not None:
+        draws = collector.finalize()
     if len(draws) < 4:
         raise RuntimeError(f'{algorithm} retained only {len(draws)} draws; increase budget or reduce thinning')
     draws = np.asarray(draws)
-    if not np.all(np.isfinite(draws)):
+    if collector is None and not np.all(np.isfinite(draws)):
         raise FloatingPointError('Nonfinite retained draws')
     return draws, {'algorithm': algorithm, 'seed': seed, 'iterations': iterations,
                    'implementation': 'NumPy with frozen target and map constants',
@@ -140,7 +149,9 @@ def run_numpy_metropolis(target, algorithm, mapping, config, seed, seconds=None)
                    'requested_seconds': seconds, 'budget_overshoot_seconds': max(0., elapsed-seconds) if seconds else 0.,
                    'acceptance_rate': accepted/iterations, 'frozen_scale': scale,
                    'log_density_evaluations': kernel.evaluations-warmup_evaluations,
-                   'warmup_log_density_evaluations': warmup_evaluations, 'adaptation_during_sampling': False}
+                   'warmup_log_density_evaluations': warmup_evaluations, 'adaptation_during_sampling': False,
+                   'draw_collection': (collector.metadata() if collector is not None else
+                                       {'collection_strategy': 'in-memory standalone API'})}
 
 
 def make_metropolis_runner(target, algorithm, mapping, config):
@@ -151,15 +162,72 @@ def make_metropolis_runner(target, algorithm, mapping, config):
     return None
 
 
-def run_metropolis(target, algorithm, mapping, config, seed, seconds=None):
+def run_metropolis(target, algorithm, mapping, config, seed, seconds=None, *, collector=None):
     from .burnin import discard_burnin
     runner = make_metropolis_runner(target, algorithm, mapping, config)
     if runner is None:
-        draws, record = run_numpy_metropolis(target, algorithm, mapping, config, seed, seconds)
+        draws, record = run_numpy_metropolis(target, algorithm, mapping, config, seed, seconds, collector=collector)
         record['backend_note'] = 'Python fallback: target or transition has no compiled implementation'
     else:
-        draws, record = runner.run(seed, seconds)
+        draws, record = runner.run(seed, seconds, collector=collector)
     return discard_burnin(draws, record, config)
+
+
+def _count_at_least(values, threshold):
+    return sum(int(np.count_nonzero(values[start:start+65536] >= threshold))
+               for start in range(0, len(values), 65536))
+
+
+class _ScalarTraces:
+    """Keep NUTS counters bounded while preserving exact NumPy reductions."""
+    def __init__(self, stack, directory):
+        self.stack, self.directory = stack, directory
+        self.collectors = []
+
+    def append(self, values, length):
+        from .draw_storage import DiskDrawCollector
+        for index, value in enumerate(values):
+            array = np.asarray(value)[:length]
+            if index == len(self.collectors):
+                self.collectors.append(self.stack.enter_context(DiskDrawCollector(
+                    1, directory=self.directory, dtype=array.dtype, buffer_bytes=256*1024)))
+            self.collectors[index].append(array[:, None])
+
+    def flush(self):
+        for collector in self.collectors:
+            collector.flush()
+
+    def metadata(self):
+        return {'collection_strategy': 'One buffered temporary file per scalar statistic; files closed before returning draws',
+                'collection_buffer_bytes_per_statistic': 256*1024,
+                'collection_statistics': len(self.collectors),
+                'collection_timing_policy': 'Scalar appends and final buffer flush included in sampling_seconds'}
+
+    def finalize(self):
+        # Each column is contiguous, so mean/sum retain the original reduction
+        # order used after concatenating each separate scalar trace.
+        return [collector.finalize()[:, 0] for collector in self.collectors]
+
+
+def _append_physical(chunks, collector, target, raw, offset, thin):
+    first = (thin-1-offset) % thin
+    if first >= len(raw):
+        return
+    values = np.asarray(target.physical(np.asarray(raw)[first::thin]))
+    if collector is None:
+        if not np.all(np.isfinite(values)):
+            raise FloatingPointError('Nonfinite retained NUTS draws')
+        chunks.append(values.copy())
+    else:
+        collector.append(values)
+
+
+def _finish_physical(chunks, collector, dimension):
+    draws = (collector.finalize() if collector is not None else
+             np.concatenate(chunks) if chunks else np.empty((0, dimension)))
+    if len(draws) < 4:
+        raise RuntimeError('Insufficient NUTS draws')
+    return draws
 
 
 class BlackJAXRunner:
@@ -195,7 +263,7 @@ class BlackJAXRunner:
         self.batch = jax.jit(batch).lower(key, dummy, jnp.asarray(.1), jnp.ones(target.d)).compile()
         self.compile_seconds = time.perf_counter()-start
 
-    def run(self, seed, seconds=None, iterations=None):
+    def run(self, seed, seconds=None, iterations=None, *, collector=None):
         import jax
         import jax.numpy as jnp
         c = self.config
@@ -203,34 +271,41 @@ class BlackJAXRunner:
         start = time.perf_counter()
         (state, parameters), winfo = jax.block_until_ready(self.warm(pilot, jnp.asarray(self.target.initial())))
         warmup_seconds = time.perf_counter()-start
-        arrays = [[] for _ in range(5)]
-        count = 0
-        start = time.perf_counter()
-        while (count < iterations if seconds is None else time.perf_counter()-start < seconds):
-            key, drawkey = jax.random.split(key)
-            state, info = jax.block_until_ready(self.batch(drawkey, state, parameters['step_size'], parameters['inverse_mass_matrix']))
-            for buf, value in zip(arrays, info):
-                buf.append(np.asarray(value))
-            count += c['nuts_batch_size']
-        elapsed = time.perf_counter()-start
-        raw, acc, div, work, depth = [np.concatenate(a) for a in arrays]
-        if iterations is not None:
-            raw, acc, div, work, depth = [a[:iterations] for a in (raw, acc, div, work, depth)]
-        draws = np.asarray(self.target.physical(raw[c['thin']-1::c['thin']]))
-        if len(draws) < 4 or not np.all(np.isfinite(draws)):
-            raise RuntimeError('Insufficient or nonfinite NUTS draws')
-        record = {'algorithm': 'NUTS', 'implementation': 'BlackJAX', 'seed': seed,
-            'iterations': len(raw), 'computed_iterations': count, 'retained_draws': len(draws), 'thin': c['thin'],
-            'warmup_iterations': c['warmup'], 'warmup_seconds': warmup_seconds,
-            'sampling_seconds': elapsed, 'requested_seconds': seconds,
-            'budget_overshoot_seconds': max(0., elapsed-seconds) if seconds else 0.,
-            'acceptance_rate': float(acc.mean()), 'divergences': int(div.sum()),
-            'max_depth_hits': int((depth >= c['nuts_max_depth']).sum()),
-            'gradient_evaluations': int(work.sum()), 'warmup_divergences': int(np.asarray(winfo[0]).sum()),
-            'frozen_scale': float(parameters['step_size']), 'inverse_mass_matrix': np.asarray(parameters['inverse_mass_matrix']).tolist(),
-            'adaptation_during_sampling': False}
-        from .burnin import discard_burnin
-        return discard_burnin(draws, record, c)
+        chunks, count, used_count = [], 0, 0
+        with ExitStack() as stack:
+            metrics = _ScalarTraces(stack, collector.directory if collector is not None else None)
+            start = time.perf_counter()
+            while (count < iterations if seconds is None else time.perf_counter()-start < seconds):
+                key, drawkey = jax.random.split(key)
+                state, info = jax.block_until_ready(self.batch(drawkey, state, parameters['step_size'], parameters['inverse_mass_matrix']))
+                used = len(info[0]) if iterations is None else min(len(info[0]), max(0, iterations-count))
+                if used:
+                    _append_physical(chunks, collector, self.target, info[0][:used], count, c['thin'])
+                    metrics.append(info[1:], used)
+                    used_count += used
+                count += c['nuts_batch_size']
+            metrics.flush()
+            if collector is not None:
+                collector.flush()
+            elapsed = time.perf_counter()-start
+            draws = _finish_physical(chunks, collector, self.target.d)
+            acc, div, work, depth = metrics.finalize()
+            record = {'algorithm': 'NUTS', 'implementation': 'BlackJAX', 'seed': seed,
+                'iterations': used_count, 'computed_iterations': count, 'retained_draws': len(draws), 'thin': c['thin'],
+                'warmup_iterations': c['warmup'], 'warmup_seconds': warmup_seconds,
+                'sampling_seconds': elapsed, 'requested_seconds': seconds,
+                'budget_overshoot_seconds': max(0., elapsed-seconds) if seconds else 0.,
+                'acceptance_rate': float(acc.mean()), 'divergences': int(div.sum()),
+                'max_depth_hits': _count_at_least(depth, c['nuts_max_depth']),
+                'gradient_evaluations': int(work.sum()), 'warmup_divergences': int(np.asarray(winfo[0]).sum()),
+                'frozen_scale': float(parameters['step_size']), 'inverse_mass_matrix': np.asarray(parameters['inverse_mass_matrix']).tolist(),
+                'adaptation_during_sampling': False,
+                'sampling_output_timing': 'Thinning, physical conversion, scalar recording, draw appends and final buffer flush included',
+                'diagnostic_collection': metrics.metadata(),
+                'draw_collection': (collector.metadata() if collector is not None else
+                                       {'collection_strategy': 'in-memory standalone API'})}
+            from .burnin import discard_burnin
+            return discard_burnin(draws, record, c)
 
 
 class NumPyroRunner:
@@ -255,39 +330,60 @@ class NumPyroRunner:
             return kernel.sample(state, (), {})
         warm = jax.jit(lambda state: jax.lax.fori_loop(0, config['warmup'], lambda i, s: one_step(s), state))
         self.warm = warm.lower(dummy).compile()
-        def production(state):
-            def step(state, unused):
-                state = one_step(state)
-                return state, (state.z, state.accept_prob, state.diverging, state.num_steps)
-            return jax.lax.scan(step, state, None, length=config['nuts_samples'])
-        self.production = jax.jit(production).lower(dummy).compile()
+        self.production_batch_size = min(1024, config['nuts_samples'])
+        self.production_remainder = config['nuts_samples'] % self.production_batch_size
+        def production(length):
+            def run_batch(state):
+                def step(state, unused):
+                    state = one_step(state)
+                    return state, (state.z, state.accept_prob, state.diverging, state.num_steps)
+                return jax.lax.scan(step, state, None, length=length)
+            return jax.jit(run_batch).lower(dummy).compile()
+        self.production = production(self.production_batch_size)
+        self.production_tail = production(self.production_remainder) if self.production_remainder else None
         self.compile_seconds = time.perf_counter()-start
 
-    def run(self, seed):
+    def run(self, seed, *, collector=None):
         import jax
         c = self.config
         start = time.perf_counter()
         state = jax.block_until_ready(self.warm(self.initialize(jax.random.PRNGKey(seed))))
         warmup_seconds = time.perf_counter()-start
         frozen_scale = float(state.adapt_state.step_size)
-        start = time.perf_counter()
-        final_state, result = jax.block_until_ready(self.production(state))
-        raw, acc, div, work = [np.asarray(a) for a in result]
-        elapsed = time.perf_counter()-start
-        if float(final_state.adapt_state.step_size) != frozen_scale:
-            raise RuntimeError('NUTS adapted during production')
-        draws = np.asarray(self.target.physical(raw[c['thin']-1::c['thin']]))
-        if len(draws) < 4 or not np.all(np.isfinite(draws)):
-            raise RuntimeError('Insufficient or nonfinite NumPyro draws')
-        record = {'algorithm': 'NUTS', 'implementation': 'NumPyro', 'seed': seed,
-            'iterations': len(raw), 'retained_draws': len(draws), 'thin': c['thin'],
-            'warmup_iterations': c['warmup'], 'warmup_seconds': warmup_seconds,
-            'sampling_seconds': elapsed, 'acceptance_rate': float(acc.mean()),
-            'divergences': int(div.sum()),
-            'max_depth_hits': int((work >= 2**c['nuts_max_depth']-1).sum()),
-            'max_depth_detection': 'num_steps >= 2**max_tree_depth - 1 (full tree saturation)',
-            'gradient_evaluations': int(work.sum()), 'frozen_scale': frozen_scale,
-            'inverse_mass_matrix': np.asarray(final_state.adapt_state.inverse_mass_matrix).tolist(),
-            'adaptation_during_sampling': False}
-        from .burnin import discard_burnin
-        return discard_burnin(draws, record, c)
+        chunks, count = [], 0
+        with ExitStack() as stack:
+            metrics = _ScalarTraces(stack, collector.directory if collector is not None else None)
+            start = time.perf_counter()
+            while count < c['nuts_samples']:
+                batch = (self.production if c['nuts_samples']-count >= self.production_batch_size
+                         else self.production_tail)
+                state, result = jax.block_until_ready(batch(state))
+                raw = np.asarray(result[0])
+                _append_physical(chunks, collector, self.target, raw, count, c['thin'])
+                metrics.append(result[1:], len(raw))
+                count += len(raw)
+            metrics.flush()
+            if collector is not None:
+                collector.flush()
+            elapsed = time.perf_counter()-start
+            if float(state.adapt_state.step_size) != frozen_scale:
+                raise RuntimeError('NUTS adapted during production')
+            draws = _finish_physical(chunks, collector, self.target.d)
+            acc, div, work = metrics.finalize()
+            record = {'algorithm': 'NUTS', 'implementation': 'NumPyro', 'seed': seed,
+                'iterations': count, 'retained_draws': len(draws), 'thin': c['thin'],
+                'warmup_iterations': c['warmup'], 'warmup_seconds': warmup_seconds,
+                'sampling_seconds': elapsed, 'acceptance_rate': float(acc.mean()),
+                'divergences': int(div.sum()),
+                'max_depth_hits': _count_at_least(work, 2**c['nuts_max_depth']-1),
+                'max_depth_detection': 'num_steps >= 2**max_tree_depth - 1 (full tree saturation)',
+                'gradient_evaluations': int(work.sum()), 'frozen_scale': frozen_scale,
+                'inverse_mass_matrix': np.asarray(state.adapt_state.inverse_mass_matrix).tolist(),
+                'adaptation_during_sampling': False,
+                'production_batch_size': self.production_batch_size,
+                'sampling_output_timing': 'Thinning, physical conversion, scalar recording, draw appends and final buffer flush included',
+                'diagnostic_collection': metrics.metadata(),
+                'draw_collection': (collector.metadata() if collector is not None else
+                                       {'collection_strategy': 'in-memory standalone API'})}
+            from .burnin import discard_burnin
+            return discard_burnin(draws, record, c)

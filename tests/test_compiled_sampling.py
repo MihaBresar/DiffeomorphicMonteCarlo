@@ -4,6 +4,9 @@ The reference target, maps and MetropolisKernel are independently implemented;
 these checks do not construct expected values from native implementation helpers.
 """
 import unittest
+from pathlib import Path
+import tempfile
+from unittest.mock import patch
 
 import numpy as np
 from numpy.testing import assert_allclose
@@ -12,6 +15,8 @@ from dcs_bench import compiled_sampling as native
 from dcs_bench.samplers import MetropolisKernel, run_numpy_metropolis
 from dcs_bench.targets import Target
 from dcs_bench.transforms import BallMap, SphereMap
+from dcs_bench.draw_storage import DiskDrawCollector
+from dcs_bench.burnin import discard_burnin
 
 
 def targets():
@@ -48,6 +53,37 @@ def method_maps(target):
 
 
 class CompiledSamplingTests(unittest.TestCase):
+    def test_streamed_draws_preserve_all_kernels_without_concatenation(self):
+        target = targets()[0]
+        config = dict(warmup=25, iterations=1003, thin=7, compiled_batch_size=64,
+                      burnin_fraction=1/3)
+        cases = [(target, algorithm, mapping) for algorithm, mapping in method_maps(target)]
+        cases.append((Target(dict(kind='skew_t', dimension=200, nu=3., alpha={'0': 20., '1': -30.})),
+                      'RWM-Gaussian', None))
+        for target, algorithm, mapping in cases:
+            with self.subTest(algorithm=algorithm, dimension=target.d), tempfile.TemporaryDirectory() as tmp:
+                runner = native.CompiledRunner(target, algorithm, mapping, config)
+                expected, previous = runner.run(82919)
+                expected, previous = discard_burnin(expected, previous, config)
+                concatenate = np.concatenate
+                def no_draw_concatenation(arrays, *args, **kwargs):
+                    # NumPy's RNG joins tiny 1-D seed-entropy arrays internally.
+                    # The forbidden operation is joining 2-D draw batches.
+                    if any(np.ndim(array) == 2 for array in arrays):
+                        raise AssertionError('No full draw concatenation')
+                    return concatenate(arrays, *args, **kwargs)
+                with DiskDrawCollector(target.d, directory=tmp, buffer_bytes=4096) as collector:
+                    with patch.object(native.np, 'concatenate', side_effect=no_draw_concatenation):
+                        actual, record = runner.run(82919, collector=collector)
+                    actual, record = discard_burnin(actual, record, config)
+                    np.testing.assert_array_equal(actual, expected)
+                    for key in ('iterations', 'retained_draws', 'burnin_iterations', 'first_retained_iteration',
+                                'acceptance_rate', 'frozen_scale', 'log_density_evaluations',
+                                'warmup_log_density_evaluations'):
+                        self.assertEqual(record[key], previous[key])
+                    self.assertEqual(record['draw_collection']['collection_rows'], config['iterations']//config['thin'])
+                self.assertEqual(list(Path(tmp).iterdir()), [])
+
     def test_all_canonical_densities_and_physical_coordinates(self):
         rng = np.random.default_rng(91541)
         for target in targets():

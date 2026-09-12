@@ -30,6 +30,7 @@ jobs:
       - name: Choose workers within the runner's available CPU allocation
         run: python -c "from dcs_bench.cpu import cpu_info; import os; info=cpu_info(); print(info); open(os.environ['GITHUB_ENV'], 'a').write('BENCH_WORKERS='+str(min(2, info['capacity']))+'\n')"
       - run: python -m unittest discover -s tests -v
+      - run: python scripts/check_draw_storage.py --output results/ci-draw-storage.json
       - run: python -m examples.basic_sampler
       - run: python run_experiment.py skew-t-100d-fixed --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-single-scs
       - run: python run_experiment.py --plot-only results/ci-single-scs
@@ -44,6 +45,7 @@ jobs:
       - run: python run_experiment.py skew-t-50d-nu-0.5 --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-superheavy-counts
       - run: python run_experiment.py skew-t-200d-baselines --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-baselines
       - run: python run_experiment.py eight-schools --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-eight-schools
+      - run: python scripts/benchmark_result_processing.py --input results/ci-eight-schools --repeat 1 --diagnostic-workers ${{ env.BENCH_WORKERS }} --output results/ci-processing.json
       - run: python run_experiment.py garch11 --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-garch11
       - run: python run_experiment.py logistic-regression --preset quick --workers ${{ env.BENCH_WORKERS }} --reference-dir results/ci-reference --output-dir results/ci-logistic
       - uses: actions/upload-artifact@v4
@@ -61,5 +63,7 @@ jobs:
             results/ci-single-scs
             results/ci-baselines
             results/ci-eight-schools
+            results/ci-processing*.json
+            results/ci-draw-storage.json
             results/ci-garch11
             results/ci-logistic

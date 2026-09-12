@@ -4,12 +4,14 @@ import html
 import json
 from fractions import Fraction
 from pathlib import Path
+from time import perf_counter
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from .targets import Target
-from .references import functional_draws, mcmc_diagnostics
+from .processing import process_chains
+from .cpu import cpu_info
 from .display import number, cell, figure_ticks
 
 COLORS = ['#9370DB', '#FF8C00', '#228B22', '#FF1493', '#4682B4']
@@ -267,7 +269,8 @@ def export_paper_values(output, config, all_summary):
 
 
 def rebuild(output):
-    from .engine import read_chain, write_json
+    from .engine import write_json
+    started = perf_counter()
     output = Path(output)
     config = json.loads((output/'configuration.json').read_text())
     labels = dict(LABELS)
@@ -276,6 +279,7 @@ def rebuild(output):
     folder = output/'figures'
     folder.mkdir(exist_ok=True)
     all_summary, csv_rows, all_data = [], [], []
+    print('Sampling is complete. Processing saved chains and convergence diagnostics.', flush=True)
     for s, spec in enumerate(config['targets']):
         target = Target(spec)
         directory = output/f'scenario-{s}'
@@ -284,16 +288,14 @@ def rebuild(output):
         summary = {'target': spec, 'reference': ref, 'algorithms': {}}
         data = {}
         for algorithm in config['algorithms']:
-            pairs = [read_chain(directory/'chains'/f'{algorithm}-{i:03d}.npz', manifest['fingerprint']) for i in range(config['runs'])]
-            chains, records = list(zip(*pairs))
-            functions = [functional_draws(target, x, config['threshold']) for x in chains]
-            estimates = np.array([f.mean(axis=0) for f in functions])
-            quantiles = np.array([np.quantile(x[:, :4], config['q_levels'], axis=0) for x in chains])
-            # Unequal wall-time runs retain unequal lengths. Only multichain
-            # diagnostics use an explicitly recorded common prefix.
-            length = min(map(len, functions))
-            diagnostics = mcmc_diagnostics(np.stack([f[:length] for f in functions]), ref['functional_names'])
-            indiv = [mcmc_diagnostics(f[None, ...], ref['functional_names']) for f in functions]
+            processed = process_chains(
+                [directory/'chains'/f'{algorithm}-{i:03d}.npz' for i in range(config['runs'])],
+                target, config['threshold'], config['q_levels'], ref['functional_names'],
+                expected=manifest['fingerprint'], temporary_parent=output,
+                diagnostic_workers=min(4, config.get('workers', 1), cpu_info()['capacity']),
+                label=f'Scenario {s}, {algorithm}', progress=lambda message: print(message, flush=True))
+            estimates, quantiles, records = (processed[key] for key in ('estimates', 'quantiles', 'records'))
+            length, diagnostics, indiv = (processed[key] for key in ('length', 'diagnostics', 'indiv'))
             errors = mse_summary(estimates, ref['functional_truth'])
             family = 'sphere' if algorithm == 'SCS' else 'ball'
             setup_seconds = setup.get(family, {}).get('optimization', {}).get('seconds', 0.) if algorithm == 'SCS' or algorithm.startswith('DCS') else 0.
@@ -304,6 +306,7 @@ def rebuild(output):
                       +r.get('production_compile_and_pilot_seconds', 0.)+setup_seconds/config['runs'] for r in records]
             algo_summary = dict(errors, chain_functional_estimates=estimates.tolist(),
                 chain_quantiles=quantiles.tolist(), cross_chain_diagnostics=diagnostics,
+                result_processing=processed['processing'],
                 diagnostic_draws_per_chain=length, independent_chain_diagnostics=indiv,
                 mean_sampling_seconds=float(np.mean([r['sampling_seconds'] for r in records])),
                 mean_seconds_including_setup=float(np.mean(totals)),
@@ -316,7 +319,7 @@ def rebuild(output):
                 algo_summary['mean_'+field] = total/len(records)
             if target.kind == 'skew_t':
                 coord_names = target.names[:10]
-                coordinate_ess = [mcmc_diagnostics(x[None, :, :10], coord_names)['ess_bulk'] for x in chains]
+                coordinate_ess = processed['coordinate_ess']
                 values = [v for entry in coordinate_ess for v in entry.values()]
                 algo_summary['chain_coordinate_bulk_ess'] = coordinate_ess
                 algo_summary['total_coordinate_bulk_ess'] = (float(np.sum(values)/len(coord_names))
@@ -348,7 +351,17 @@ def rebuild(output):
         writer = csv.DictWriter(stream, fieldnames=list(dict.fromkeys(key for row in csv_rows for key in row)))
         writer.writeheader()
         writer.writerows(csv_rows)
-    return _render_prepared(output, config, all_summary, all_data, labels)
+    diagnostic_seconds = perf_counter()-started
+    print('Convergence diagnostics complete. Saving tables and figures.', flush=True)
+    rendered = _render_prepared(output, config, all_summary, all_data, labels)
+    write_json(output/'processing.json', dict(
+        schema_version=1, statistics_seconds=diagnostic_seconds,
+        tables_and_figures_seconds=perf_counter()-started-diagnostic_seconds,
+        total_seconds=perf_counter()-started,
+        sampling_clock_includes_result_processing=False,
+        diagnostic_subsampling=False))
+    print(f'Result processing finished in {perf_counter()-started:.2f} seconds.', flush=True)
+    return rendered
 
 
 def render_saved_summary(output):

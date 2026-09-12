@@ -326,7 +326,7 @@ class CompiledRunner:
         return _block(rng, z, lp, scale, hbar, logbar, count, offset, self.thin,
                       adapt, keep, self.initial_scale, self.code, *self.context)
 
-    def run(self, seed, seconds=None):
+    def run(self, seed, seconds=None, *, collector=None):
         if seconds is not None and (not np.isfinite(seconds) or seconds <= 0.):
             raise ValueError('Sampling time must be positive and finite')
         if seconds is None and self.iterations//self.thin < 4:
@@ -339,7 +339,7 @@ class CompiledRunner:
         if self.code != 2:
             scale = float(np.exp(np.clip(logbar, -30., 15.)))
         warmup_seconds = time.perf_counter()-start
-        draws, iterations, accepted, evaluations = [], 0, 0, 0
+        draws, iterations, accepted, evaluations = ([] if collector is None else collector), 0, 0, 0
         start = time.perf_counter()
         while True:
             if seconds is None:
@@ -357,9 +357,13 @@ class CompiledRunner:
             accepted += batch_accept
             evaluations += batch_evaluations
             draws.append(batch_draws)
+        if collector is not None:
+            # Include collection and the final buffered write in production
+            # time for every worker-backed method, without another draw copy.
+            collector.flush()
         elapsed = time.perf_counter()-start
-        draws = np.concatenate(draws)
-        if len(draws) < 4 or not np.all(np.isfinite(draws)):
+        draws = np.concatenate(draws) if collector is None else collector.finalize()
+        if len(draws) < 4 or (collector is None and not np.all(np.isfinite(draws))):
             raise FloatingPointError('Insufficient or nonfinite retained compiled draws')
         return draws, {
             'algorithm': self.algorithm, 'seed': int(seed), 'iterations': iterations,
@@ -375,6 +379,8 @@ class CompiledRunner:
             'warmup_log_density_evaluations': warm_evaluations+1,
             'warmup_acceptance_rate': warm_accept/self.warmup if self.warmup else None,
             'adaptation_during_sampling': False,
+            'draw_collection': (collector.metadata() if collector is not None else
+                                {'strategy': 'In-memory arrays; standalone API'}),
         }
 
 

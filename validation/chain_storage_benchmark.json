@@ -1,0 +1,113 @@
+{
+  "source": "results/global-native-reproduce/eight-schools/scenario-0/chains/DCS-HnR-000.npz",
+  "source_description": "Completed HnR Eight Schools chain; larger case repeats the same complete draw array ten times only to benchmark serialization.",
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "numpy": "1.26.4",
+  "results": [
+    {
+      "rows": 36779,
+      "array_bytes": 2942320,
+      "method": "original_numpy_compressed",
+      "median_seconds": 0.059243916000013996,
+      "measurements": [
+        {
+          "seconds": 0.0598196659993846,
+          "archive_bytes": 2826286,
+          "selected_compression": null,
+          "sample_ratio": null
+        },
+        {
+          "seconds": 0.05885008400036895,
+          "archive_bytes": 2826286,
+          "selected_compression": null,
+          "sample_ratio": null
+        },
+        {
+          "seconds": 0.059243916000013996,
+          "archive_bytes": 2826286,
+          "selected_compression": null,
+          "sample_ratio": null
+        }
+      ]
+    },
+    {
+      "rows": 36779,
+      "array_bytes": 2942320,
+      "method": "automatic_lossless",
+      "median_seconds": 0.018584082999950624,
+      "measurements": [
+        {
+          "seconds": 0.018462834000274597,
+          "archive_bytes": 2947543,
+          "selected_compression": "stored",
+          "sample_ratio": 0.9628162384033203
+        },
+        {
+          "seconds": 0.018584082999950624,
+          "archive_bytes": 2947532,
+          "selected_compression": "stored",
+          "sample_ratio": 0.9628162384033203
+        },
+        {
+          "seconds": 0.01893795800060616,
+          "archive_bytes": 2947541,
+          "selected_compression": "stored",
+          "sample_ratio": 0.9628162384033203
+        }
+      ]
+    },
+    {
+      "rows": 367790,
+      "array_bytes": 29423200,
+      "method": "original_numpy_compressed",
+      "median_seconds": 0.5888787499998216,
+      "measurements": [
+        {
+          "seconds": 0.5858040839993919,
+          "archive_bytes": 28228159,
+          "selected_compression": null,
+          "sample_ratio": null
+        },
+        {
+          "seconds": 0.5888787499998216,
+          "archive_bytes": 28228159,
+          "selected_compression": null,
+          "sample_ratio": null
+        },
+        {
+          "seconds": 0.5923350410002968,
+          "archive_bytes": 28228159,
+          "selected_compression": null,
+          "sample_ratio": null
+        }
+      ]
+    },
+    {
+      "rows": 367790,
+      "array_bytes": 29423200,
+      "method": "automatic_lossless",
+      "median_seconds": 0.02404895800009399,
+      "measurements": [
+        {
+          "seconds": 0.02449379100016813,
+          "archive_bytes": 29428420,
+          "selected_compression": "stored",
+          "sample_ratio": 0.9631404876708984
+        },
+        {
+          "seconds": 0.02404895800009399,
+          "archive_bytes": 29428417,
+          "selected_compression": "stored",
+          "sample_ratio": 0.9631404876708984
+        },
+        {
+          "seconds": 0.023772167000061017,
+          "archive_bytes": 29428419,
+          "selected_compression": "stored",
+          "sample_ratio": 0.9631404876708984
+        }
+      ]
+    }
+  ],
+  "limitations": "Local sequential serialization benchmark, three repetitions. Excludes sampling and diagnostics; does not measure the user Windows run. New save function additionally makes an atomic replacement and records storage metadata. Both formats preserve every draw bit."
+}

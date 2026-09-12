@@ -15,6 +15,25 @@ from dcs_bench.plotting import rebuild, render_saved_summary, burnin_counts, num
 
 
 class FigureTests(unittest.TestCase):
+    def test_plot_only_reuses_summary_and_explicit_recompute_reads_chains(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root/'summary.json', {'scenarios': []})
+            with patch('dcs_bench.plotting.render_saved_summary') as render, \
+                 patch('dcs_bench.plotting.rebuild') as recompute:
+                self.assertEqual(run_experiment.main(['--plot-only', str(root)]), 0)
+                render.assert_called_once_with(root)
+                recompute.assert_not_called()
+            with patch('dcs_bench.plotting.render_saved_summary') as render, \
+                 patch('dcs_bench.plotting.rebuild') as recompute:
+                self.assertEqual(run_experiment.main(['--plot-only', str(root), '--recompute-diagnostics']), 0)
+                recompute.assert_called_once_with(root)
+                render.assert_not_called()
+            (root/'summary.json').unlink()
+            with patch('dcs_bench.plotting.rebuild') as recompute:
+                self.assertEqual(run_experiment.main(['--plot-only', str(root)]), 0)
+                recompute.assert_called_once_with(root)
+
     def test_sampling_burnin_counts_remain_separate_from_generated_counts(self):
         records = [{'iterations': 1000, 'burnin_iterations': 333, 'estimation_iterations': 667},
                    {'iterations': 1200, 'burnin_iterations': 400, 'estimation_iterations': 800}]
@@ -92,7 +111,7 @@ class FigureTests(unittest.TestCase):
             numerical = {path: path.read_bytes() for path in root.rglob('*')
                          if path.suffix in ('.json', '.csv', '.npz')}
             with patch('dcs_bench.engine.read_chain', side_effect=AssertionError('No chain reads for label refresh')), \
-                 patch('dcs_bench.plotting.mcmc_diagnostics', side_effect=AssertionError('No recomputed diagnostics')):
+                 patch('dcs_bench.processing.mcmc_diagnostics', side_effect=AssertionError('No recomputed diagnostics')):
                 render_saved_summary(root)
             for path, payload in numerical.items():
                 self.assertEqual(path.read_bytes(), payload)
