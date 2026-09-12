@@ -95,7 +95,18 @@ class ParallelTests(unittest.TestCase):
                     self.assertEqual(record['execution']['cpu_id'], plan['cpu_ids'][record['execution']['worker_slot']])
                 records.append(record)
             self.assertEqual(list(root.glob('.draws-*')), [])
-            self.assertEqual(len({r['execution']['pid'] for r in records}), workers)
+            # Very short chains can all finish on one worker before another
+            # leaves the start-barrier poll, especially on Windows. Verify
+            # every worker actually started without imposing queue fairness.
+            compiled = [json.loads(p.read_text(encoding='utf-8'))
+                        for p in (root/'jobs').glob('RWM-Gaussian-*-worker-*.compilation.json')]
+            self.assertEqual(len(compiled), workers)
+            self.assertEqual(len({entry['pid'] for entry in compiled}), workers)
+            self.assertEqual({entry['worker_slot'] for entry in compiled}, set(range(workers)))
+            self.assertEqual(len(list((root/'jobs').glob('*-queue/worker-*.ready'))), workers)
+            worker_pids = {entry['worker_slot']: entry['pid'] for entry in compiled}
+            for record in records:
+                self.assertEqual(record['execution']['pid'], worker_pids[record['execution']['worker_slot']])
             # Every submitted chain was claimed exactly once, including a final
             # unbalanced batch and a resume containing sparse chain indices.
             claims = [json.loads(p.read_text(encoding='utf-8'))
