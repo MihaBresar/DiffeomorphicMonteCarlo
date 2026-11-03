@@ -1,9 +1,20 @@
-# Boundary relocation comparison
+# Historical boundary relocation comparison
 
-Select **100D boundary comparison** in the launcher. This separate experiment
-compares **DCS-BW**, **DCS-BW-reflect** and the **unmodified author SCS** on the
-same 100D normal-CDF-skewed Student-t target with ν=3. The main experiment and
-All seven sequence remain unchanged.
+**This page preserves the earlier separate boundary experiment.** It is no
+longer a launcher choice. Use the current [configurable comparisons](COMPARISONS.md):
+four samplers in JAX (DCS-RWM, DCS-BW, SCS and DCS-BW-reflect), or optimized
+Numba BW/reflected BW versus unchanged author SCS. Both offer 100D and 500D skewed t targets, each with VI on or off for both
+map families. All seven includes the four-method JAX suite on 100D skewed t
+with the selected VI policy; the optimized and additional-target runs are
+separate choices.
+
+The historical `skew-t-100d-boundary` CLI identifier and
+`scripts/reproduce_boundary_100d.py` remain available, as does
+`run_experiment.py --plot-only SAVED_RUN` for archived results. The description
+below concerns that historical protocol and its revisions. It compares
+**DCS-BW**, **DCS-BW-reflect** and the **unmodified author SCS** on the same
+100D normal-CDF-skewed Student-t target with ν=3. References below to an
+unchanged main comparison describe the earlier release.
 
 Both BW variants share one fitted ball map. They draw the same uniform-ball
 increments at a given proposal scale. Standard BW rejects outside proposals;
@@ -20,38 +31,97 @@ generated iterations; every remaining state, including rejection repeats,
 contributes to tail-probability and mean-norm estimates. Only stored traces are
 thinned. Counts and full-precision MSEs are exported; figures use two decimals.
 
+Execution revision `matched-wave-cpu-v2` gives each method the same CPU set
+even in a partial final wave, using a smaller pool initialized before JAX.
+For 50 chains on 32 workers, the final 18 use the same first 18 CPU slots.
+Assignments are recorded and checked on Windows/Linux; macOS records
+OS-managed allocation. Earlier revisions could use different subsets in a
+partial wave. Rerun all three methods together for corrected timings.
+
+Both estimates are radial and have the same truth for the symmetric and skewed
+t target. They assess radial estimation, not exploration of the skewed
+direction or overall mixing. Equal VI and step-calibration budgets also do
+not establish equally good fits or optimal tuning; the main protocol explains
+[these limits](SCS_100D.md#matched-map-fitting-and-separate-step-calibration).
+
 | Preset | Chains per method | Sampling seconds per chain | Separate warmup | VI updates × draws per map |
 |---|---:|---:|---:|---:|
 | Quick check | 2 | 0.05 | 100 | 20 × 128 |
 | Smaller reproduction | 20 | 2.00 | 1,000 | 400 × 500 |
 | Full paper settings | 50 | 20.00 | 1,500 | 1,500 × 2,000 |
 
-## Current calibration: protocol v2
+## Current calibration: protocol v3
 
-Each variant tunes its step separately toward acceptance 0.234 using the same
-dual-averaging rule and warmup budget, then freezes the scale. **Ordinary DCS-BW
-and author SCS retain their original calibration**, including the numerical
-log-scale ceiling of 15, equivalent to a step ceiling of exp(15). **Only
-DCS-BW-reflect has the additional step ceiling of 2.** The main 100D comparison
-is unchanged.
+**Reflected BW now selects its step using observed squared movement inside the
+ball, with no special upper bound of 2.** Ordinary BW and author SCS retain
+their original separate acceptance-target 0.234 calibration. All methods use
+the same total warmup-transition budget and freeze their scales before timed
+sampling. The main 100D comparison is unchanged.
 
-This is an explicit method-specific constraint. Reflection can make 0.234
-unattainable: for an exactly uniform transformed target, every valid reflected
-proposal is accepted at every scale. An initial pilot sent reflected BW to
-exp(15), with acceptance around 0.8. The bound of 2 was chosen after that pilot;
-it is the unit ball's diameter, not a claim that larger reflected steps are
-redundant or that 2 is optimal. Saturation is recorded and flagged rather than
-described as successful calibration. Interpret the fitted steps and observed
-acceptances together with MSE and time.
+For reflected BW, a pilot window with actual post-Metropolis states Z has score
 
-The historical v1 checks below imposed the ceiling of 2 on **all** methods.
-That can change the warmup path of ordinary BW and SCS even when their final
-steps lie below 2. Protocol v2 removes that additional constraint from both
-baselines. It preserves their original calibration while studying the new
-reflected kernel under its stated bound. This is not a fixed-identical-step
-comparison; both boundary handling and the reflected method's calibration
-constraint can affect its result. Rerun all three methods together to evaluate
-v2; the historical v1 table is not a result for the current protocol.
+    J(h) = mean ||Z_next - Z_current||².
+
+Rejected moves contribute zero. The score is at most 4 inside the unit ball
+and remains meaningful at 100% acceptance. It measures movement per
+transition in ball coordinates; it does not use the paper's radial truth,
+production errors or MSE. Expected squared jumping distance is an established
+tuning objective; this finite local search is our implementation, not a claim
+to reproduce a published optimizer. See
+[Pasarica and Gelman (2010)](https://www3.stat.sinica.edu.tw/sstest/j20n1/j20n113/j20n113.html).
+
+The complete rule is fixed before sampling:
+
+1. Start at h=0.10, as in the other methods.
+2. Compare h/2, h and 2h in each of eight rounds. Split the existing warmup
+   budget across the 24 trial windows, assigning remainder transitions in
+   chronological order. For custom budgets below 24, reduce the number of
+   rounds; at least three transitions are required.
+3. Run a continuous pilot path and rotate candidate order each round. Include
+   the first move of every window in its score. Select the largest observed
+   score, with exact ties favoring the smaller step, and center the next
+   triplet at that step.
+4. Retain the final pilot state, and freeze the last round's selected step.
+   The normal first-third sampling burn-in remains additional to this pilot.
+
+Steps above 2 are permitted. Only the shared numerical safeguards
+exp(−30) and exp(15) remain; they protect finite-precision calculations and are
+not claimed to be optimal search limits. The reflected proposal and its
+Metropolis correction are unchanged. Increasing the raw step does not make
+the final displacement unbounded: it can cause repeated chord reflections.
+
+Every candidate's step, transition count, observed acceptance, jump score and
+selection flag is saved in `reflected_tuning.csv` and chain metadata. The HTML
+report shows selected steps and scores. An edge winner in the final round is
+reported as such, not certified as an interior optimum. Scores from short,
+possibly transient windows are noisy; reflection can also make the objective
+nonmonotone. This is a local finite-budget search, not a guarantee of optimal
+mixing or improved radial MSE. Warmup acceptance is descriptive, not a target
+for reflected BW.
+
+Both reflected BW and SCS accept every valid proposal for an exactly uniform
+transformed target, so either can fail to attain acceptance 0.234. This change
+addresses that issue for the reflected variant requested here; the unchanged
+SCS calibration is not claimed immune. Matching total tuning resources does
+not make their tuning criteria identical. Compare the specified procedures
+and disclose the difference.
+
+In a calibration-only check with the full 1,500 × 2,000 fit (seed 42), 1,500
+warmup transitions and all 50 default chain seeds 901001–901050, the selected
+steps were 0.20 in 7 chains, 0.40 in 42 chains and 0.80 in 1 chain. All were
+below 2 without an enforced cutoff. Six final-round winners were the smaller
+candidate and six the larger candidate; this remains a finite local search.
+These checks do not establish an optimal scale or a new MSE ranking. See the
+[v3 validation record](../validation/boundary_v3_checks.json).
+
+## Historical calibration: v1 and v2
+
+The historical v1 checks below imposed step ceiling 2 on all methods. Protocol
+v2 restored ordinary BW/SCS calibration and retained that extra ceiling only
+for reflected BW, following a pilot with high acceptance at exp(15). Those
+were exploratory settings, not evidence that 2 was optimal or necessary for
+validity. Their archives and report labels remain unchanged. Rerun all three
+methods together for v3; neither earlier protocol can be updated by replotting.
 
 ## Why the reflection proposal is valid
 
@@ -88,20 +158,12 @@ and finite behavior near the boundary.
 
 ## Running and reproducing
 
-On Windows, without commands:
-
-1. Download the latest GitHub ZIP and extract it into a new folder.
-2. Open **Start.bat** in that folder and click **Set up environment** if needed.
-3. Select **100D boundary comparison** and **Full paper settings**.
-4. Choose **32 CPU workers** on the Ryzen 9 9950X3D with SMT enabled, or click
-   **Use all CPU threads**. This permits up to 32 simultaneous chains; the
-   preset still runs 50 chains per method.
-5. Select **Original seeds (batch 0)**, or **Fresh batch 1** through **Fresh batch 5**
-   for a new set of sampling and warmup streams, then click **Start run**.
-
-Each launch creates a fresh dated result folder. Open `paper_values.html`
-under **Exact numbers and tables** after it finishes. Use the same worker
-setting when comparing runs.
+The former **100D boundary comparison** launcher entry has been replaced.
+For runs without commands, follow [the current launcher guide](CLICK_TO_RUN.md)
+and select the four-sampler JAX or optimized Numba comparison. Both include
+reflected BW and offer the target and VI selectors. To run this historical
+three-method boundary protocol, use the command-line entry point below with
+a fresh output folder. Keep the same worker setting when comparing runs.
 
 The default `seed_batch=0` uses sampling seed 901001. Batch b adds
 1,000,000 × b to that seed; map-fitting seed 42 remains fixed. The launcher
@@ -122,10 +184,15 @@ python run_experiment.py skew-t-100d-boundary --preset paper --workers 32 --seed
 
 `--seed-batch` and a custom `--seed` are mutually exclusive.
 
-The saved protocol is `timed-boundary-dcs-scs-v2`. Original figure families are
+The saved protocol is `timed-boundary-dcs-scs-v3`. Original figure families are
 retained in the new result folder, with the reflected variant clearly labelled.
 This is an exploratory comparison, not a claim of dominance or a convergence
 theorem for the new reflected kernel.
+
+The [preceding v2 comparison audit](../validation/current_comparison_fairness_audit.json)
+records independent transformation and boundary checks, the CPU-allocation
+correction, author-code provenance and inference limitations. Its description
+of the reflected-only ceiling applies to historical v2, not current v3.
 
 The tables export empirical MSE uncertainty summaries computed directly from
 the per-chain squared errors, alongside MSE, exact counts and time. These are
@@ -142,7 +209,7 @@ After the initial exp(15)-ceiling pilot, two fresh checks used 20 chains per met
 and 1,500 VI updates with 2,000 draws per update. Fit/chain seeds were
 42/903001 and 43/904001. The common step ceiling was 2 in both checks.
 All three methods used the same budgets within each check. **These are
-historical v1 results with a common cap of 2, not current v2 results.** They
+historical v1 results with a common cap of 2, not current v3 results.** They
 also predate the seed-batch selector; their custom seed values are retained.
 
 | Check | Method | Mean generated iterations | Tail-probability MSE | Mean-norm MSE | Acceptance |
@@ -168,4 +235,4 @@ includes the initial exp(15)-ceiling pilot as well as both subsequent checks,
 with full-precision values, fitted maps, per-chain records, source hashes and
 environment details. The cap was selected after that pilot; none of these
 results is presented as a preregistered confirmatory comparison or evidence
-for the v2 protocol.
+for the v2 or v3 protocols.

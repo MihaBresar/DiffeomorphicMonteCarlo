@@ -12,23 +12,33 @@ the final measured iteration count; thinning keeps its original iteration grid.
 For 500,000 iterations, discard 166,667 and use the remaining 333,333 before
 thinning. At thinning 10 this stores 33,334 post-burn-in states.
 
-## November 2026 matched SCS comparison
+## Current sampler comparisons
 
-If you already ran the compiled, first-third-burn-in release described below,
-only the **100D skewed t (ν=3) equal-time comparison** needs rerunning for this
-update. It now keeps the authors' SCS transition and implements DCS in the same
-JAX framework, with matched VI resources, shared step-size tuning and equivalent
-output processing. Previous 100D timings are not measurements of this protocol.
+The previous three-method 100D and separate boundary launcher entries have
+been replaced by two choices:
 
-The subsequent DCS efficiency update records implementation revision
-`jax-dcs-exact-ball-v1` within the same matched protocol. It uses an equivalent
-uniform-ball proposal generator, an exact β=2 map simplification and earlier
-rejection of outside-ball proposals. The authors' SCS transition and all shared
-fitting, tuning and recording policies remain unchanged. Rerun **all three
-methods in the 100D comparison**, including SCS, to measure them under the same
-machine conditions. The new BW generator preserves its proposal distribution
-but changes seeded trajectories; existing graphs cannot be updated by changing
-their time labels. No other experiment needs rerunning for this efficiency update.
+- **Four samplers: DCS-RWM, DCS-BW, SCS and DCS-BW-reflect**, using the same
+  JAX framework and full-state processing (`timed-sampler-comparison-v1`).
+- **Optimized Numba DCS-BW and reflected BW versus SCS**, using optimized
+  DCS production and the unchanged author SCS JAX transition
+  (`timed-numba-comparison-v1`). This comparison includes differences between
+  the implementations and their output processing.
+
+Both offer 100D and 500D skewed Student-t targets with ν=3 and DCS β=2. Each can
+run **With VI** or **Without VI** for both map families. Every choice retains
+separate proposal-step tuning and frozen sampling steps. See
+[the current protocol](COMPARISONS.md).
+
+Start a fresh run of **every method in the chosen comparison** for each target
+and VI setting you want to assess. Old results remain valid records of their
+saved protocols; replotting cannot turn them into the new comparison or
+measure the optimized backend. Keep the same worker count and machine
+conditions across methods. For a second independent sampling check, choose
+a fresh seed batch; VI-on fits retain seed 42.
+
+This comparison update does not by itself require rerunning the other six
+experiments if they already used the compiled kernels and one-third burn-in
+policy below. Formatting changes alone only require regenerating reports.
 
 ## Earlier compiled-kernel and burn-in update
 
@@ -41,7 +51,8 @@ exact integers, and CSV/JSON retain full precision.
 
 | Launcher experiment | Current comparison | Outputs |
 |---|---|---|
-| 100D skewed t (ν=3): DCS-RWM, DCS-BW and SCS — equal time | 50 chains/method, 20 seconds/chain at Full paper settings | `VsSCS`, radial estimates, counts, runtime, bias/variance |
+| Four samplers: DCS-RWM, DCS-BW, SCS and DCS-BW-reflect | Selected target and VI setting; equal time, JAX | `VsSCS`, radial estimates, counts, runtime, bias/variance |
+| Optimized Numba DCS-BW and reflected BW versus SCS | Selected target and VI setting; equal time, mixed implementations | Same comparison figure families and exact-value tables |
 | 50D t: infinite first moment, equal samples | 50 chains/method, 500,000 iterations/chain | `SuperInfiniteFirstTest`, tail/log-norm and quantiles |
 | 200D skew-t: DCS versus NUTS | Equal sampling time | `NUTS_PBW_vs` |
 | 200D skew-t: random-walk baselines | Equal sampling time | `VsRWM_NUTS` |
@@ -49,22 +60,30 @@ exact integers, and CSV/JSON retain full precision.
 | GARCH(1,1) | HnR time matched to mean NUTS sampling time | Posterior table and diagnostics |
 | Logistic regression: both priors | Equal sampling time, independent reference | `QQ-regresssion` |
 
-The 100D comparison uses 2 chains of 0.05 seconds for Quick check, 20 chains of
+Both current comparisons use 2 chains of 0.05 seconds for Quick check, 20 chains of
 2 seconds for Smaller reproduction, and 50 chains of 20 seconds for Full paper
-settings. Both map families use equal fresh-batch VI budgets. All three methods
-use separate dual-averaging warmup toward 0.234 using observed acceptances,
-then freeze their steps. SCS invokes the unmodified author JAX transition;
-DCS uses the same JAX framework and output processing.
-See [the exact comparison protocol](SCS_100D.md). The identifier
-`skew-t-100d-fixed` is retained only for compatibility; it now launches this
-equal-time comparison.
+settings, for every target and VI choice. With VI, both map families receive
+equal fresh-batch budgets. Without VI, both maps use R=1 with zero centre/deformation,
+and no fitting draws. Ordinary methods use acceptance-target 0.234 calibration;
+reflected BW uses ball-movement pilots within the same transition budget.
+All steps freeze before timed sampling. Numba DCS starts from the same JAX
+pilot state and selected step as its JAX counterpart.
+
+The CLI identifiers `skew-t-100d-fixed` and `skew-t-100d-boundary` and their
+scripts remain available for historical protocols, as do report regeneration
+and the [three-method](SCS_100D.md) and [boundary](BOUNDARY_100D.md) descriptions.
+They do not launch the new configurable suite and are no longer menu choices.
 
 The super-heavy-tail experiment retains equal iteration counts. Its mean norm
 does not exist at ν=0.5, so use its tail probability, finite mean log norm and
 marginal quantiles. These plots cannot be reconstructed by rescaling timed MSE.
 
-**All seven experiments + posterior table** runs the complete sequence and
-prepares new independent logistic references. Quick check only verifies that
+**All seven experiments + posterior table** runs the four-method JAX comparison
+on the 100D skewed-t target and the other six experiments,
+and prepares independent logistic references. Its VI choice controls both maps
+in the comparison; the other experiments retain their existing map options.
+The optimized Numba and 500D comparisons are separate selections.
+Quick check only verifies that
 execution works. Use Smaller reproduction first to estimate resource needs;
 use Full paper settings for manuscript results. Keep worker counts and other
 computer activity comparable across methods. The Ryzen 16-core/32-thread CPU
@@ -73,16 +92,20 @@ can use 32 workers where enough independent chains are available. See
 
 To compare fitted and untuned maps in other experiments, choose **Möbius map**
 or **Vanilla map** and start a fresh run for each. Vanilla fixes R=1, centre=0
-and Möbius=0 while preserving β and separate proposal tuning. The default 100D
-comparison uses its specified fitting recipe automatically.
+and Möbius=0 while preserving β and separate proposal tuning. This older
+DCS-only selector does not control SCS; use the new comparison's **With VI /
+Without VI** selector to switch both map families. Eight Schools and GARCH
+retain their identity maps.
 
 ## Optional command-line equivalents
 
 ```bash
-python scripts/reproduce_all.py --preset paper --workers 32 --output-root results/paper-new
-python run_experiment.py skew-t-100d-fixed --preset paper --workers 32 --output-dir results/scs-time-new
+python scripts/reproduce_all.py --preset paper --workers 32 --vi on --output-root results/paper-new
+python run_experiment.py sampler-comparison --target skew-t-100d --vi on --preset paper --workers 32 --output-dir results/comparison-100d-vi
+python run_experiment.py sampler-comparison-numba --target skew-t-100d --vi off --preset paper --workers 32 --output-dir results/numba-100d-no-vi
+python run_experiment.py sampler-comparison --target skew-t-500d --vi off --preset paper --workers 32 --output-dir results/comparison-500d-no-vi
 python run_experiment.py skew-t-50d-nu-0.5 --preset paper --workers 32 --output-dir results/superheavy-new
-python run_experiment.py --plot-only results/scs-time-new
+python run_experiment.py --plot-only results/comparison-100d-vi
 ```
 
 The other experiment identifiers are `skew-t-200d-nuts`,

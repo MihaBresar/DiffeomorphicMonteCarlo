@@ -1,5 +1,16 @@
 # Validation of the corrected implementation
 
+## Current selectable-target comparisons (3 November 2026)
+
+The current suite covers **eight comparison combinations**: 100D and 500D skewed Student-t targets, two implementation modes, and VI on/off for both map families. Both targets use ν=3 and DCS β=2. Checks cover target-specific analytic references, exact one-third burn-in, frozen step calibration, native/JAX numerical agreement and partial-worker scheduling. SCS's pinned source files and licence remain unchanged. The machine-readable [check record](../validation/comparison_suite_checks.json) records the current automated-test and execution-check results.
+
+All **eight Smaller reproduction combinations** completed on the Apple M4 Pro laptop with four workers: **560 chains**, twenty per method/case, two seconds of production each, no retries or discarded attempts. The numerical sources stayed fixed during these runs. The shared JAX and native comparisons used identical fitted maps and step calibration for each target/VI setting. Guard flags are reported, including SCS saturation in 12 of 20 chains in each 100D no-VI comparison. These are conditional, exploratory estimates, not full-paper rankings.
+
+See [the full-precision method results](../validation/comparison_smaller_results.csv), [map fitting results](../validation/comparison_smaller_results_fitting.csv), [observed comparisons](COMPARISON_RESULTS.md) and [the protocol](COMPARISONS.md). Remote Windows/Linux validation requires a successful run of the updated GitHub Actions workflow; no such run is claimed before publication.
+
+The following sections retain historical validation records for earlier revisions.
+
+
 The Windows queue follow-up passed **39 tests**, including eight competing
 processes claiming 219 jobs exactly once across three synchronized rounds.
 A 200D DCS-versus-NUTS smaller reproduction was deliberately stopped after

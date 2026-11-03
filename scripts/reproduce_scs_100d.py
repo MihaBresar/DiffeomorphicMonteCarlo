@@ -22,12 +22,14 @@ import numpy as np
 from dcs_bench.engine import environment, write_json
 from dcs_bench.references import radial_truth
 from dcs_bench.targets import Target
+from dcs_bench.transforms import BallMap, SphereMap
 from dcs_bench.tuning import fit_map
 from dcs_bench.simulation_error import mse_variability, paired_mse_differences
 
 METHODS = ('DCS-RWM', 'DCS-BW', 'SCS')
 SEED_BATCH_STRIDE = 1_000_000
 MAX_SEED_BATCH = 999
+EXECUTION_REVISION = 'matched-wave-cpu-v2'
 TARGET = {'kind': 'skew_t', 'dimension': 100, 'nu': 3., 'alpha': {'0': 100., '1': -100.}}
 PRESETS = {
     'quick': dict(runs=2, time_budget=.05, warmup=100, thin=1, optimizer_steps=20, optimizer_samples=128),
@@ -36,7 +38,7 @@ PRESETS = {
 }
 TIME_SCOPE = ('Equal per-chain sampling time includes first-third burn-in and radial accumulation. '
               'Fitting, compilation and step tuning are outside the clock. All methods use the same '
-              'JAX scan framework and separate dual-averaging tuning toward 0.234 using observed acceptances, then freeze their steps. Only post-burn-in '
+              'JAX scan framework and their recorded separate step-calibration rules, then freeze their steps. Only post-burn-in '
               'states contribute estimates. All methods use the same 300-transition timing batches, '
               'with actual elapsed time and overshoot recorded. Methods run in equal-size synchronized waves.')
 
@@ -84,13 +86,33 @@ def configuration(preset='quick', workers=1, overrides=None):
         raise ValueError('time_budget must be finite and positive')
     if 100 % config['thin']:
         raise ValueError('thin must divide 100 for exact timed burn-in boundaries')
-    validate_workers(config['workers'])
+    hardware = cpu_info()
+    validate_workers(config['workers'], hardware)
+    config['execution_revision'] = EXECUTION_REVISION
+    config['wave_cpu_ids'] = _wave_cpu_ids(config, hardware)
+    config['affinity_policy'] = ('fixed_cpu_prefix_per_wave' if all(cpu is not None for cpu in hardware['cpu_ids'])
+                                 else 'os_managed_no_strict_pinning')
     return config
+
+
+def _wave_cpu_ids(config, hardware):
+    """Use the same ordered CPU prefix for every method, including partial waves."""
+    width = min(config['workers'], config['runs'])
+    slots = list(hardware['cpu_ids'])
+    if len(slots) < width:
+        raise ValueError('Not enough CPU slots for the requested wave size')
+    if any(cpu is None for cpu in slots):
+        if not all(cpu is None for cpu in slots):
+            raise ValueError('CPU slots must be either all pinned or all OS-managed')
+    elif len(slots) != len(set(slots)):
+        raise ValueError('Pinned CPU slots must be unique')
+    return [slots[:min(width, config['runs']-start)] for start in range(0, config['runs'], width)]
 
 
 def source_hashes():
     paths = list((ROOT/'dcs_bench').glob('*.py')) + list((ROOT/'third_party/scs_paper').rglob('*.py'))
-    paths += [Path(__file__), ROOT/'scripts/reproduce_boundary_100d.py', ROOT/'scripts/scs_100d_figures.py', ROOT/'requirements-cpu.txt']
+    paths += [Path(__file__), ROOT/'scripts/reproduce_boundary_100d.py', ROOT/'scripts/reproduce_comparison.py',
+              ROOT/'scripts/scs_100d_figures.py', ROOT/'requirements-cpu.txt']
     return {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 
 
@@ -98,6 +120,16 @@ def prepare(config):
     target = Target(config['target'])
     maps, fitting = {}, {}
     for family in ('ball', 'sphere'):
+        if config.get('vi', 'on') == 'off':
+            mapping = (BallMap(target.d, beta=config['beta']) if family == 'ball'
+                       else SphereMap(target.d, latitude=config['latitude']))
+            maps[family] = mapping.parameters()
+            fitting[family] = dict(seconds=0., steps=0, training_draws=0, total_training_draws=0,
+                loss=[], seed=None, vi_enabled=False, initial_scale=1., scale_policy='unit',
+                map_policy='untuned', coordinate_clipping=False, cdf_clipping=False,
+                fitting_policy='No VI for either family: R=1, centre=0, deformation=0')
+            print(f'Using untuned {family} map (VI off)', flush=True)
+            continue
         print(f'Fitting {family} map with the shared VI protocol', flush=True)
         mapping, metadata = fit_map(target, config, family, config['fit_seed'])
         maps[family] = mapping.parameters()
@@ -126,7 +158,9 @@ def chain_job(job):
         barrier.wait(timeout=900)
         record.update(algorithm=algorithm, chain=job['chain'], seed=job['seed'],
                       wave=job['wave'], wave_size=job['wave_size'],
-                      worker={'pid': os.getpid(), **_ALLOCATION}, time_scope=TIME_SCOPE)
+                      wave_cpu_ids=list(job['wave_cpu_ids']), execution_revision=EXECUTION_REVISION,
+                      affinity_policy=job['config']['affinity_policy'],
+                      worker={'pid': os.getpid(), **_ALLOCATION}, time_scope=job['config'].get('time_scope', TIME_SCOPE))
         if not np.all(np.isfinite(traces)) or not np.all(np.isfinite(record['mean_all_iterations'])):
             raise FloatingPointError('Nonfinite chain estimates')
         output = Path(job['output']); output.parent.mkdir(parents=True, exist_ok=True)
@@ -147,42 +181,97 @@ def chain_job(job):
         raise
 
 
+def _validate_wave_allocation(rows, expected_cpus):
+    """Fail closed if a completed method did not use its entire assigned pool."""
+    if len(rows) != len(expected_cpus):
+        raise RuntimeError('Completed method has the wrong number of wave workers')
+    workers = [row.get('worker', {}) for row in rows]
+    pids = [worker.get('pid') for worker in workers]
+    if None in pids or len(set(pids)) != len(expected_cpus):
+        raise RuntimeError('Each chain in a wave must use a distinct worker process')
+    actual = [worker.get('cpu_id') for worker in workers]
+    if all(cpu is None for cpu in expected_cpus):
+        if any(cpu is not None for cpu in actual) or any(worker.get('pinned') is not False for worker in workers):
+            raise RuntimeError('OS-managed wave unexpectedly claims strict CPU pinning')
+    elif not all(worker.get('pinned') is True for worker in workers) or \
+            set(actual) != set(expected_cpus) or len(set(actual)) != len(expected_cpus):
+        raise RuntimeError('Completed method did not use the expected pinned CPU set')
+
+
 def run_chains(root, config, maps):
     methods = tuple(config['algorithms'])
     count = min(config['workers'], config['runs'])
+    wave_cpus = _wave_cpu_ids(config, cpu_info())
+    if config.get('execution_revision') != EXECUTION_REVISION or config.get('wave_cpu_ids') != wave_cpus:
+        raise ValueError('CPU allocation changed after configuration; create a fresh configuration')
     context = multiprocessing.get_context('spawn')
     records = {name: [] for name in methods}
     with context.Manager() as manager:
-        slots = manager.Queue()
-        for cpu in cpu_info()['cpu_ids'][:count]:
-            slots.put(cpu)
-        with concurrent.futures.ProcessPoolExecutor(max_workers=count, mp_context=context,
-                initializer=initialize_worker, initargs=(slots,)) as pool:
+        pool, pool_width = None, 0
+        try:
             for wave, start in enumerate(range(0, config['runs'], count)):
                 chains = list(range(start, min(start+count, config['runs'])))
+                if len(chains) != pool_width:
+                    # Stop the larger pool before allocating the partial-wave
+                    # pool. Every method then occupies every worker, whose CPU
+                    # affinity is established before its first JAX import.
+                    if pool is not None:
+                        pool.shutdown(wait=True, cancel_futures=True)
+                        pool = None
+                    slots = manager.Queue()
+                    for cpu in wave_cpus[wave]:
+                        slots.put(cpu)
+                    pool = concurrent.futures.ProcessPoolExecutor(max_workers=len(chains), mp_context=context,
+                        initializer=initialize_worker, initargs=(slots,))
+                    pool_width = len(chains)
                 order = methods[wave % len(methods):]+methods[:wave % len(methods)]
                 for algorithm in order:
                     barrier = manager.Barrier(len(chains))
                     jobs = [dict(algorithm=algorithm, chain=chain, seed=config['seed']+chain,
-                        wave=wave, wave_size=len(chains), barrier=barrier, config=config,
+                        wave=wave, wave_size=len(chains), wave_cpu_ids=wave_cpus[wave], barrier=barrier, config=config,
                         mapping=maps['sphere' if algorithm == 'SCS' else 'ball'],
                         output=str(root/'chains'/algorithm/f'{chain:03d}.npz')) for chain in chains]
                     print(f'Wave {wave+1}, {algorithm}: {len(chains)} concurrent chains', flush=True)
-                    futures = [pool.submit(chain_job, job) for job in jobs]
-                    errors = []
-                    for future in concurrent.futures.as_completed(futures):
+                    futures, completed, errors = [], [], []
+                    try:
+                        for job in jobs:
+                            futures.append(pool.submit(chain_job, job))
+                        for future in concurrent.futures.as_completed(futures):
+                            try:
+                                completed.append(future.result())
+                            except BaseException as error:
+                                errors.append(error)
+                                # A dead worker or failed initializer cannot
+                                # abort its own barrier; release its peers here.
+                                try:
+                                    barrier.abort()
+                                except Exception:
+                                    pass
+                                for pending in futures:
+                                    pending.cancel()
+                        if errors:
+                            from threading import BrokenBarrierError
+                            secondary = (BrokenBarrierError, concurrent.futures.CancelledError)
+                            raise next((e for e in errors if not isinstance(e, secondary)), errors[0])
+                        _validate_wave_allocation(completed, wave_cpus[wave])
+                        records[algorithm].extend(completed)
+                    except BaseException:
                         try:
-                            records[algorithm].append(future.result())
-                        except BaseException as error:
-                            errors.append(error)
-                    if errors:
-                        from threading import BrokenBarrierError
-                        raise next((e for e in errors if not isinstance(e, BrokenBarrierError)), errors[0])
+                            barrier.abort()
+                        except Exception:
+                            pass
+                        for future in futures:
+                            future.cancel()
+                        raise
+        finally:
+            if pool is not None:
+                pool.shutdown(wait=True, cancel_futures=True)
     return {key: sorted(values, key=lambda x: x['chain']) for key, values in records.items()}
 
 
 def summarize(config, maps, fitting, records):
-    truth = radial_truth(Target(TARGET), 50.)[1]
+    target = Target(config.get('target', TARGET))
+    truth = radial_truth(target, config.get('threshold', 50.))[1]
     cases = {}
     for name in config['algorithms']:
         rows = records[name]
@@ -217,11 +306,12 @@ def summarize(config, maps, fitting, records):
             final_scales=[r['final_scale'] for r in rows], records=rows)
         cases[name].update(mse_variability(means, truth))
     return dict(config=config, truth=truth.tolist(), functionals=['tail_probability', 'mean_norm'],
-                maps=maps, fitting=fitting, cases=cases, time_scope=TIME_SCOPE,
+                maps=maps, fitting=fitting, cases=cases, time_scope=config.get('time_scope', TIME_SCOPE),
                 paired_mse_differences=paired_mse_differences(
                     {name: case['chain_means'] for name, case in cases.items()}, records, truth),
-                target_note='Shared normal-CDF-skewed t target from the DCS experiment. The SCS paper uses a '
-                            'Student-t CDF and nu=1 or2; this applies the SCS kernel with common benchmark tuning to our nu=3 target.',
+                target_note=config.get('target_note', 'Shared normal-CDF-skewed t target from the DCS experiment. '
+                            'The SCS paper uses a Student-t CDF and nu=1 or2; this applies the SCS kernel '
+                            'with recorded benchmark tuning to our nu=3 target.'),
                 mse_note='All post-burn-in iterations, including repeats after rejections; exact radial truth. '
                          'Empirical bias squared plus between-chain variance with divisor number of chains equals MSE. '
                          'More chains estimate error more precisely but cannot repair insufficient chain mixing.')
@@ -235,7 +325,7 @@ def run(config, output):
     started = time.perf_counter()
     manifest = dict(status='running', protocol=config['protocol'], config=config,
                     source_hashes=source_hashes(), environment=environment(), hardware=cpu_info(),
-                    started_utc=datetime.now(timezone.utc).isoformat(), time_scope=TIME_SCOPE)
+                    started_utc=datetime.now(timezone.utc).isoformat(), time_scope=config.get('time_scope', TIME_SCOPE))
     write_json(output/'configuration.json', config)
     write_json(output/'manifest.json', manifest)
     try:

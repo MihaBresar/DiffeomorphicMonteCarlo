@@ -74,7 +74,7 @@ def target_spec(config):
         'nu': config.get('nu', 3.), 'alpha': config.get('alpha', {0: 100., 1: -100.}),
     }))
     if spec['kind'] != 'skew_t':
-        raise ValueError('The paper comparison adapter requires a skew-t target')
+        raise ValueError('The comparison adapter requires a skew-t benchmark target')
     return spec
 
 

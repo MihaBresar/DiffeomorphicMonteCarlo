@@ -1,5 +1,28 @@
 # Changes
 
+## 2026-11-03 — selectable targets, shared VI switch and optimized Numba comparison
+
+- Replace the old visible SCS/boundary choices with a four-method JAX comparison (DCS-RWM, DCS-BW, SCS, DCS-BW-reflect) and a separate Numba DCS-BW/reflect versus author JAX SCS comparison. Keep old CLI and replot compatibility.
+- Offer the original 100D skew-t(3) and matching 500D skew-t(3), both with DCS β=2. Use prespecified analytic radial references and thresholds.
+- Add VI on/off for both map families. Off uses unit scale, zero centre/deformation and no fitting; all methods still receive separate step calibration. On uses equal fitting resources for both families.
+- Reuse the same JAX calibrated state and step in optimized Numba DCS production. Fuse density/radius calculations, cache rejected-state values and accumulate exact radial summaries without full-state output; retain rejection repeats. Disclose the separate PCG64 production stream and unequal framework/output costs.
+- Preserve equal sampling clocks, one-third burn-in, method-order rotation, CPU allocations, exact counts, two-decimal displays and full-precision exports. Add target/backend labels and tests for numerical kernels, calibration transfer, reports and public CLI routes.
+
+## 2026-11-03 — reflected-BW ball-movement calibration, boundary v3
+
+- Remove the reflected-only step ceiling of 2. Tune reflected BW by observed squared displacement of actual post-Metropolis states in ball coordinates, using rotating h/2, h, 2h trial windows within exactly the existing warmup-transition budget. Rejected moves contribute zero, and steps above 2 remain available.
+- Freeze the selected step before production. Preserve the reflected transition, target, fitted maps, burn-in, sampling clock and ordinary BW/SCS calibration. Only the common finite-precision scale guards remain.
+- Record candidate steps, iteration counts, acceptance, scores and selections in chain metadata and `reflected_tuning.csv`. Report final-round edge winners without claiming optimality. High acceptance is valid for this criterion; it is no longer forced toward 0.234 for reflected BW.
+- Version the separate boundary experiment as `timed-boundary-dcs-scs-v3`. Keep historical v1/v2 results and replot labels unchanged; rerun all boundary methods together for new comparisons. Equal tuning resources do not imply identical tuning criteria or improved radial MSE.
+
+## 2026-11-03 — current-comparison fairness audit
+
+- Fix CPU allocation in partial final waves of both 100D comparisons. Use a smaller pool with the same ordered CPU subset for every method, established before JAX initialization. Record and check expected and actual allocations under `matched-wave-cpu-v2`; macOS remains explicitly OS-managed. Rerun all methods together for corrected timings, especially 50 chains on 32 workers.
+- Preserve targets, kernels, map fitting, step calibration and seed rules. No new performance ranking is claimed.
+- Correct stale descriptions of historical fixed-step/original-VI SCS execution and clarify which reports include ESS, R-hat and directional diagnostics.
+- State the scope of radial-only results, the reflected-only step bound, conditional map fits and the limits of equal-budget tuning. Absolute VI losses omit different base constants and cannot rank map families as normalized KL values.
+- Exercise a partial final wave in Linux/Windows CI. Give every pilot of the historical joint-radius CI smoke check one second via an explicit override, avoiding too few draws in its old 0.1-second Windows check; all scientific preset defaults remain unchanged.
+
 ## 2026-11-03 — boundary v2, seed batches and MSE variability
 
 - Restore ordinary DCS-BW and author SCS's original step calibration in the boundary comparison, including the numerical log-scale ceiling of 15. Apply the extra step ceiling of 2 only to reflected BW, whose acceptance target may be unattainable. Save this as `timed-boundary-dcs-scs-v2`; the main comparison's protocol is unchanged.

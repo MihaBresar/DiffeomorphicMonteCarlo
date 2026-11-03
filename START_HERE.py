@@ -22,9 +22,12 @@ from dcs_bench.cpu import cpu_info, validate_workers
 ROOT = Path(__file__).resolve().parent
 RUNS = ROOT/'results'/'click-runs'
 PRESETS = ('quick', 'reproduce', 'paper')
-EXPERIMENTS = ('all', 'skew-t-200d-nuts', 'skew-t-200d-baselines', 'skew-t-100d-fixed',
-               'skew-t-100d-boundary', 'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression')
-SCS_COMPARISONS = ('skew-t-100d-fixed', 'skew-t-100d-boundary')
+EXPERIMENTS = ('all', 'skew-t-200d-nuts', 'skew-t-200d-baselines', 'sampler-comparison',
+               'sampler-comparison-numba', 'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression')
+COMPARISONS = ('sampler-comparison', 'sampler-comparison-numba')
+LEGACY_SCS_COMPARISONS = ('skew-t-100d-fixed', 'skew-t-100d-boundary')
+SCS_COMPARISONS = COMPARISONS + LEGACY_SCS_COMPARISONS
+COMPARISON_TARGETS = ('skew-t-100d', 'skew-t-500d')
 
 
 def environment_python():
@@ -72,20 +75,32 @@ def environment_ready():
         return False
 
 
-def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=0):
-    if preset not in PRESETS or experiment not in EXPERIMENTS:
+def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=0, comparison_target='skew-t-100d', vi='on'):
+    if preset not in PRESETS or experiment not in EXPERIMENTS + LEGACY_SCS_COMPARISONS:
         raise ValueError('Choose a listed preset and experiment')
     if type(seed_batch) is not int or not 0 <= seed_batch <= 999:
         raise ValueError('Seed batch must be an integer from 0 to 999')
     if seed_batch and experiment not in SCS_COMPARISONS:
-        raise ValueError('Seed batches are available only for the two 100D SCS comparisons')
+        raise ValueError('Seed batches are available only for the sampler comparisons')
     if not plot_only:
         validate_workers(workers)
         if ball_map_policy not in ('mobius', 'vanilla'):
             raise ValueError('Choose a listed DCS map policy')
     py = str(environment_python())
     directory = Path(directory)
-    if experiment in SCS_COMPARISONS:
+    if experiment in COMPARISONS:
+        if comparison_target not in COMPARISON_TARGETS or vi not in ('on', 'off'):
+            raise ValueError('Choose a listed comparison target and VI policy')
+        if resume or plot_only:
+            raise ValueError('Sampler comparisons start from scratch in a new results folder.')
+        command = [py, '-u', str(ROOT/'scripts/reproduce_comparison.py'),
+                   '--comparison', 'numba' if experiment.endswith('-numba') else 'jax',
+                   '--target', comparison_target, '--vi', vi, '--preset', preset,
+                   '--workers', str(workers), '--output-dir', str(directory/experiment)]
+        if seed_batch:
+            command += ['--seed-batch', str(seed_batch)]
+        return [command]
+    if experiment in LEGACY_SCS_COMPARISONS:
         if resume or plot_only:
             raise ValueError('The 100D SCS comparison starts from scratch in a new results folder.')
         script = 'reproduce_boundary_100d.py' if experiment == 'skew-t-100d-boundary' else 'reproduce_scs_100d.py'
@@ -95,13 +110,15 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
             command += ['--seed-batch', str(seed_batch)]
         return [command]
     if experiment == 'all':
+        if vi not in ('on', 'off'):
+            raise ValueError('Choose a listed VI policy')
         command = [py, '-u', str(ROOT/'scripts/reproduce_all.py'), '--preset', preset, '--output-root', str(directory)]
         if plot_only:
             command.append('--plot-only')
         elif resume:
             command.append('--resume')
         if not plot_only:
-            command += ['--workers', str(workers), '--ball-map-policy', ball_map_policy]
+            command += ['--workers', str(workers), '--ball-map-policy', ball_map_policy, '--vi', vi]
         return [command]
     result = directory/experiment
     if plot_only:
@@ -215,7 +232,7 @@ class Controller:
                 raise RuntimeError('Environment validation failed; see installation output above')
         self.start_job(work, 'Setting up the environment…')
 
-    def run(self, preset='quick', experiment='skew-t-100d-fixed', run_id=None, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=0):
+    def run(self, preset='quick', experiment='sampler-comparison', run_id=None, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=0, comparison_target='skew-t-100d', vi='on'):
         if not self.ready:
             raise ValueError('Click Set up environment first')
         if run_id:
@@ -227,6 +244,8 @@ class Controller:
             workers = saved.get('workers', 1)
             ball_map_policy = saved.get('ball_map_policy', 'mobius')
             seed_batch = saved.get('seed_batch', 0)
+            comparison_target = saved.get('comparison_target', 'skew-t-100d')
+            vi = saved.get('vi', 'on')
             if not plot_only and saved.get('ball_scale_policy', 'fit') != 'fit':
                 raise ValueError('The fixed R=sqrt(d) option has been removed. Start a new run with a Möbius or vanilla map.')
         else:
@@ -234,11 +253,12 @@ class Controller:
             directory = RUNS/run_id
         commands = commands_for_run(preset, experiment, directory, resume=bool(run_id and directory.exists()),
                                     plot_only=plot_only, workers=workers, ball_map_policy=ball_map_policy,
-                                    seed_batch=seed_batch)
+                                    seed_batch=seed_batch, comparison_target=comparison_target, vi=vi)
         def work():
             directory.mkdir(parents=True, exist_ok=True)
             (directory/'launcher-run.json').write_text(json.dumps({'preset': preset, 'experiment': experiment,
-                'workers': workers, 'ball_map_policy': ball_map_policy, 'seed_batch': seed_batch}, indent=2)+'\n')
+                'workers': workers, 'ball_map_policy': ball_map_policy, 'seed_batch': seed_batch,
+                'comparison_target': comparison_target, 'vi': vi}, indent=2)+'\n')
             self.current_run = run_id
             with (directory/'launcher.log').open('a', encoding='utf-8') as logfile:
                 for command in commands:
@@ -318,9 +338,10 @@ def make_handler(controller, token):
                 if not 0 <= size <= 4096: raise ValueError('Invalid request size')
                 data = json.loads(self.rfile.read(size) or b'{}')
                 if self.path == '/setup': controller.setup()
-                elif self.path == '/run': controller.run(data.get('preset', 'quick'), data.get('experiment', 'skew-t-100d-fixed'),
+                elif self.path == '/run': controller.run(data.get('preset', 'quick'), data.get('experiment', 'sampler-comparison'),
                     workers=data.get('workers', 1), ball_map_policy=data.get('ball_map_policy', 'mobius'),
-                    seed_batch=data.get('seed_batch', 0))
+                    seed_batch=data.get('seed_batch', 0),
+                    comparison_target=data.get('comparison_target', 'skew-t-100d'), vi=data.get('vi', 'on'))
                 elif self.path == '/resume': controller.run(run_id=data['id'])
                 elif self.path == '/replot': controller.run(run_id=data['id'], plot_only=True)
                 elif self.path == '/show':

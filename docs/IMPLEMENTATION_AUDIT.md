@@ -1,7 +1,6 @@
 # DCS/SCS implementation and tuning audit
 
-This is a historical audit. The current default 100D comparison uses the
-[author SCS and DCS in JAX with matched fitting and warmup](SCS_100D.md).
+This is a historical audit. The [current comparison suite](COMPARISONS.md) offers a four-method JAX comparison and a separate optimized-Numba comparison, each with target and shared VI switches.
 The frozen-adaptation and launcher descriptions below describe the earlier release.
 
 The September 11 update restores the original figures, removes the physical-core

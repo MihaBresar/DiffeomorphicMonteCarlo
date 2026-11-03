@@ -9,7 +9,7 @@ if hasattr(signal, 'SIGBREAK'):
     signal.signal(signal.SIGBREAK, signal.default_int_handler)
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPERIMENTS = ['skew-t-200d-nuts', 'skew-t-200d-baselines', 'skew-t-100d-fixed',
+EXPERIMENTS = ['skew-t-200d-nuts', 'skew-t-200d-baselines', 'sampler-comparison',
                'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression']
 
 
@@ -21,6 +21,8 @@ def main():
     parser.add_argument('--plot-only', action='store_true')
     parser.add_argument('--workers', type=int, default=1)
     parser.add_argument('--ball-map-policy', choices=['mobius', 'vanilla'], default='mobius')
+    parser.add_argument('--vi', choices=['on', 'off'], default='on',
+                        help='VI on/off for both maps in the four-method comparison')
     args = parser.parse_args()
     output = (args.output_root or ROOT/'results'/args.preset).resolve()
     reference = output/'logistic-reference'
@@ -32,21 +34,28 @@ def main():
         subprocess.run(command, cwd=ROOT, check=True)
     for name in EXPERIMENTS:
         directory = output/name
+        if args.plot_only and name == 'sampler-comparison' and not directory.exists():
+            # Preserve report regeneration for an earlier seven-experiment archive.
+            historical = output/'skew-t-100d-fixed'
+            if historical.exists():
+                directory = historical
         command = [sys.executable, str(ROOT/'run_experiment.py')]
         if args.plot_only:
             command += ['--plot-only', str(directory)]
         else:
             command += [name, '--preset', args.preset, '--output-dir', str(directory), '--reference-dir', str(reference),
                         '--workers', str(args.workers)]
-            if name != 'skew-t-100d-fixed':
+            if name != 'sampler-comparison':
                 command += ['--ball-map-policy', args.ball_map_policy]
+            else:
+                command += ['--target', 'skew-t-100d', '--vi', args.vi]
             if args.resume and (directory/'manifest.json').exists():
-                if name == 'skew-t-100d-fixed':
+                if name == 'sampler-comparison':
                     import json
                     manifest = json.loads((directory/'manifest.json').read_text(encoding='utf-8'))
-                    if manifest.get('protocol') in ('original-dcs-author-scs-v1', 'timed-dcs-author-scs-v2', 'timed-matched-dcs-scs-v3') and manifest.get('status') == 'complete':
+                    if manifest.get('protocol') == 'timed-sampler-comparison-v1' and manifest.get('status') == 'complete' and manifest.get('config', {}).get('vi') == args.vi:
                         continue
-                    raise ValueError('The single SCS comparison requires a fresh output folder after an interrupted run.')
+                    raise ValueError('The sampler comparison requires a fresh output folder after an interrupted run or a VI change.')
                 command.append('--resume')
         print(' '.join(command), flush=True)
         subprocess.run(command, cwd=ROOT, check=True)

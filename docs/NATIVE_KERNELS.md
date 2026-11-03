@@ -3,8 +3,7 @@
 All seven launcher experiments use compiled loops for their canonical sampling
 methods. `compiled_sampling.py` covers DCS-RWM, DCS-BW, DCS-HnR, ordinary Gaussian
 and stable random walks, and SCS. It supports the skew-t, logistic, Eight Schools
-(centered and noncentered), and GARCH densities. The default 100D comparison
-uses its specialized native radial accumulator and the SCS authors' JAX kernel.
+(centered and noncentered), and GARCH densities. The current `sampler-comparison` runs DCS-RWM/BW/reflect and author SCS in a shared compiled JAX scan framework. The separate `sampler-comparison-numba` runs optimized native BW/reflect against unchanged author JAX SCS; both targets and both VI settings are available. See [the exact comparison scope](COMPARISONS.md).
 NumPyro/BlackJAX NUTS retain their compiled implementations.
 
 Each worker compiles before the sampling start barrier. Warmup is separate;
@@ -12,8 +11,7 @@ production steps are frozen. Native kernels use float64 without fast-math,
 cache target/map constants, and call the actual SciPy normal log-CDF routine.
 SCS and ordinary random-walk baselines receive the same compilation treatment.
 The first third of actual generated sampling iterations is discarded for every
-current experiment. The default author-SCS recipe retains fixed h=0.10; its
-untimed equilibration is reported separately from DCS step calibration.
+current experiment. Ordinary BW, DCS-RWM and SCS use separate per-chain acceptance-target 0.234 calibration. Reflected BW uses squared ball movement within the same warmup budget, without a special bound of 2. All production steps freeze. Fixed SCS h=0.10 describes an archived recipe, not either current comparison.
 
 Fixed-count runs use bounded chunks. Timed general kernels check the clock
 after batches of 256 transitions, and record elapsed time and overshoot. The
@@ -25,7 +23,15 @@ The public `sample(log_density, ...)` interface accepts arbitrary Python
 callables. These use the explicit NumPy fallback; arbitrary Python cannot be
 promised native compilation. It still returns the requested number of thinned,
 post-burn-in draws and reports the implementation. Built-in benchmark targets
-always use the native path for the methods listed above.
+always use compiled paths for the methods listed above.
+
+## Optimized radial BW loops
+
+`numba_radial.py` fuses transformed density, physical radius and radial summaries for BW/reflect on skew-t targets. It caches the current density/radius through rejections, reuses scratch buffers, and stores only cumulative sums plus thinned radii. Every repeated post-Metropolis state still enters the estimates. It uses float64, no fast-math and uniform-ball displacements from d+2 Gaussian variables. Arbitrary β remains supported; β=2 uses the exact boundary-gap simplification.
+
+Native production starts at the identical JAX-calibrated state and frozen step used in the shared-framework mode. PCG64 production streams are independent of the calibration stream, so parity means matching proposal and target laws, not identical seeded trajectories. Controlled-increment tests compare Metropolis decisions, density/Jacobian formulas, reflected chords and all-state cumulative statistics, including d=500.
+
+A local macOS ARM64 throughput check used 900,000 transitions per case, three rotated repeats, and the same saved 100D map and method-specific calibrated start/step. Median paired JAX/Numba time ratios were **10.73× for BW** and **10.27× for reflected BW**. Median rates were 161,765 versus 1,734,092 iterations/s for BW, and 129,286 versus 1,334,991 for reflected BW. Compilation and calibration were excluded. These measurements compare DCS implementations, not DCS against SCS, and do not establish MSE improvements or promised Ryzen speedups. The complete map, configuration and measurements are in [the validation record](../validation/radial_numba_throughput.json). Reproduce them using `python scripts/benchmark_radial_numba.py` while no other CPU-heavy jobs run. Source hashes identify the measured revision; the subsequently corrected RNG-description string does not alter sampling.
 
 ## Paired implementation measurements
 

@@ -4,7 +4,15 @@ The original figure families are restored. The corrected saved chains and
 references determine the numbers; old paper values are never pasted into new
 results. Both fixed-time and fixed-iteration designs remain in the repository.
 
-New DCS labels identify the selected map as **Möbius VI** or **vanilla**. Vanilla
+The two current sampler-comparison reports identify their selected target,
+**VI on/off for both map families**, and JAX or optimized Numba execution.
+Both support 100D and 500D skewed Student-t targets with ν=3 and DCS β=2.
+See [the current comparison protocol](COMPARISONS.md). The JAX report includes
+DCS-RWM, DCS-BW, SCS and DCS-BW-reflect; the optimized report includes both BW
+variants and unchanged author SCS. Their figures describe the selected run;
+they do not imply a general sampler ranking.
+
+In the other experiments, DCS labels identify the selected map as **Möbius VI** or **vanilla**. Vanilla
 means R=1, centre=0 and Möbius=0, with the experiment's β unchanged. Exact-value
 tables record the policy and its parameter meaning. The two PosteriorDB targets
 keep their identity maps. Old fixed-R=√d results retain their historical labels.
@@ -17,11 +25,22 @@ keep their identity maps. Old fixed-R=√d results retain their historical label
 | `SuperInfiniteFirstTest` | Linear MSE bars for tail probability, mean log norm, then average runtime at equal iterations |
 | `QQ-regresssion` | Two-by-two marginal Q–Q plots for β₁, with ν=4 and ν=6 |
 
-The current 100D report identifies the matched `timed-matched-dcs-scs-v3`
-protocol: shared fitting budgets, separate step calibration for all methods,
-and frozen production steps. Replotting an older v1/v2 summary preserves its
-recorded tuning policy and design; it does not relabel historical results as a
-new matched run. All existing 100D figure families and exact-value exports remain.
+Current reports identify `timed-sampler-comparison-v1` or
+`timed-numba-comparison-v1`. They retain `VsSCS`, `scs_100d_estimates`,
+`scs_100d_runtime`, and `scs_100d_bias_variance`; the historical filenames stay
+the same for 500D, while plot titles identify the actual target.
+Every method receives equal sampling time and separate proposal calibration;
+the first third of timed iterations is discarded. Reflected BW uses
+ball-movement pilots, while the original methods target acceptance 0.234.
+Steps remain frozen during sampling. Without VI, both families use
+unit scale and zero centre/deformation, with no fitting draws.
+
+Replotting earlier three-method or boundary summaries preserves their recorded
+target, tuning policy and design. It does not relabel them as the new suite.
+Legacy CLI identifiers and report regeneration remain supported, although the
+old comparisons are no longer launcher choices. The All seven sequence now
+uses the four-method JAX comparison on 100D skewed t with the chosen VI policy;
+the other six experiments retain their existing map options.
 
 The compact **200D random-walk baselines** report keeps just `VsRWM_NUTS`
 (two MSE panels), `VsRWM_NUTS_ergodic_averages` (tail and norm estimates), and
@@ -35,14 +54,15 @@ plots (`*_marginal_qq`) and radial boxplots (`*_ergodic_averages`, or the main
 and aggregate ESS. ESS is the sum over chains of each chain's mean bulk ESS in
 its first ten coordinates. An unavailable ESS is marked unavailable, never zero.
 
-Each skew-t run additionally saves `*_sample_counts`, showing mean generated
+The generic skew-t runs additionally save `*_sample_counts`, showing mean generated
 iterations, mean retained samples, and mean production runtime. The fixed-step
 experiment has the same iterations per method by design; its runtime and MSE
 compare efficiency. Timed experiments compare the iterations and retained draws
 generated within the common wall-time budget, along with MSE. The super-heavy-tail
 50D target (ν=0.5) now uses equal production iterations: 500,000 per chain and
-50 chains per method under Full paper settings, retaining 50,000 draws per chain
-at thinning 10. Its original image basenames and plot families remain, with
+50 chains per method under Full paper settings. It discards 166,667 iterations
+and uses the remaining 333,333 for estimation, storing 33,334 post-burn-in draws
+per chain at thinning 10. Its original image basenames and plot families remain, with
 runtime replacing unequal iteration counts in the main figure's third panel.
 For this target the mean norm does not exist; its second MSE panel continues to
 estimate the finite mean of log₁₀(1+‖X‖), and the marginal quantile plots remain.
@@ -58,10 +78,12 @@ If a custom target gives an unsaved coordinate a nonzero skew coefficient, only
 the independent IID reference is replayed using its recorded seed and batch size.
 No MCMC is run to rebuild figures.
 
-Directional checks and the newer logarithmic MSE plots with bootstrap intervals
-are in `figures/supplementary`. The launcher puts them in a collapsed
-**Supplementary diagnostics** section. The compact 200D baseline report skips
-these supplementary outputs.
+Where enabled in the generic experiments, directional checks and newer
+logarithmic MSE plots with bootstrap intervals are in `figures/supplementary`.
+The launcher puts them in a collapsed **Supplementary diagnostics** section.
+The compact 200D baseline report skips these outputs. The two new comparison
+suites report radial estimates and MSE with descriptive between-chain error
+summaries; they do not add individual-chain convergence diagnostics.
 
 ## Exact numerical values
 
@@ -75,16 +97,26 @@ uncertainty remains in the summary and exported data.
 Each experiment saves:
 
 - **`paper_values.html`**: a readable table opened directly in the browser.
-- **`paper_values.csv`**: all MSE/RMSE values, reference values and MCSE, bootstrap
-  intervals, chain counts, generated iterations, retained samples and timings.
-- **`sample_counts.csv`**: integer totals and per-chain means; exact fractions
-  accompany means so non-integer means are never silently rounded down.
-- **`chain_metrics.csv`**: individual-chain estimates, squared errors and work
-  counts, sufficient to reconstruct the reported MSE independently.
+- **`paper_values.csv`**: estimates, error summaries, references, chain counts,
+  generated iterations, retained samples and timings. Additional uncertainty
+  columns depend on the experiment's report profile.
+- **`sample_counts.csv`**: exact integer totals and per-chain means; use the
+  totals and chain count to recover a non-integer mean without display rounding.
+- **`chain_metrics.csv`**, or **`scs_100d_chains.csv`** in the current comparisons:
+  individual-chain estimates, squared errors and work counts, sufficient to
+  reconstruct the reported MSE independently.
 - **`*_marginal_qq.csv`** and **`QQ-regresssion.csv`**: the plotted quantiles and bands, where that experiment includes them.
 
+The new comparison suites also save `tuned_parameters.csv`, `setup_times.csv`
+and `reflected_tuning.csv`, recording map parameters, excluded setup costs and
+every reflected-BW pilot candidate. With VI off, fitting costs and training
+counts are zero; proposal calibration still runs.
+
 Generated iterations include repeated states after rejected proposals. Retained
-samples exclude warmup and reflect thinning. Neither is an effective sample size.
+samples exclude the first-third sampling burn-in and reflect thinning; separate
+step tuning is excluded from all production counts. Every post-burn-in iteration
+enters the new comparisons' estimates, including states omitted from the saved
+thinned traces. Neither generated nor retained counts are effective sample sizes.
 The separate posterior-table CSV retains full numerical precision as well.
 
 ## Open the generated figures

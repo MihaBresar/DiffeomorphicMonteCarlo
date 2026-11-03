@@ -33,7 +33,7 @@ class LauncherTests(unittest.TestCase):
             with self.subTest(experiment=experiment), self.assertRaises(ValueError):
                 launcher.commands_for_run('quick', experiment, Path('results/test'))
 
-    def test_visible_menu_keeps_main_scs_default_and_adds_boundary_comparison(self):
+    def test_visible_menu_replaces_old_comparisons_with_two_new_modes(self):
         from html.parser import HTMLParser
         class ExperimentMenu(HTMLParser):
             def __init__(self):
@@ -56,9 +56,16 @@ class LauncherTests(unittest.TestCase):
         menu = ExperimentMenu()
         menu.feed((launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8'))
         self.assertEqual({x['value'] for x in menu.options}, set(launcher.EXPERIMENTS))
-        self.assertEqual([x['value'] for x in menu.options if 'selected' in x], ['skew-t-100d-fixed'])
+        self.assertEqual([x['value'] for x in menu.options if 'selected' in x], ['sampler-comparison'])
         self.assertEqual(sum('SCS' in label for label in menu.labels), 2)
-        self.assertIn('skew-t-100d-boundary', {x['value'] for x in menu.options})
+        self.assertIn('sampler-comparison-numba', {x['value'] for x in menu.options})
+        self.assertTrue(set(launcher.LEGACY_SCS_COMPARISONS).isdisjoint(x['value'] for x in menu.options))
+        target_menu = ExperimentMenu()
+        target_menu.feed((launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8')
+                         .replace('id="experiment"', 'id="other-menu"')
+                         .replace('id="comparison-target"', 'id="experiment"'))
+        self.assertEqual([x['value'] for x in target_menu.options], ['skew-t-100d', 'skew-t-500d'])
+        self.assertEqual(tuple(x['value'] for x in target_menu.options), launcher.COMPARISON_TARGETS)
         seed_menu = ExperimentMenu()
         seed_menu.feed((launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8')
                        .replace('id="experiment"', 'id="other-menu"').replace('id="seed-batch"', 'id="experiment"'))
@@ -80,7 +87,7 @@ class LauncherTests(unittest.TestCase):
             with self.subTest(experiment=experiment):
                 commands = launcher.commands_for_run('quick', experiment, Path('results/test'))
                 self.assertTrue(all('--seed-batch' not in command for command in commands))
-                with self.assertRaisesRegex(ValueError, 'only for the two 100D'):
+                with self.assertRaisesRegex(ValueError, 'only for the sampler comparisons'):
                     launcher.commands_for_run('quick', experiment, Path('results/test'), seed_batch=1)
 
     def test_invalid_seed_batches_fail_before_any_job_starts(self):

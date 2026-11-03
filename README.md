@@ -2,16 +2,16 @@
 
 Reproducible experiments for *Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions*, by Miha Brešar and Aleksandar Mijatović.
 
-This corrected implementation centralizes target densities and transformations, saves individual chains, and regenerates figures and tables from saved results. The default 100D comparison matches map-fitting budgets, proposal-step calibration and the compiled JAX CPU timing driver across DCS and SCS. SCS calls the unmodified author transition directly. All experiments freeze proposal tuning before sampling, then discard the first third of generated sampling iterations. The synthetic and logistic targets are local constructions; only Eight Schools and GARCH use PosteriorDB. Empirical examples are not required to satisfy the paper's sufficient theorem assumptions.
+This corrected implementation centralizes target densities and transformations, saves individual chains, and regenerates figures and tables from saved results. The current comparison suite offers a shared-JAX comparison and a separate optimized-Numba DCS comparison, each with two targets and VI on/off for both map families. SCS calls the unmodified author transition directly. All experiments freeze proposal tuning before sampling, then discard the first third of generated sampling iterations. The synthetic and logistic targets are local constructions; only Eight Schools and GARCH use PosteriorDB. Empirical examples are not required to satisfy the paper's sufficient theorem assumptions.
 
 ## Run with clicks — no commands needed
 
-The separate **100D boundary comparison** adds reflected-chord DCS-BW alongside
-standard DCS-BW and author SCS. Current protocol v2 preserves ordinary BW and
-SCS's original step calibration and applies an extra step ceiling of 2 only
-to reflected BW. See [its protocol and reversibility argument](docs/BOUNDARY_100D.md).
-The common-cap results in its validation archive are historical v1 results;
-rerun all three methods to evaluate v2. The main comparison is unchanged.
+Choose one of two comparisons:
+
+- **Sampler comparison (JAX):** DCS-RWM, DCS-BW, author SCS and reflected DCS-BW, all in the same JAX timing/recording framework.
+- **Optimized Numba comparison:** DCS-BW and reflected DCS-BW with fused native loops, versus the unmodified author SCS in JAX. This measures implementation efficiency; it does not equalize framework and output-processing costs.
+
+Each offers **100D skewed t(3)** or **500D skewed t(3)**, both with DCS β=2, and **VI on/off for both map families**. Step sizes are always pretuned separately and frozen before sampling. Reflected BW uses ball-movement calibration without a hard ceiling of 2; ordinary BW, RWM and SCS target acceptance 0.234. See [the comparison protocol](docs/COMPARISONS.md).
 
 Download this repository using **Code → Download ZIP**, extract it, and install
 **Python 3.12 (64-bit)**. On Windows double-click **Start.bat**; on macOS open
@@ -28,15 +28,7 @@ when the run finishes. See the [step-by-step click-to-run guide](docs/CLICK_TO_R
 for installation, moving to another computer, and troubleshooting. These
 experiments run locally on your computer.
 
-For the revised boundary experiment on Windows, use the **latest ZIP**, open
-**Start.bat**, and select **100D boundary comparison → Full paper settings**.
-Choose **32 CPU workers** on the Ryzen 9 9950X3D, then **Original seeds (batch 0)**
-or **Fresh batch 1–5**, and click **Start run**. Both 100D comparisons offer
-these batches: the original uses sampling seed 901001; fresh batches change
-sampling and warmup streams while keeping map-fitting seed 42 fixed. Repeating
-a batch reuses its streams, but timed counts and the burn-in cutoff can vary,
-so identical seeds do not guarantee identical MSE. Compare fresh batches to
-assess sampling variability conditional on those fitted maps.
+On Windows, use the latest ZIP, open **Start.bat**, choose a comparison, target and VI setting, then **Smaller reproduction** or **Full paper settings**. On the Ryzen 9 9950X3D you can choose **32 CPU workers**. Both comparisons offer original sampling seeds (batch 0) and fresh batches 1–5; the map-fitting seed remains 42. Repeating a batch reuses its random streams, but wall-clock stopping can change sample counts and MSE. Compare independent batches to assess variability conditional on the fitted maps.
 
 ## Install and check from a terminal
 
@@ -83,39 +75,28 @@ The full run is substantial. Timed synthetic/regression comparisons require thou
 |---|---|---|
 | `skew-t-200d-nuts` | d=200, ν=3, α=(20,-30,0,…) | 50 chains/method, 20 s each |
 | `skew-t-200d-baselines` | Same target | 50 chains/method, 10 s each |
-| `skew-t-100d-fixed` | d=100, ν=3, α=(100,-100,0,…) | 50 chains/method, 20 seconds each; matched DCS-RWM/BW and SCS |
+| `sampler-comparison` | 100D/500D skew-t(3), DCS β=2 | 50 chains/method, 20 s each; DCS-RWM/BW/reflect and SCS in JAX |
+| `sampler-comparison-numba` | Same two selectable targets | Same budgets; optimized Numba DCS-BW/reflect versus author JAX SCS |
 | `skew-t-50d-nu-0.5` | Symmetric t, d=50, ν=0.5 | 50 chains/method, 500,000 steps each; discard 166,667 |
 | `logistic-regression` | d=20, independent t priors, ν=4 and 6 | 20 chains/method/ν, 30 s each |
 | `eight-schools` | Centered hierarchy, log τ coordinate | 50 chains, 150,000 NUTS steps; DCS matched to mean NUTS production time |
 | `garch11` | Four-parameter PosteriorDB GARCH | Same posterior timing design |
 
-The legacy name `skew-t-100d-baselines` forwards to the corrected **200-dimensional** configuration with a message. The default comparison’s presets are explicit in `scripts/reproduce_scs_100d.py`; other experiment settings are in `configs/<identifier>.json`. `--dry-run` displays the resolved configuration.
-
-The default **100D skewed t (ν=3): DCS-RWM, DCS-BW and SCS** is one equal-time comparison,
-with equal sampling time and measured iteration counts. The first third of each
-sampling run is discarded after separate tuning. Both maps receive the same
-fresh-batch VI budget, and all three methods tune their proposal steps toward
-acceptance 0.234 before freezing them for sampling. Both implementations use
-compiled JAX CPU scans with the same timing and recording work. SCS calls the
-unmodified author transition under the common fitting and calibration protocol.
-The shared target is the original DCS normal-CDF skew-t; the SCS paper’s
-Student-t-CDF target is different. See [the exact protocol](docs/SCS_100D.md).
-The command-line identifier routes to the same runner as the launcher.
-
-For either 100D comparison, `--seed-batch b` accepts integers 0–999 and sets
-sampling seed 901001 + 1,000,000 × b; the default is batch 0. It leaves
-map-fitting seed 42 unchanged and is mutually exclusive with a custom `--seed`.
-For example:
+**All seven experiments** includes the JAX comparison on the original 100D target, plus the other six experiments; it does not expand into all eight target/VI/backend combinations. Run the two comparisons individually to select the 500D target. Their presets are defined in `scripts/reproduce_scs_100d.py` and resolved by `scripts/reproduce_comparison.py`; the other six use `configs/<identifier>.json`. `--dry-run` shows the exact configuration.
 
 ```bash
-python run_experiment.py skew-t-100d-boundary --preset paper --workers 32 --seed-batch 1 --output-dir results/boundary-batch-1
+python run_experiment.py sampler-comparison --target skew-t-100d --vi on --preset reproduce --workers 4 --output-dir results/jax-100d-vi
+python run_experiment.py sampler-comparison-numba --target skew-t-100d --vi off --preset reproduce --workers 4 --output-dir results/numba-100d-no-vi
+python run_experiment.py sampler-comparison --target skew-t-500d --vi on --preset paper --workers 32 --seed-batch 1 --output-dir results/jax-500d-batch-1
 ```
 
-Earlier fitting, symmetric, equal-time and joint-radius audits remain in `scripts`,
-`validation` and their protocol documents for provenance. They are no longer
-launcher choices.
+`--seed-batch b` accepts 0–999 and sets sampling seed 901001 + 1,000,000 × b, leaving fit seed 42 unchanged. The comparison uses the manuscript's normal-CDF-skewed t density; it is not the SCS paper's Student-t-CDF example. The two map families have equal VI budgets, and the two implementation modes reuse the same JAX step calibration. The [protocol](docs/COMPARISONS.md) lists the remaining method-specific choices and clock scope.
+
+Old SCS and boundary comparisons are removed from the launcher. Their command-line identifiers, archived results and replot support remain for provenance. The legacy `skew-t-100d-baselines` alias still forwards to the corrected 200D configuration.
 
 All canonical benchmark kernels now use compiled sampling loops, including hit-and-run and the ordinary/spherical baselines. See [native implementation checks and measured speedups](docs/NATIVE_KERNELS.md) and [the HnR/NUTS audit](docs/HNR_NUTS.md).
+
+The [laptop comparison results](docs/COMPARISON_RESULTS.md) cover all eight Student-t target/VI/backend combinations, with full-precision exports and tuning limitations. These smaller runs do not establish universal rankings.
 
 ## Saved artifacts
 
@@ -130,9 +111,9 @@ checks, keeping the radial boxplots, MSE bars and sample-count/runtime figures.
 
 Workers stream draws through bounded buffers, preventing a second full-chain allocation at the end of sampling. Large reports process one chain and one cross-chain diagnostic quantity at a time, with progress messages and temporary disk storage. Saving chooses compression only when a bounded sample indicates useful space savings. Completed summaries can regenerate figures without repeating diagnostics. See [result processing](docs/RESULT_PROCESSING.md) for timing and storage details. Kernels, burn-in and retained-sample statistics are unchanged; new timed comparisons should rerun every method together because output streaming now occurs inside the production clock.
 
-Outside the compact 200D baseline report, summary files report chain estimates, MSE/RMSE and descriptive bootstrap intervals, functional MCSE, bulk/tail ESS, rank R-hat, NUTS divergences, tree saturation indicators, work counts, frozen tuning and timings. Unavailable diagnostics are null with an explanation. MSE is averaged over independent-chain squared errors. Posterior references remain finite Monte Carlo estimates, with their uncertainty reported.
+The general experiment reports, excluding the current comparison suite and the compact 200D baseline report, include chain estimates, MSE/RMSE and descriptive bootstrap intervals, functional MCSE, bulk/tail ESS, rank R-hat, NUTS divergences, tree saturation indicators, work counts, frozen tuning and timings. Unavailable diagnostics are null with an explanation. MSE is averaged over independent-chain squared errors. Posterior references remain finite Monte Carlo estimates, with their uncertainty reported.
 
-Each of the other skew-t runs, except the compact 200D baselines, also creates a supplementary `*_directional` figure. Radial functions cannot assess whether skewness is sampled correctly, so these check a bounded directional probability and a bounded directional mean against independent references.
+The general skew-t runs, excluding the current comparison suite and the compact 200D baselines, also create a supplementary `*_directional` figure. Radial functions cannot assess whether skewness is sampled correctly, so these check a bounded directional probability and a bounded directional mean against independent references. The current comparison suite reports radial estimation only; their tail and norm metrics do not establish better exploration of the skewed direction or overall mixing.
 
 The original Q–Q, radial boxplot and linear MSE figure families are restored,
 including both fixed-time and fixed-iteration comparisons. Additional directional
@@ -141,14 +122,14 @@ tables use two decimals, with scientific notation for MSE and small values.
 Integer sample counts stay exact; CSV and JSON files retain full numerical
 precision. See [the figure guide](docs/FIGURES.md).
 
-The two current 100D comparisons also export inexpensive empirical MSE
+The current comparisons also export inexpensive empirical MSE
 uncertainty summaries computed from per-chain squared errors. These describe
 the saved run; they are not formal 95% confidence intervals or uncertainty
 over refitting the maps. The t(3) norm has an infinite fourth moment, so its
 squared-error variance need not exist and empirical error bars can miss rare
 large errors. Keep this limitation in mind when comparing MSE across batches.
 
-For experiments other than the default 100D comparison, the **DCS map** selector offers **Möbius map** (the default VI fit of R, centre
+For the six other experiments, the **DCS map** selector offers **Möbius map** (the default VI fit of R, centre
 and Möbius parameters) and **Vanilla map** (fully untuned R=1, centre=0 and
 Möbius=0). Vanilla retains the experiment's β and skips map fitting entirely.
 Both choices keep proposal-scale warmup and freezing unchanged; SCS keeps its

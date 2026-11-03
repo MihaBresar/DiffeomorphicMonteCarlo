@@ -4,7 +4,7 @@ Both methods materialize the same 300-state scan and run the same vectorized
 radial bookkeeping. DCS evaluates both densities for admissible proposals;
 standard BW rejects outside-ball proposals and its separate reflected variant
 relocates them along the proposal chord. Compilation and
-shared separate step calibration are untimed; all production steps are frozen.
+separate step calibration are untimed; all production steps are frozen.
 """
 from functools import lru_cache
 import json
@@ -20,7 +20,29 @@ from .transforms import BallMap, mobius
 BATCH_SIZE = 300
 PREFIX_STRIDE = 100
 STEP_POLICY = 'common raw dual averaging of observed acceptance to 0.234 during separate warmup; smoothed final scale frozen'
+ACCEPTANCE_TUNING = 'indicator_dual_averaging_0234'
+BALL_TUNING = 'ball_esjd_pilot_v1'
+BALL_STEP_POLICY = ('Discarded-pilot squared jump distance in ball coordinates; '
+                    'up to eight rotating h/2, h, 2h triplet rounds within the existing warmup budget, then frozen')
 IMPLEMENTATION_REVISION = 'jax-dcs-exact-ball-v1'
+
+
+def resolve_step_tuning(config):
+    """Keep historical calibration unless a method explicitly opts into ball ESJD."""
+    policies = config.get('step_tuning_policies', {})
+    if not isinstance(policies, dict):
+        raise ValueError('step_tuning_policies must map methods to tuning policy identifiers')
+    for method, policy in policies.items():
+        if method not in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', 'SCS'):
+            raise ValueError(f'Unknown tuning method: {method}')
+        if policy not in (ACCEPTANCE_TUNING, BALL_TUNING):
+            raise ValueError(f'Unknown step tuning policy: {policy}')
+        if policy == BALL_TUNING and method != 'DCS-BW-reflect':
+            raise ValueError('Ball ESJD calibration is defined for reflected BW only')
+    selected = policies.get(config['algorithm'], ACCEPTANCE_TUNING)
+    if selected == BALL_TUNING and config['warmup'] < 3:
+        raise ValueError('Ball ESJD calibration requires at least three warmup transitions')
+    return selected
 
 
 def resolve_step_scale_ceiling(config):
@@ -190,7 +212,8 @@ def _radial_batch(block, projection, state, key, scale, thin, threshold):
 
 
 @lru_cache(maxsize=8)
-def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initial_scale, scale_ceiling=None):
+def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initial_scale, scale_ceiling=None,
+              tuning_policy=ACCEPTANCE_TUNING):
     """Compile both phases without consuming a chain's RNG or timing budget."""
     import jax
     import jax.numpy as jnp
@@ -198,7 +221,13 @@ def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initi
         json.loads(mapping_json), json.loads(spec_json), algorithm)
     if not np.isfinite(float(density(initial))) or not np.all(np.isfinite(np.asarray(projection(initial)))):
         raise ValueError('Nonfinite initial density or physical point')
-    burn = lambda state, key: _calibrate(block, state, key, warmup, initial_scale, scale_ceiling)
+    if tuning_policy == BALL_TUNING:
+        from .ball_tuning import calibrate_ball_esjd
+        burn = lambda state, key: calibrate_ball_esjd(block, state, key, warmup, initial_scale, scale_ceiling)
+    elif tuning_policy == ACCEPTANCE_TUNING:
+        burn = lambda state, key: _calibrate(block, state, key, warmup, initial_scale, scale_ceiling)
+    else:
+        raise ValueError(f'Unknown step tuning policy: {tuning_policy}')
     batch = lambda state, key, scale: _radial_batch(block, projection, state, key, scale, thin, threshold)
     device = jax.local_devices(backend='cpu')[0]
     initial, key, scale = jax.device_put((initial, jax.random.key(0), jnp.asarray(initial_scale)), device)
@@ -218,23 +247,37 @@ class _Matched:
         if int(mapping['dimension']) != int(spec['dimension']):
             raise ValueError('Map and target dimensions differ')
         scale_ceiling = resolve_step_scale_ceiling(config)
+        self.tuning_policy = resolve_step_tuning(config)
         self.initial_scale = float(config.get('initial_scale', .1))
         previous = _programs.cache_info().misses
-        burn, self.program, initial, compile_seconds = _programs(
+        arguments = (
             json.dumps(mapping, sort_keys=True), json.dumps(spec, sort_keys=True),
             config['algorithm'], config['warmup'], config['thin'],
             float(config.get('threshold', 50.)), self.initial_scale, scale_ceiling)
+        # Preserve the original compiled-program key and RNG path for controls.
+        if self.tuning_policy == BALL_TUNING:
+            arguments += (self.tuning_policy,)
+        burn, self.program, initial, compile_seconds = _programs(*arguments)
         self.compile_seconds = compile_seconds if _programs.cache_info().misses > previous else 0.
         key = jax.device_put(jax.random.key(seed), jax.local_devices(backend='cpu')[0])
         burn_key, self.key = jax.random.split(key)
         started = time.perf_counter()
-        self.state, scale, accepts = jax.block_until_ready(burn(initial, burn_key))
+        calibrated = jax.block_until_ready(burn(initial, burn_key))
         self.warmup_seconds = time.perf_counter() - started
+        self.tuning_metadata = {}
+        if self.tuning_policy == BALL_TUNING:
+            self.state, scale, accepts, history = calibrated
+            history = np.asarray(history)
+            if not np.all(np.isfinite(history)) or not np.all(np.isfinite(np.asarray(self.state))):
+                raise FloatingPointError('Nonfinite reflected-BW calibration')
+            self.tuning_metadata = _ball_tuning_metadata(history, float(scale), config['warmup'])
+        else:
+            self.state, scale, accepts = calibrated
         self.scale = float(scale)
         self._scale = scale
         self.warmup_acceptance = float(accepts) / config['warmup'] if config['warmup'] else None
         self.implementation = ('Original author JAX SCS transition' if config['algorithm'] == 'SCS'
-            else 'DCS JAX transition') + '; shared calibration, full-state scans and radial recording'
+            else 'DCS JAX transition') + '; separate calibration, full-state scans and radial recording'
 
     def batch(self):
         import jax
@@ -244,7 +287,35 @@ class _Matched:
 
 
 def _backend(mapping, config, seed):
-    return _Matched(mapping, config, seed)
+    calibration = _Matched(mapping, config, seed)
+    if config.get('dcs_backend', 'jax') == 'numba' and config['algorithm'] != 'SCS':
+        from .numba_radial import NumbaRadial
+        return NumbaRadial(mapping, config, seed, calibration)
+    return calibration
+
+
+def _ball_tuning_metadata(history, scale, warmup):
+    """Small, serializable pilot evidence; no retained samples enter selection."""
+    if history.ndim != 3 or history.shape[1:] != (3, 5) or len(history) == 0:
+        raise ValueError('Malformed ball tuning history')
+    if not np.all(np.isfinite(history)) or int(history[:, :, 1].sum()) != warmup:
+        raise ValueError('Ball tuning history does not account for its warmup budget')
+    if not np.all(history[:, :, 4].sum(axis=1) == 1.):
+        raise ValueError('Each ball tuning round must select exactly one candidate')
+    chosen = int(np.argmax(history[-1, :, 4]))
+    if not np.isclose(history[-1, chosen, 0], scale, rtol=1e-12, atol=0.):
+        raise ValueError('Frozen step differs from the selected ball pilot step')
+    names = ('lower_candidate_won_final_round', 'middle_candidate_won_final_round',
+             'upper_candidate_won_final_round')
+    status = names[chosen] if np.any(history[:, :, 2] > 0.) else 'no_positive_jump_observed'
+    rows = [dict(round=r+1, candidate=c, scale=float(values[0]), iterations=int(values[1]),
+                 ball_esjd=float(values[2]), acceptance=float(values[3]), selected=bool(values[4]))
+            for r, trials in enumerate(history) for c, values in enumerate(trials)]
+    return dict(tuning_history=rows, tuning_pilot_iterations=warmup,
+                tuning_rounds=len(history), tuning_selected_esjd=float(history[-1, chosen, 2]),
+                tuning_search_status=status,
+                tuning_note='Local finite-budget pilot search of squared ball movement per transition; '
+                            'not an optimum certificate or a radial-MSE criterion')
 
 
 def _validate(config):
@@ -257,6 +328,10 @@ def _validate(config):
             raise ValueError(f'{name} must be an integer')
     if config['warmup'] < 0 or config['thin'] < 1 or PREFIX_STRIDE % config['thin']:
         raise ValueError('Require nonnegative warmup and thin to be a positive divisor of 100')
+    if config.get('dcs_backend', 'jax') not in ('jax', 'numba'):
+        raise ValueError('dcs_backend must be jax or numba')
+    if config.get('dcs_backend') == 'numba' and config['algorithm'] == 'DCS-RWM':
+        raise ValueError('The optimized Numba comparison contains BW and reflected BW, not DCS-RWM')
 
 
 def _postburn(prefixes, norms, thin, threshold):
@@ -282,9 +357,11 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
     batch; the measured overshoot is always reported.
     """
     _validate(config)
+    tuning_policy = resolve_step_tuning(config)
     scale_ceiling = resolve_step_scale_ceiling(config)
     recorded_ceiling = float(np.exp(15.) if scale_ceiling is None else scale_ceiling)
     backend = _backend(mapping_dict, config, int(seed))
+    native = config.get('dcs_backend') == 'numba' and config['algorithm'] != 'SCS'
     thin, threshold = config['thin'], float(config.get('threshold', 50.))
     capacity, batches = 1024, 0
     prefix_buffer = np.empty((capacity * 3, 3), dtype=float)
@@ -333,9 +410,11 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         'warmup_iterations': config['warmup'], 'warmup_acceptance': backend.warmup_acceptance,
         'initial_scale': float(config.get('initial_scale', .1)), 'scale': float(backend.scale), 'final_scale': float(backend.scale),
         'frozen_scale': float(backend.scale), 'adaptation_during_sampling': False,
-        'step_policy': STEP_POLICY,
-        'target_acceptance': .234,
-        'common_cpu_backend': 'JAX',
+        'step_policy': BALL_STEP_POLICY if tuning_policy == BALL_TUNING else STEP_POLICY,
+        'tuning_policy': tuning_policy,
+        'target_acceptance': None if tuning_policy == BALL_TUNING else .234,
+        'common_cpu_backend': 'mixed: optimized Numba DCS, author JAX SCS' if config.get('dcs_backend') == 'numba' else 'JAX',
+        'backend': 'Numba' if native else 'JAX',
         'implementation_revision': config.get('implementation_revision', IMPLEMENTATION_REVISION),
         'boundary_policy': ('reflect_along_proposal_chord' if config['algorithm'] == 'DCS-BW-reflect'
                             else 'author_cap_stepout' if config['algorithm'] == 'SCS' else 'direct_rejection'),
@@ -344,7 +423,8 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         'proposal_generator': ('normal_d_plus_2_projection' if config['algorithm'] in ('DCS-BW', 'DCS-BW-reflect')
                                else 'author_tangent_normal' if config['algorithm'] == 'SCS'
                                else 'isotropic_normal'),
-        'common_statistic_policy': 'Full 300-state scans; physical projection and norm for every state, including rejection repeats',
+        'common_statistic_policy': ('All 300 post-MH states enter statistics; optimized DCS caches unchanged radii and accumulates without full-state output'
+                                    if native else 'Full 300-state scans; physical projection and norm for every state, including rejection repeats'),
         'accepted': int(totals[2]), 'acceptance': float(totals[2] / iterations),
         'postburn_accepted': int(sums[2]), 'postburn_acceptance': float(sums[2] / count),
         'tail_count': int(sums[0]), 'norm_sum': float(sums[1]),
@@ -355,11 +435,17 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         'estimator': 'all post-burn timed iterations, including rejection repeats; thinning affects saved traces only',
         'implementation': backend.implementation,
         'history_storage_bytes': int(prefix_buffer.nbytes + norm_buffer.nbytes),
-        'target_skew_cdf': 'normal', 'checkpoints': [],
+        'target_skew_cdf': 'normal' if config.get('target', {}).get('kind', 'skew_t') == 'skew_t' else None,
+        'checkpoints': [],
     }
+    record.update(getattr(backend, 'tuning_metadata', {}))
+    if native:
+        record['rng_note'] = 'Shared JAX calibration; independent domain-separated NumPy PCG64 production stream. Different backends preserve proposal laws, not bitwise production trajectories.'
+        record['calibration_backend'] = 'JAX, identical to the shared-framework comparison'
+        record['compilation_note'] = 'Recorded setup includes shared JAX calibration/scan compilation and native Numba compilation; all precede sampling.'
     if config['algorithm'] == 'SCS':
         from .scs_paper import UPSTREAM_COMMIT
         record['source_commit'] = UPSTREAM_COMMIT
-        record['rng_note'] = 'JAX PRNG for all methods; independent keys between warmup steps and production blocks preserve the transition law'
-        record['scs_implementation'] = 'Unmodified author rwm_bright_side_stepout; shared external step calibration and radial recording'
+        record['rng_note'] = 'SCS uses JAX PRNG; independent keys between warmup steps and production blocks preserve the transition law. Native DCS, when selected, uses a separate PCG64 production stream.'
+        record['scs_implementation'] = 'Unmodified author rwm_bright_side_stepout; recorded external step calibration and radial recording'
     return traces, record

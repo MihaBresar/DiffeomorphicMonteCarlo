@@ -43,21 +43,24 @@ class BoundaryComparisonTests(unittest.TestCase):
         a, b = original.configuration('paper'), boundary.configuration('paper')
         self.assertEqual(a['algorithms'], ['DCS-RWM', 'DCS-BW', 'SCS'])
         self.assertEqual(b['algorithms'], ['DCS-BW', 'DCS-BW-reflect', 'SCS'])
-        self.assertEqual(b['protocol'], 'timed-boundary-dcs-scs-v2')
-        self.assertEqual(b['step_scale_ceilings'], {'DCS-BW-reflect': 2.})
+        self.assertEqual(b['protocol'], 'timed-boundary-dcs-scs-v3')
+        self.assertEqual(b['step_tuning_policies'], {'DCS-BW-reflect': 'ball_esjd_pilot_v1'})
+        self.assertNotIn('step_scale_ceilings', b)
         self.assertNotIn('step_scale_ceiling', b)
         self.assertNotIn('step_scale_ceiling',a)
         for key in ('target','runs','time_budget','warmup','optimizer_steps','optimizer_samples',
-                    'initial_scale','step_policy','burnin_fraction','seed','fit_seed'):
+                    'initial_scale','burnin_fraction','seed','fit_seed'):
             self.assertEqual(a[key], b[key])
+        self.assertNotEqual(a['step_policy'], b['step_policy'])
 
     def test_ceiling_resolution_preserves_defaults_and_historical_scalar_limits(self):
         for method in boundary.METHODS:
             with self.subTest(method=method):
                 config = dict(boundary.configuration(), algorithm=method)
-                expected = 2. if method == 'DCS-BW-reflect' else None
-                self.assertEqual(timed.resolve_step_scale_ceiling(config), expected)
+                self.assertIsNone(timed.resolve_step_scale_ceiling(config))
                 historical = dict(config, step_scale_ceiling=3.)
+                self.assertEqual(timed.resolve_step_scale_ceiling(historical), 3.)
+                historical['step_scale_ceilings'] = {'DCS-BW-reflect': 2.}
                 self.assertEqual(timed.resolve_step_scale_ceiling(historical),
                                  2. if method == 'DCS-BW-reflect' else 3.)
                 historical.pop('step_scale_ceilings')
@@ -75,7 +78,7 @@ class BoundaryComparisonTests(unittest.TestCase):
                     timed.run_timed({}, {**config, **change}, 11)
                 backend.assert_not_called()
 
-    def test_v2_controls_reproduce_main_calibration_and_fixed_production_prefix(self):
+    def test_v3_controls_reproduce_main_calibration_and_fixed_production_prefix(self):
         # Use real 100D kernels and nontrivial maps. Equal-time stopping is not
         # deterministic; compare a fixed prefix to isolate tuning and RNG use.
         scs_paper._author()
@@ -104,6 +107,53 @@ class BoundaryComparisonTests(unittest.TestCase):
                         np.testing.assert_array_equal(old_prefixes, new_prefixes)
                         np.testing.assert_array_equal(old_norms, new_norms)
                         np.testing.assert_array_equal(before.state, after.state)
+
+    def test_ball_tuning_policy_and_warmup_validate_before_backend(self):
+        base = dict(algorithm='DCS-BW-reflect', time_budget=.01, warmup=100, thin=10,
+                    step_tuning_policies={'DCS-BW-reflect': timed.BALL_TUNING})
+        self.assertEqual(timed.resolve_step_tuning(base), timed.BALL_TUNING)
+        self.assertEqual(timed.resolve_step_tuning(dict(base, algorithm='SCS')), timed.ACCEPTANCE_TUNING)
+        for change in ({'step_tuning_policies': []},
+                       {'step_tuning_policies': {'DCS-BW-reflect': 'unknown'}},
+                       {'step_tuning_policies': {'SCS': timed.BALL_TUNING}},
+                       {'step_tuning_policies': {'typo': timed.ACCEPTANCE_TUNING}},
+                       {'warmup': 2}):
+            with self.subTest(change=change), patch.object(timed, '_backend') as backend:
+                with self.assertRaises(ValueError):
+                    timed.run_timed({}, {**base, **change}, 11)
+                backend.assert_not_called()
+
+    def test_reflected_pilot_metadata_and_frozen_production(self):
+        scs_paper._author()
+        import jax
+        config = dict(boundary.configuration(overrides={'warmup': 99, 'thin': 10}),
+                      algorithm='DCS-BW-reflect', dimension=5, nu=2., alpha={},
+                      target=dict(kind='skew_t', dimension=5, nu=2., alpha={}))
+        mapping = BallMap(5, scale=np.sqrt(2.)).parameters()
+        backend = timed._Matched(mapping, config, 7721)
+        history = backend.tuning_metadata['tuning_history']
+        self.assertEqual(sum(row['iterations'] for row in history), 99)
+        self.assertEqual(backend.tuning_policy, timed.BALL_TUNING)
+        self.assertEqual(backend.warmup_acceptance, 1.)
+        self.assertLess(backend.scale, np.exp(15.))
+        self.assertEqual(sum(row['selected'] for row in history), backend.tuning_metadata['tuning_rounds'])
+        block, projection, _, _ = timed._components(mapping, config['target'], 'DCS-BW-reflect')
+        frozen = backend.scale
+        _, subkey = jax.random.split(backend.key)
+        expected, _ = block(backend.state, subkey, 300, frozen)
+        prefixes, norms = backend.batch()
+        np.testing.assert_array_equal(backend.state, expected[-1])
+        np.testing.assert_allclose(norms, np.linalg.norm(projection(expected), axis=1)[9::10], rtol=1e-12)
+        self.assertEqual(backend.scale, frozen)
+        with patch.object(timed, '_backend', return_value=backend), \
+                patch.object(timed.time, 'perf_counter', side_effect=[0., .1]), \
+                patch.object(timed.time, 'process_time', side_effect=[0., .01]):
+            _, record = timed.run_timed(mapping, config, 7721)
+        self.assertIsNone(record['target_acceptance'])
+        self.assertEqual(record['tuning_policy'], timed.BALL_TUNING)
+        self.assertEqual(record['tuning_history'], history)
+        self.assertEqual(record['step_scale_ceiling'], np.exp(15.))
+        self.assertFalse(record['adaptation_during_sampling'])
 
     def test_records_use_resolved_method_ceiling(self):
         class Fake:

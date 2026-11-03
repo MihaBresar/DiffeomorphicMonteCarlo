@@ -1,11 +1,25 @@
-# One 100D skewed-t comparison
+# Historical three-method 100D skewed-t comparison
 
-The default launcher experiment compares **DCS-RWM, DCS-BW and SCS at the same
+**This page preserves an earlier protocol.** It is no longer a launcher
+choice. The current [configurable comparisons](COMPARISONS.md) are the
+four-method JAX suite (DCS-RWM, DCS-BW, SCS and DCS-BW-reflect) and the
+optimized Numba BW/reflected-BW comparison with unchanged author SCS. Both
+offer 100D and 500D skewed t targets, each with
+VI on or off for both map families. All seven now uses the four-method JAX
+suite on 100D skewed t with its selected VI policy.
+
+The historical `skew-t-100d-fixed` CLI identifier and
+`scripts/reproduce_scs_100d.py` remain available. Existing reports can still
+be regenerated with `run_experiment.py --plot-only SAVED_RUN`; their protocol
+and numerical results remain historical. The following description concerns
+that earlier three-method comparison, including its recorded revisions.
+
+The earlier launcher experiment compares **DCS-RWM, DCS-BW and SCS at the same
 sampling time per chain** on the existing 100-dimensional normal-CDF-skewed
 Student-t target, with ν=3 and α=(100,−100,0,…). It estimates P(‖X‖≥50) and E‖X‖
 against exact radial truth. All three methods start at the physical vector of
 ones, using the correct inverse map. The protocol identifier is
-`timed-matched-dcs-scs-v3`. Current runs also record implementation revision
+`timed-matched-dcs-scs-v3`. Its latest archived version records implementation revision
 `jax-dcs-exact-ball-v1`, distinguishing the DCS implementation improvements
 below from the initial JAX implementation of this same experimental protocol.
 
@@ -25,6 +39,19 @@ methods and chains can produce different iteration counts.
 Quick check uses abbreviated fitting and cannot support a performance ranking.
 Fifty independent chains improve precision of the empirical error assessment;
 they do not remove bias caused by insufficient exploration within a chain.
+
+Both reported functions depend only on the radius. For this odd skewing
+argument, the skew factors at x and −x sum to two, so these radial truths also
+equal those of the symmetric t target. The figures therefore compare radial
+estimation; they cannot establish correct exploration of the skewed direction
+or general mixing superiority. Such a claim would require additional
+direction-sensitive functionals.
+
+See the [comparison audit](../validation/current_comparison_fairness_audit.json)
+for independent numerical checks, author-code provenance and remaining
+limitations. It covers this main comparison and the preceding boundary v2,
+not the other six production experiments. Current boundary v3 replaces its
+reflected-only step bound with [ball-movement calibration](BOUNDARY_100D.md).
 
 ## Matched map fitting and separate step calibration
 
@@ -46,6 +73,9 @@ Fitting uses the same target as production, without the old clipped-CDF or
 physical-coordinate-clipping objectives. Both fitted maps remain fixed during
 warmup and sampling. Parameters, optimizer settings, fitting costs and training
 histories are saved, so the comparison is conditional on the recorded fits.
+Equal fitting budgets do not guarantee equally good fits. The stored training
+losses omit family-specific base-density constants, so their absolute levels
+must not be compared across ball and sphere maps as normalized KL values.
 
 Every chain starts with proposal scale 0.10 and calibrates it with the same raw
 dual-averaging rule toward acceptance 0.234 during the separate warmup listed
@@ -54,6 +84,9 @@ rule. **Each resulting scale is frozen before timed sampling starts.** The map
 and step remain fixed during the timed first-third burn-in and all subsequent
 estimation. Matching this rule does not assume that 0.234 is optimal for each
 method, or that equal numerical step sizes have equal geometric meanings.
+The average warmup acceptance is not a check of the final frozen step: inspect
+production acceptance separately. A claim about optimally tuned methods would
+need a common, prespecified tuning-sensitivity study for all methods.
 
 DCS-RWM proposes isotropic Gaussian increments; DCS-BW proposes uniformly in a
 Euclidean ball. Both reject proposals outside the open unit ball. SCS uses its
@@ -199,7 +232,14 @@ to a 0.05-second smoke check; use the longer presets for comparisons.
 Parallel chains run in synchronized waves, with only one method sampling at a
 time. Method order rotates between waves. Each method receives identical wave
 sizes and CPU allocation; Windows/Linux affinity fills physical cores before
-SMT siblings. A 50-chain run can use 32 workers on the Ryzen 9 9950X3D. Sequential
+SMT siblings. Execution revision `matched-wave-cpu-v2` uses a new smaller pool
+for a partial final wave: a 50-chain/32-worker run uses the same first 18 CPU
+slots for every method in its last wave. Expected CPU sets and actual worker
+assignments are recorded and checked; inconsistent pinned allocations fail.
+Earlier revisions could use different subsets of the 32 CPUs in that last
+wave, so rerun every method together for corrected timing comparisons.
+On macOS, allocation is explicitly OS-managed rather than strictly pinned.
+A 50-chain run can use 32 workers on the Ryzen 9 9950X3D. Sequential
 runs provide the clearest isolated timing comparison; parallel timings describe
 the recorded concurrent CPU workload. Keep the machine otherwise idle when
 measuring speed.
@@ -220,19 +260,20 @@ counts, per-chain errors, elapsed times and tuned parameters. Each independent
 chain has equal weight in MSE, even when iteration counts differ. Variance uses
 divisor n, so **MSE = empirical bias² + variance**, up to floating-point rounding.
 
-Use **Start.bat → Set up environment → 100D skewed t (ν=3) → Start run** on
-Windows, or **Start.command** on macOS. Run environment setup again after an
-update. A command-line run must use a fresh output folder:
+The former launcher entry has been replaced; use
+[the current no-command instructions](CLICK_TO_RUN.md) for the configurable
+suite. To reproduce this historical three-method protocol from the command
+line, choose a fresh output folder:
 
 ```bash
 python run_experiment.py skew-t-100d-fixed --preset paper --workers 32 --output-dir results/scs-100d-timed-paper
 ```
 
 The historical `skew-t-100d-fixed` identifier is retained for compatibility;
-its default protocol now fixes **time**. `--time-budget` overrides seconds per
-chain. The launcher and compatibility entry points route this identifier to
-the same runner. Rerun this one experiment for the current matched comparison;
-existing sampling results cannot be converted by replotting.
+its protocol fixes **time**. `--time-budget` overrides seconds per chain.
+It is separate from the current `sampler-comparison` identifier. Replotting
+preserves the saved protocol; it cannot convert existing sampling results
+into a new comparison.
 
 ## Initial JAX implementation: short matched checks, 3 November 2026
 

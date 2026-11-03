@@ -52,9 +52,11 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 
 1. Click **Set up environment** and wait for **Environment ready**. This installs
    the pinned packages inside this project and can take several minutes.
-2. Leave **100D skewed t (ν=3): DCS-RWM, DCS-BW and SCS** and **Quick
-   check** selected, choose **CPU workers** (start with 2–4), and click **Start
-   run**. Quick-check graphs verify execution; they are not publication results.
+2. Leave **Four samplers: DCS-RWM, DCS-BW, SCS and DCS-BW-reflect** and
+   **Quick check** selected. Choose a **Target distribution** and whether to
+   use **Variational map fitting — both DCS and SCS**. Choose **CPU workers**
+   (start with 2–4), then click **Start run**. Quick-check graphs verify
+   execution; they are not publication results.
 3. After the quick check succeeds, choose **Smaller reproduction** or **Full
    paper settings** and click **Use all CPU threads**, then **Start run** again.
    On the Ryzen 9 9950X3D, this allows up to 32 workers with SMT enabled.
@@ -64,35 +66,40 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
    open `paper_values.html` to read estimates, MSE, sample counts and timing
    values. The page uses two decimals; its CSV downloads retain full precision.
 
-See [the full protocol](SCS_100D.md) for matched fitting and step calibration, the unmodified SCS author transition, and separate timing clocks.
+The two current comparison choices are:
 
-To compare boundary handling, choose **100D boundary comparison** instead.
-It compares standard DCS-BW, reflected-chord DCS-BW, and author SCS. The current
-v2 protocol preserves ordinary BW and SCS's original step calibration; only
-reflected BW has an extra step ceiling of 2 because its acceptance target can
-be unattainable. See the [separate protocol](BOUNDARY_100D.md). Its older
-validation table used a common ceiling of 2 and is labelled historical v1.
+- **Four samplers: DCS-RWM, DCS-BW, SCS and DCS-BW-reflect** runs all four in
+  the same JAX CPU framework, with full-state recording and common radial
+  processing.
+- **Optimized Numba DCS-BW and reflected BW versus SCS** runs the two ball-walk
+  methods in optimized Numba loops against the unchanged author SCS JAX
+  transition. DCS reuses the same JAX step calibration, then caches densities
+  and radii and accumulates estimates inside the sampling loop. This measures
+  the selected implementations, including their different processing costs.
 
-For a new full boundary comparison on Windows, download the **latest ZIP**,
-extract it into a new folder, open **Start.bat**, and set up the environment.
-Select **100D boundary comparison → Full paper settings → 32 CPU workers**
-on the Ryzen 9 9950X3D. Choose **Original seeds (batch 0)** or **Fresh batch 1–5**,
-then click **Start run**. Rerun all three methods together; old tables are
-retained but do not evaluate the revised boundary protocol.
+Each choice offers **100D skewed Student-t, ν=3** and **500D skewed Student-t,
+ν=3**. Both targets use DCS β=2.
+See [the current comparison protocol](COMPARISONS.md) for target definitions,
+thresholds, tuning and timing policies.
 
-Both 100D comparisons offer a seed-batch selector. **Original seeds (batch 0)** uses
+Use **With VI** to fit both map families with the same training resources.
+**Without VI** uses unit scale, zero centre and zero
+deformation for both families. In either case every method still receives
+separate proposal-step tuning: original methods target acceptance 0.234;
+reflected BW selects by squared movement in the ball. Sampling steps stay
+fixed. The reflected candidates and scores appear in `reflected_tuning.csv`;
+there is no special upper step bound of 2.
+
+Both current comparisons offer a seed-batch selector. **Original seeds (batch 0)** uses
 sampling seed 901001; **Fresh batch 1–5** use new sampling and warmup streams
-while keeping map-fitting seed 42 fixed. Choose a different batch to check
+while keeping map-fitting seed 42 fixed when VI is on. Choose a different batch to check
 whether an observed MSE ordering persists. Repeating the same batch reuses
 its streams, but timing can change how many iterations finish and where
 first-third burn-in ends, so counts and estimates can still differ. These
-batches assess sampling variability conditional on the fitted maps, not
-variability from fitting new maps. The main comparison's sampling and
-calibration protocol is unchanged.
-
-The default comparison contains exactly **DCS-RWM, DCS-BW and SCS** on one
-100D skewed Student-t target with **3 degrees of freedom**. Each method runs
-for the same production sampling time:
+batches assess sampling variability conditional on the selected maps, not
+variability from fitting new maps. Keep target, VI choice, run size and worker
+count the same when comparing methods. Each method runs for the same
+production sampling time:
 
 | Run size | Chains per method | Sampling seconds per chain |
 | --- | ---: | ---: |
@@ -106,25 +113,25 @@ The exact-value exports also include inexpensive empirical MSE uncertainty
 summaries from the per-chain errors. Treat these as descriptive; they are not
 formal 95% confidence intervals, and the heavy tail of the norm statistic
 makes rare large errors especially important.
-The comparison fits both map families with the same training budget and tunes
-all three proposal steps automatically, then freezes them for sampling. The
-**DCS map** selector is disabled for this matched protocol.
-The three methods run separately with the same worker setting. Selecting
+Methods run separately with the same worker setting. Selecting
 32 workers allows 2, 20 or 32 simultaneous chains in Quick check, Smaller
 reproduction or Full paper settings respectively; it does not multiply the
 chain count by the number of methods.
 
 The other original experiments remain in the Experiment menu. **All seven
-experiments + posterior table** runs the full collection. The former map and
-step-size diagnostic audits are no longer launcher choices; their existing
-scripts, documentation and saved results remain available for reference.
+experiments + posterior table** includes the four-sampler JAX comparison on
+the 100D skewed-t target and the other six experiments. Its VI selector controls
+both maps in that comparison. Run the optimized Numba and 500D
+comparisons individually. The former three-method 100D and boundary choices
+have been removed from the launcher; their command-line scripts and saved-report
+regeneration remain available for historical compatibility.
 
 For large posterior runs, the log distinguishes sampling, saving and
 convergence diagnostics. A chain can finish sampling before its file and
 report are ready. These stages now use bounded memory and report their
 progress; see [result processing](RESULT_PROCESSING.md).
 
-For the other experiments, the **DCS map** selector offers **Möbius map**, which
+For the other experiments, the **DCS map for the other experiments** selector offers **Möbius map**, which
 fits R, centre and Möbius parameters by VI, and **Vanilla map**, which uses
 untuned R=1, centre=0 and Möbius=0. Both keep the experiment's β and the same
 proposal-scale warmup. The identity maps in Eight Schools and GARCH are

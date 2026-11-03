@@ -1,4 +1,4 @@
-"""Original-style 100D SCS comparison figures and exact numerical tables.
+"""Original-style sampler comparison figures and exact numerical tables.
 
 Rendering never selects methods, changes tuning, or substitutes thinned
 estimates for the recorded all-iteration chain means.
@@ -71,7 +71,9 @@ def _table(rows):
     return '<div class="table-wrap"><table><thead><tr>'+header+'</tr></thead><tbody>'+body+'</tbody></table></div>'
 
 
-def _policy(name, timed=False, matched=False):
+def _policy(name, timed=False, matched=False, ball_esjd=False):
+    if ball_esjd and name == 'DCS-BW-reflect':
+        return 'Ball-movement pilot selection by mean squared jumping distance; selected step frozen during timed sampling'
     if matched:
         return 'Shared dual-averaging step calibration toward 0.234, then frozen during timed sampling'
     if timed:
@@ -113,13 +115,19 @@ def render_report(root, summary):
     figures = root/'figures'
     figures.mkdir(exist_ok=True)
     cases, config = summary['cases'], summary['config']
-    boundary = config.get('protocol') in ('timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2')
+    suite = config.get('protocol') in ('timed-sampler-comparison-v1', 'timed-numba-comparison-v1')
+    optimized = config.get('protocol') == 'timed-numba-comparison-v1'
+    vi_mode = config.get('vi', 'on')
+    boundary = config.get('protocol') in ('timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2', 'timed-boundary-dcs-scs-v3')
     restored_controls = config.get('protocol') == 'timed-boundary-dcs-scs-v2'
-    matched = config.get('protocol') == 'timed-matched-dcs-scs-v3' or boundary
+    ball_esjd = config.get('protocol') == 'timed-boundary-dcs-scs-v3' or suite
+    matched = config.get('protocol') == 'timed-matched-dcs-scs-v3' or boundary or suite
     timed = config.get('mode') == 'time' or config.get('protocol') == 'timed-dcs-author-scs-v2' or matched
     if not cases or any(name not in METHODS for name in cases):
         raise ValueError('Expected completed DCS-RWM, DCS-BW, or SCS cases')
-    names = [name for name in METHODS if name in cases]
+    names = [name for name in (config.get('algorithms', METHODS) if suite else METHODS) if name in cases]
+    if len(names) != len(cases) or len(set(names)) != len(names):
+        raise ValueError('Configured methods must list every completed case exactly once')
     counts = {name: _counts(cases[name], config, timed) for name in names}
     truth = _pair(summary['truth'])
     means = {name: _means(cases[name]) for name in names}
@@ -131,12 +139,17 @@ def render_report(root, summary):
             raise ValueError('MSE, squared bias, and variance must be nonnegative')
         if not np.allclose(mses[name], biases[name]+variances[name], rtol=1e-9, atol=1e-15):
             raise ValueError('Recorded MSE must equal empirical squared bias plus variance (ddof=0)')
-    target = summary.get('target', {})
+    target = config.get('target', summary.get('target', {}))
     dimension, nu = target.get('dimension', 100), target.get('nu', 3.)
     threshold = config.get('threshold', 50.)
     smoke = config.get('preset') == 'quick'
     title = ('EXECUTION CHECK — ' if smoke else '')+f'{dimension}D skewed Student-t, ν = {nu:g}'
-    if boundary:
+    if suite:
+        target_title = config.get('target_title') or f'{dimension}D skewed Student-t, ν = {nu:g}'
+        title = ('EXECUTION CHECK — ' if smoke else '') + target_title
+        title += ' — optimized Numba DCS / author SCS' if optimized else ' — four samplers, JAX'
+        title += ' — VI '+str(vi_mode)
+    elif boundary:
         title += ' — boundary comparison'
     budget = (f"{config['runs']} chains per method; {number(config['time_budget'])} s of timed sampling per chain; "
               'first third of generated iterations discarded' if timed else
@@ -152,7 +165,12 @@ def render_report(root, summary):
                        'the ceiling may bind. Sampling steps stay fixed.')
     if restored_controls:
         tuning_note = 'Original BW/SCS calibration retained; reflected BW alone has step ceiling 2.00. All tune toward 0.234, then freeze.'
-    metric_labels = (f'P(‖X‖ ≥ {threshold:g})', 'E[‖X‖]')
+    if ball_esjd:
+        tuning_note = 'BW/SCS retain acceptance calibration; reflected BW uses ball-movement pilots. Equal warmup budgets; all sampling steps frozen.'
+    metric_labels = (f'P(‖X‖ ≥ {number(threshold) if suite else format(threshold, "g")})', 'E[‖X‖]')
+    if suite:
+        tuning_note = ('VI '+str(vi_mode)+' for both maps. Acceptance calibration for original methods; '
+                       'ball-movement pilots for reflected BW; all steps frozen.')
     x = np.arange(1, len(names)+1)
     colors = [COLORS[name] for name in names]
     figure_names = []
@@ -189,8 +207,9 @@ def render_report(root, summary):
         ax.ticklabel_format(axis='y', style='plain', useOffset=False)
     comparison_title = ('Boundary Handling: Performance & Mean Squared Error' if boundary else
                         'Performance & Mean Squared Error Comparison')
+    comparison_target_title = target_title if suite else f'{dimension}D skewed Student-t, ν = {nu:g}'
     fig.suptitle(('EXECUTION CHECK — ' if smoke else '')+comparison_title+'\n'+
-                 f'{dimension}D skewed Student-t, ν = {nu:g}', fontsize=14, fontweight='bold')
+                 comparison_target_title, fontsize=14, fontweight='bold')
     fig.text(.5, .079, budget+'.', ha='center', fontsize=9)
     fig.text(.5, .049, tuning_note+' '+estimation_note,
              ha='center', fontsize=9)
@@ -334,13 +353,13 @@ def render_report(root, summary):
         fig.tight_layout(rect=(0, .12, 1, .9))
         save(fig, 'scs_100d_prefix_mse')
 
-    case_rows, chain_rows = [], []
+    case_rows, chain_rows, tuning_rows, tuning_summaries = [], [], [], []
     for name in names:
         case = cases[name]
         count = counts[name]
         per_chain = count['generated'][0] if len(set(count['generated'])) == 1 else 'varies; see chain table'
         retained = (count['retained'][0] if len(set(count['retained'])) == 1 else 'varies; see chain table')
-        row = {'method': name, 'production_step_policy': _policy(name, timed, matched), 'chains': case['chains'],
+        row = {'method': name, 'production_step_policy': _policy(name, timed, matched, ball_esjd), 'chains': case['chains'],
                'iterations_per_chain': per_chain, 'mean_iterations': count['mean_generated'],
                'total_iterations': case['total_iterations'],
                'mean_estimation_iterations': count['mean_used'], 'total_estimation_iterations': sum(count['used']),
@@ -350,6 +369,9 @@ def render_report(root, summary):
                'mean_seconds': case['mean_seconds'], 'median_seconds': case['median_seconds'],
                'iterations_per_second': case['iterations_per_second'],
                'mean_acceptance': case['mean_acceptance'], 'final_scales': case['final_scales']}
+        if suite:
+            row.update(target=target_title, dimension=dimension, vi=vi_mode, dcs_beta=config.get('beta'),
+                       execution_backend='Numba' if optimized and name != 'SCS' else 'JAX')
         for metric, key in enumerate(METRICS):
             row[key+'_truth'] = truth[metric]
             row[key+'_mse'] = mses[name][metric]
@@ -365,7 +387,18 @@ def render_report(root, summary):
             raise ValueError('Each chain must have exactly one record')
         for index, estimate in enumerate(means[name]):
             row = dict(records[index]) if records else {'chain': index}
-            row.update(method=name, production_step_policy=_policy(name, timed, matched))
+            history = row.pop('tuning_history', None)
+            row.update(method=name, production_step_policy=_policy(name, timed, matched, ball_esjd))
+            if ball_esjd and name == 'DCS-BW-reflect':
+                for pilot in history or []:
+                    tuning_rows.append(dict(method=name, chain=row['chain'], seed=row.get('seed'),
+                        **{key: pilot.get(key) for key in ('round', 'candidate', 'scale', 'iterations',
+                                                         'ball_esjd', 'acceptance', 'selected')}))
+                tuning_summaries.append({'method': name, 'chain': row['chain'],
+                    'warmup_iterations': row.get('warmup_iterations', config['warmup']),
+                    'frozen_step': row.get('frozen_scale', row.get('final_scale')),
+                    'selected_ball_esjd': row.get('tuning_selected_esjd'),
+                    'search_status': row.get('tuning_search_status')})
             row.setdefault('iterations', count['generated'][index])
             row.setdefault('discarded_iterations', count['discarded'][index])
             row.setdefault('estimation_iterations', count['used'][index])
@@ -409,6 +442,8 @@ def render_report(root, summary):
         csvs['scs_100d_prefix_mse.csv'] = prefix_rows
     if setup_rows:
         csvs['setup_times.csv'] = setup_rows
+    if tuning_rows:
+        csvs['reflected_tuning.csv'] = tuning_rows
     for filename, rows in csvs.items():
         _write_csv(root/filename, rows)
 
@@ -437,7 +472,7 @@ def render_report(root, summary):
             'The sample-count panel reports all generated iterations. Exact generated, discarded and estimation counts are listed for every chain below. Matching tuning rules does not assert that acceptance 0.234 is optimal for every method; the frozen steps differ because their geometries differ.',
         ]
         notes[7] = 'The unmodified author SCS transition is called directly under the common benchmark fitting and tuning protocol. DCS uses the same compiled scan and recording structure. All methods sample the same normal-CDF-skewed Student-t target at ν = 3; this is not a literal reproduction of the SCS publication target, which uses a Student-t CDF.'
-        if config.get('implementation_revision') == 'jax-dcs-exact-ball-v1':
+        if config.get('implementation_revision') == 'jax-dcs-exact-ball-v1' and not suite:
             notes[2] = 'Both map families use the same fresh-batch reverse-KL fitting framework, optimizer budget, Adam updates and gradient clipping. All three samplers use compiled JAX CPU scans and the same full-state recording policy. DCS rejects outside-ball proposals before either density evaluation and recomputes both current and proposed densities for every admissible proposal. Physical projection and radial estimation run after each batch for every method. DCS-RWM and DCS-BW share the ball map.'
             notes.append('This implementation generates the same uniform-ball BW proposal distribution from d+2 Gaussian draws and simplifies the β=2 map using an exact Möbius identity. The BW random-number sequence for a given seed changes, while its proposal law is preserved. The author SCS transition, shared fitting and tuning budgets, recording and timing remain unchanged.')
     if boundary:
@@ -446,18 +481,73 @@ def render_report(root, summary):
             notes[1] += ' All three methods have a common upper step limit of '+number(config['step_scale_ceiling'])+'.'
         if restored_controls:
             notes[1] += ' Ordinary BW and SCS retain exactly the original main-comparison calibration, including its existing numerical guard exp(15). Only reflected BW has a step ceiling of 2. This method-specific constraint is explicit because its acceptance target can be unattainable; it is not a claim of optimal tuning.'
+        if ball_esjd:
+            notes[1] = 'Ordinary BW and SCS retain their original separate acceptance-target 0.234 calibration. Reflected BW spends the same warmup transition budget on ball-movement pilots at h/2, h and 2h in up to eight rounds, rotating candidate order. It selects by observed mean squared displacement inside the ball, with rejected moves contributing zero. Every method freezes its selected step before timed sampling; the first third of timed iterations is then discarded.'
+            notes[3] = 'The sample-count panel reports all generated iterations. Exact generated, discarded and estimation counts are listed below. Reflected BW uses a different tuning objective, with no reflected-only geometric step ceiling; only the numerical log-step guard of 15 remains. Equal warmup transition budgets do not establish equally effective or optimal tuning.'
+            notes[7] = 'The unmodified author SCS transition is called directly with the recorded benchmark fitting and acceptance calibration. Both BW variants share their fitted map; reflected BW uses its recorded ball-movement pilot rule. All methods sample the same normal-CDF-skewed Student-t target at ν = 3; this does not reproduce the SCS publication target, which uses a Student-t CDF.'
         notes[2] = 'Standard DCS-BW and DCS-BW-reflect share the same fitted ball map and initial physical point. The reflected variant folds an outside proposal back along its chord, then applies the transformed-density Metropolis test. Author SCS keeps its original cap step-out. Map fitting, recording and time budgets are matched.'
         notes[5] = 'The setup table reports fitting once per map; both BW variants share the ball fit. Compilation and step calibration are excluded from the sampling clock for all methods.'
         notes.append('Reflected-chord BW is a separate reversible kernel, not literal SCS step-out or specular billiards. No clipping onto the ball boundary is used. A numerical invalid endpoint becomes a rejected move.')
         reflected = cases.get('DCS-BW-reflect', {})
-        if any(row.get('scale_ceiling_reached') for row in reflected.get('records', [])):
+        if ball_esjd:
+            notes.append('The pilot score measures movement in ball coordinates, not production MSE or radial-estimation efficiency. A finite noisy local search is not a proof of an optimal scale. All pilot observations are discarded and the selected scale is fixed throughout production. The pilot table records every tested candidate; selected flags identify the winner within each round.')
+            if any(row.get('scale_ceiling_reached') for row in reflected.get('records', [])):
+                notes.append('Reflected BW reached the numerical step-size guard in at least one chain. Inspect the saved pilot candidates and search status; this is not evidence of successful or optimal tuning.')
+        elif any(row.get('scale_ceiling_reached') for row in reflected.get('records', [])):
             notes.append('Reflected BW reached '+('its method-specific' if restored_controls else 'the common')+' step-size ceiling in at least one chain. Its acceptance target may be unattainable; do not interpret saturation as successful calibration. Inspect final scales and acceptance rates.')
+    if suite:
+        acceptance_methods = ('DCS-RWM, ordinary DCS-BW and SCS' if 'DCS-RWM' in names
+                              else 'Ordinary DCS-BW and SCS')
+        notes[1] = (acceptance_methods+' use separate acceptance-target 0.234 calibration. '
+                    'Reflected BW uses its same warmup-transition budget to select by actual squared movement in the ball, '
+                    'including zero movement after rejection. The selected steps are frozen before timing; '
+                    'the first-third timed burn-in is additional. Equal resources do not mean identical or optimal tuning criteria.')
+        notes[2] = ('VI is enabled for both map families: they receive the same optimizer and fresh-draw budgets; '
+                    'all DCS methods share the ball map. Maps remain fixed after fitting.' if vi_mode == 'on' else
+                    'VI is disabled for both map families: unit scale, zero centre and zero deformation. '
+                    'DCS retains the target-specific radial exponent and SCS retains latitude 1.1. '
+                    'No fitting draws or optimization are used; proposal-step tuning remains enabled for every method.')
+        notes[3] = ('Every post-burn-in iteration contributes equally to the radial estimates, including rejected repeats. '
+                    'Saved trace thinning does not change those estimates. Counts and full-precision errors are exported.')
+        notes[5] = ('Map fitting, compilation and step calibration are reported separately and excluded from production timing. '
+                    'All DCS methods share one ball map; SCS uses the recorded sphere map.')
+        notes[7] = ('Every method samples the same recorded target: '+target_title+'. This is a benchmark of radial '
+                    'tail-probability and mean-norm estimation, not a reproduction of the SCS publication figures or '
+                    'a general mixing guarantee. The unmodified author SCS transition is retained.')
+        if optimized:
+            notes.append('Implementation comparison: DCS-BW and reflected BW use optimized Numba loops with cached '
+                         'current density and radius, fused radial accumulation and no full physical-state recording. '
+                         'SCS uses its unmodified author JAX transition and full-state scan. DCS uses the same JAX pilot '
+                         'calibration as the common-framework mode, then hands its frozen state and step to Numba. '
+                         'The 300-transition timing batches, statistic definitions and first-third discard are common. '
+                         'This compares the recorded implementations; it does not isolate the geometric algorithm alone.')
+        else:
+            notes.append('Common-framework comparison: every method uses JAX CPU scans with full-state recording and '
+                         'the same 300-transition timing batches and radial reduction. Outside-ball rejections can skip '
+                         'density evaluation in ordinary BW/RWM; this is part of their specified transition cost.')
+        notes.append('Reflected BW keeps the reversible chord-fold proposal and its Metropolis correction. Its '
+                     'ball-movement pilot search uses up to eight rotating h/2, h, 2h rounds with no special bound of 2. '
+                     'A finite noisy local search does not certify an optimal step or optimal radial MSE. '
+                     'Every trial is recorded in reflected_tuning.csv; a final-round edge winner is reported explicitly.')
     notes.append('Empirical MSE MCSE is the sample standard deviation of chain squared errors divided by the square root of the number of chains. Largest-chain error share measures how much one chain contributes to total squared error. Paired differences align methods by saved seed; negative differences favor the named method over SCS. These are descriptive, conditional on the fitted maps, not formal confidence intervals or convergence diagnostics. Heavy-tailed norm errors can make variance-based uncertainty unreliable; fresh seed batches are needed to assess repeatability.')
     notes += [summary[key] for key in ('target_note', 'mse_note', 'time_scope') if isinstance(summary.get(key), str)]
     warning = '<p class="warning">Quick execution check only — do not interpret sampler rankings.</p>' if smoke else ''
+    guard_hits = [(name, [row for row in cases[name].get('records', []) if row.get('scale_ceiling_reached')])
+                  for name in names]
+    guard_hits = [(name, rows) for name, rows in guard_hits if rows]
+    if guard_hits:
+        numerical = all(np.isclose(row.get('step_scale_ceiling', 0.), np.exp(15.), rtol=1e-10, atol=0.)
+                        for _, rows in guard_hits for row in rows)
+        heading = 'Numerical step-size guard reached.' if numerical else 'Recorded step-size limit reached.'
+        details = '; '.join(f'{name}: {len(rows)}/{cases[name]["chains"]} chains' for name, rows in guard_hits)
+        warning += ('<p class="warning"><strong>'+heading+'</strong> '+html.escape(details)+'. '
+                    'This records calibration saturation, not evidence of an optimal step. '
+                    'Inspect the frozen steps and production acceptance before interpreting comparisons.</p>')
     page = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>100D SCS comparison</title><style>body{font:15px/1.55 system-ui,sans-serif;max-width:1450px;margin:auto;padding:28px;color:#24354b;background:#f6f8fb}h1,h2{line-height:1.2}h2{margin-top:32px}a{color:#5a429c}figure{margin:24px 0;padding:10px;background:white;border-radius:8px}img{max-width:100%;height:auto}figcaption{font-size:13px;color:#566579}.table-wrap{overflow:auto;background:white}table{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}td,th{padding:8px;border:1px solid #dee4ee;text-align:left;white-space:nowrap}td{font-family:ui-monospace,monospace}th{background:#eaf0f8}.warning{padding:12px;background:#fff0cf;border-left:4px solid #a4670d}li{margin-bottom:8px}</style></head><body>'''
+<title>Sampler comparison</title><style>body{font:15px/1.55 system-ui,sans-serif;max-width:1450px;margin:auto;padding:28px;color:#24354b;background:#f6f8fb}h1,h2{line-height:1.2}h2{margin-top:32px}a{color:#5a429c}figure{margin:24px 0;padding:10px;background:white;border-radius:8px}img{max-width:100%;height:auto}figcaption{font-size:13px;color:#566579}.table-wrap{overflow:auto;background:white}table{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}td,th{padding:8px;border:1px solid #dee4ee;text-align:left;white-space:nowrap}td{font-family:ui-monospace,monospace}th{background:#eaf0f8}.warning{padding:12px;background:#fff0cf;border-left:4px solid #a4670d}li{margin-bottom:8px}</style></head><body>'''
     page += '<h1>'+html.escape(title)+(' — equal sampling time' if timed else ' — original comparison protocol')+'</h1>'+warning+'<p>'+html.escape(budget)+'.</p>'
+    if suite:
+        page += '<p>Target: '+html.escape(target_title)+'; VI '+html.escape(str(vi_mode))+' for both map families; DCS β = '+number(config.get('beta', 2.))+'.</p>'
     if config.get('protocol'):
         page += '<p>Recorded protocol: <code>'+html.escape(config['protocol'])+'</code>.</p>'
     if config.get('implementation_revision'):
@@ -474,6 +564,8 @@ def render_report(root, summary):
         page += '<h2>Paired MSE differences from SCS</h2><p>Negative differences favor the named method. Empirical MCSE is descriptive; it is not a confidence interval.</p>'+_table(paired_rows)
     if setup_rows:
         page += '<h2>Map fitting excluded from production time</h2>'+_table(setup_rows)
+    if tuning_summaries:
+        page += '<details><summary>Reflected BW pilot tuning and frozen steps</summary><p>The score is the mean squared jump in ball coordinates, including zero movement after rejection. It is not an MSE estimate. Full pilot candidates are available in <a href="reflected_tuning.csv">reflected_tuning.csv</a> and the saved summary.</p>'+_table(tuning_summaries)+'</details>'
     page += '<h2>Every chain</h2>'+_table(chain_rows)
     page += '<h2>Full map parameters</h2>'+_table(parameter_rows)
     if prefix_rows:

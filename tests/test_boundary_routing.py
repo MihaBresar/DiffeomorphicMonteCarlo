@@ -101,7 +101,7 @@ class BoundaryRoutingTests(unittest.TestCase):
     def test_boundary_saved_summary_uses_shared_renderer_without_resampling(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
-            for protocol in ('timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2'):
+            for protocol in ('timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2', 'timed-boundary-dcs-scs-v3'):
                 summary = {'config': {'protocol': protocol}}
                 (output/'summary.json').write_text(json.dumps(summary))
                 with self.subTest(protocol=protocol), patch('scripts.scs_100d_figures.render_report') as render, \

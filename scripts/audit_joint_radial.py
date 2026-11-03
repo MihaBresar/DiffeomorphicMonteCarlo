@@ -376,6 +376,17 @@ def tail_contrasts(cases):
     return rows
 
 
+def positive_pilot_seconds(value):
+    """Reject invalid timing overrides before creating any run artifacts."""
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError('Pilot seconds must be positive and finite') from None
+    if not np.isfinite(seconds) or seconds <= 0:
+        raise argparse.ArgumentTypeError('Pilot seconds must be positive and finite')
+    return seconds
+
+
 def main(argv=None):
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, 'reconfigure'):
@@ -383,12 +394,16 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--preset', choices=PRESETS, default='quick')
     parser.add_argument('--workers', type=int)
+    parser.add_argument('--pilot-seconds', type=positive_pilot_seconds,
+                        help='Override the per-chain pilot time equally for every candidate of both methods; defaults to the preset')
     parser.add_argument('--output-dir', type=Path, required=True)
     args = parser.parse_args(argv)
     hardware = cpu_info()
     workers = args.workers or min(hardware['capacity'], PRESETS[args.preset]['runs'])
     validate_workers(workers, hardware)
     config = {**PRESETS[args.preset], 'preset': args.preset, 'workers': workers}
+    if args.pilot_seconds is not None:
+        config['pilot_seconds'] = args.pilot_seconds
     root = args.output_dir.resolve()
     if root.exists() and (not root.is_dir() or any(root.iterdir())):
         raise FileExistsError(f'Use a fresh output directory: {root}')

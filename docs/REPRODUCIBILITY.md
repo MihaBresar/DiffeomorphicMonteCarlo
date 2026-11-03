@@ -1,15 +1,8 @@
 # Reproducibility and timing policy
 
-The default 100D DCS/SCS comparison has its own explicitly recorded
-[protocol](SCS_100D.md), `timed-matched-dcs-scs-v3`: both maps receive the same
-fresh-batch VI budget and all three methods tune their proposal steps toward
-acceptance 0.234 during separate warmup. Steps are then frozen. All methods use
-compiled JAX CPU scans with the same timing and recording work, with the first
-third of actual sampling iterations discarded. The primary comparison calls
-the unmodified SCS author transition directly under this common fitting and
-calibration protocol. Both methods tune from observed accept/reject indicators.
-Historical v1/v2 reports retain their recorded policies and values.
-The policies below describe the other main experiments.
+The [current selectable-target comparisons](COMPARISONS.md) record protocols `timed-sampler-comparison-v1` (four methods in JAX) and `timed-numba-comparison-v1` (optimized Numba BW/reflect versus author JAX SCS). Both have two targets and VI on/off for both map families. Ordinary DCS-RWM/BW and SCS use acceptance-target 0.234 pretuning; reflected BW uses ball-movement pilots within the same warmup budget. All production steps freeze, and the first third of actual sampling iterations is discarded. The Numba mode changes framework and output-processing costs explicitly; the JAX mode shares those costs. SCS calls the unmodified author transition. Historical reports retain their recorded policies and values.
+
+The policies below describe the six other main experiments.
 
 All paper inputs are explicit JSON files. The manifest records their resolved values, scientific source hashes, Git commit/status when available, Python and package versions, OS/CPU count, JAX devices, float64/CPU policy and numerical-library thread settings. A run made from a dirty or uncommitted checkout records that fact; use a tagged clean checkout for the publication archive.
 
