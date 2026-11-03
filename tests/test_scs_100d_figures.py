@@ -71,6 +71,15 @@ class SCS100DFiguresTests(unittest.TestCase):
                     estimates = np.array(case['chain_means'])[:, metric]
                     expected = np.mean((estimates-summary['truth'][metric])**2)
                     self.assertEqual(float(row[key+'_mse']), expected)
+                    squared_errors = (estimates-summary['truth'][metric])**2
+                    self.assertAlmostEqual(float(row[key+'_mse_empirical_mcse']),
+                                           squared_errors.std(ddof=1)/np.sqrt(3))
+                    self.assertAlmostEqual(float(row[key+'_largest_chain_error_share']),
+                                           squared_errors.max()/squared_errors.sum())
+            with (root/'paired_mse_differences.csv').open(newline='',encoding='utf-8') as stream:
+                paired = list(csv.DictReader(stream))
+            self.assertEqual(len(paired),4)
+            self.assertEqual({row['reference'] for row in paired},{'SCS'})
             with (root/'scs_100d_chains.csv').open(newline='', encoding='utf-8') as stream:
                 chains = list(csv.DictReader(stream))
             self.assertEqual(len(chains), 9)

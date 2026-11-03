@@ -8,6 +8,7 @@ shared separate step calibration are untimed; all production steps are frozen.
 """
 from functools import lru_cache
 import json
+from numbers import Real
 import time
 
 import numpy as np
@@ -20,6 +21,35 @@ BATCH_SIZE = 300
 PREFIX_STRIDE = 100
 STEP_POLICY = 'common raw dual averaging of observed acceptance to 0.234 during separate warmup; smoothed final scale frozen'
 IMPLEMENTATION_REVISION = 'jax-dcs-exact-ball-v1'
+
+
+def resolve_step_scale_ceiling(config):
+    """Resolve an optional method limit while preserving the original log-15 default.
+
+    Per-method limits take precedence over the historical shared scalar limit.
+    Returning None for an unspecified limit keeps the original calibration and
+    compiled-program cache key unchanged, rather than round-tripping exp/log.
+    """
+    initial_scale = config.get('initial_scale', .1)
+    if isinstance(initial_scale, bool) or not isinstance(initial_scale, Real) or \
+            not np.isfinite(initial_scale) or initial_scale <= 0.:
+        raise ValueError('initial_scale must be positive and finite')
+    limits = config.get('step_scale_ceilings', {})
+    if not isinstance(limits, dict):
+        raise ValueError('step_scale_ceilings must map method names to finite numeric limits')
+    methods = ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', 'SCS')
+    for name, value in limits.items():
+        if name not in methods:
+            raise ValueError(f'Unknown step-scale ceiling method: {name}')
+        if isinstance(value, bool) or not isinstance(value, Real) or \
+                not np.isfinite(value) or value < initial_scale:
+            raise ValueError(f'step_scale_ceilings[{name!r}] must be finite and at least initial_scale')
+    shared = config.get('step_scale_ceiling')
+    if shared is not None and (isinstance(shared, bool) or not isinstance(shared, Real) or
+            not np.isfinite(shared) or shared < initial_scale):
+        raise ValueError('step_scale_ceiling must be finite and at least initial_scale')
+    selected = limits.get(config['algorithm'], shared)
+    return None if selected is None else float(selected)
 
 
 def _uniform_ball(key, dimension):
@@ -187,12 +217,8 @@ class _Matched:
         spec = scs_paper.target_spec(config)
         if int(mapping['dimension']) != int(spec['dimension']):
             raise ValueError('Map and target dimensions differ')
+        scale_ceiling = resolve_step_scale_ceiling(config)
         self.initial_scale = float(config.get('initial_scale', .1))
-        if not np.isfinite(self.initial_scale) or self.initial_scale <= 0.:
-            raise ValueError('initial_scale must be positive and finite')
-        scale_ceiling = config.get('step_scale_ceiling')
-        if scale_ceiling is not None and (not np.isfinite(scale_ceiling) or scale_ceiling < self.initial_scale):
-            raise ValueError('step_scale_ceiling must be finite and at least initial_scale')
         previous = _programs.cache_info().misses
         burn, self.program, initial, compile_seconds = _programs(
             json.dumps(mapping, sort_keys=True), json.dumps(spec, sort_keys=True),
@@ -256,6 +282,8 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
     batch; the measured overshoot is always reported.
     """
     _validate(config)
+    scale_ceiling = resolve_step_scale_ceiling(config)
+    recorded_ceiling = float(np.exp(15.) if scale_ceiling is None else scale_ceiling)
     backend = _backend(mapping_dict, config, int(seed))
     thin, threshold = config['thin'], float(config.get('threshold', 50.))
     capacity, batches = 1024, 0
@@ -311,8 +339,8 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         'implementation_revision': config.get('implementation_revision', IMPLEMENTATION_REVISION),
         'boundary_policy': ('reflect_along_proposal_chord' if config['algorithm'] == 'DCS-BW-reflect'
                             else 'author_cap_stepout' if config['algorithm'] == 'SCS' else 'direct_rejection'),
-        'step_scale_ceiling': float(config.get('step_scale_ceiling', np.exp(15.))),
-        'scale_ceiling_reached': bool(backend.scale >= config.get('step_scale_ceiling', np.exp(15.))*(1-1e-10)),
+        'step_scale_ceiling': recorded_ceiling,
+        'scale_ceiling_reached': bool(backend.scale >= recorded_ceiling*(1-1e-10)),
         'proposal_generator': ('normal_d_plus_2_projection' if config['algorithm'] in ('DCS-BW', 'DCS-BW-reflect')
                                else 'author_tangent_normal' if config['algorithm'] == 'SCS'
                                else 'isotropic_normal'),

@@ -1,0 +1,41 @@
+{
+  "protocol": "timed-boundary-dcs-scs-v2",
+  "preceding_commit": "8740064a8dbc35b7d374d58eb1b84d43f6e2344e",
+  "validation_date": "2026-11-03",
+  "local_tests_passed": 189,
+  "control_replay": {
+    "DCS-BW": {
+      "chains": 50,
+      "calibration_states": "bitwise equal",
+      "frozen_steps": "bitwise equal",
+      "warmup_acceptance": "bitwise equal"
+    },
+    "SCS": {
+      "chains": 50,
+      "calibration_states": "bitwise equal",
+      "frozen_steps": "bitwise equal",
+      "warmup_acceptance": "bitwise equal"
+    }
+  },
+  "control_replay_design": "Same saved full-paper fit (seed42), 1500 warmup steps and 50 default chain seeds per control; compare new v2 to pre-update original control calibration. States, frozen steps and acceptance reproduced bitwise. Unit regression also checks fixed production prefixes.",
+  "smoke": {
+    "status": "passed",
+    "workers": 2,
+    "runs": 2,
+    "seed_batch": 1,
+    "first_seed": 1901001,
+    "fit_seed": 42,
+    "methods": [
+      "DCS-BW",
+      "DCS-BW-reflect",
+      "SCS"
+    ],
+    "step_scale_ceilings": {
+      "DCS-BW-reflect": 2.0
+    },
+    "report_regeneration": "passed",
+    "paired_mse_table": "passed"
+  },
+  "historical_v1_report": "passed",
+  "interpretation": "Execution and invariance checks only. No new performance ranking is inferred from the two-chain smoke check. Historical v1 performance remains separately labelled."
+}

@@ -64,16 +64,51 @@ class BoundaryRoutingTests(unittest.TestCase):
                 self.assertEqual(caught.exception.code, 2)
         module.main.assert_not_called()
 
+    def test_both_100d_cli_routes_forward_seed_batch_without_changing_seeds(self):
+        for experiment, runner in ((EXPERIMENT, 'reproduce_boundary_100d'),
+                                   ('skew-t-100d-fixed', 'reproduce_scs_100d')):
+            for batch in (0, 1, 5, 999):
+                module = types.ModuleType('scripts.'+runner)
+                module.main = Mock(return_value=0)
+                with self.subTest(experiment=experiment, batch=batch), \
+                        patch.dict(sys.modules, {'scripts.'+runner: module}):
+                    self.assertEqual(run_experiment.main([experiment, '--seed-batch', str(batch)]), 0)
+                command = module.main.call_args.args[0]
+                self.assertEqual(command[command.index('--seed-batch')+1], str(batch))
+                self.assertNotIn('--seed', command)
+                self.assertNotIn('--fit-seed', command)
+
+    def test_cli_rejects_invalid_batches_and_explicit_seed_conflicts(self):
+        for options in (['--seed-batch', '-1'], ['--seed-batch', '1000'],
+                        ['--seed-batch', '1.5'], ['--seed-batch', 'true'],
+                        ['--seed', '91', '--seed-batch', '0'],
+                        ['--seed-batch', '2', '--seed', '91']):
+            with self.subTest(options=options), redirect_stderr(StringIO()):
+                with self.assertRaises(SystemExit) as caught:
+                    run_experiment.main([EXPERIMENT]+options)
+                self.assertEqual(caught.exception.code, 2)
+
+    def test_seed_batches_are_not_silently_ignored_for_other_experiments(self):
+        for experiment in ('eight-schools', 'skew-t-200d-baselines'):
+            for batch in ('0', '1'):
+                with self.subTest(experiment=experiment, batch=batch), \
+                        patch.object(run_experiment, 'load_config') as config, redirect_stderr(StringIO()):
+                    with self.assertRaises(SystemExit) as caught:
+                        run_experiment.main([experiment, '--seed-batch', batch, '--dry-run'])
+                    self.assertEqual(caught.exception.code, 2)
+                    config.assert_not_called()
+
     def test_boundary_saved_summary_uses_shared_renderer_without_resampling(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
-            summary = {'config': {'protocol': 'timed-boundary-dcs-scs-v1'}}
-            (output/'summary.json').write_text(json.dumps(summary))
-            with patch('scripts.scs_100d_figures.render_report') as render, \
-                    patch.object(run_experiment, 'run') as sample, redirect_stdout(StringIO()):
-                self.assertEqual(run_experiment.main(['--plot-only', str(output)]), 0)
-            render.assert_called_once_with(output, summary)
-            sample.assert_not_called()
+            for protocol in ('timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2'):
+                summary = {'config': {'protocol': protocol}}
+                (output/'summary.json').write_text(json.dumps(summary))
+                with self.subTest(protocol=protocol), patch('scripts.scs_100d_figures.render_report') as render, \
+                        patch.object(run_experiment, 'run') as sample, redirect_stdout(StringIO()):
+                    self.assertEqual(run_experiment.main(['--plot-only', str(output)]), 0)
+                render.assert_called_once_with(output, summary)
+                sample.assert_not_called()
 
     def test_cli_lists_new_experiment_once(self):
         output = StringIO()

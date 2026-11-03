@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 from dcs_bench.display import number, cell, figure_ticks
+from dcs_bench.simulation_error import mse_variability, paired_mse_differences
 
 METRICS = ('tail_probability', 'mean_norm')
 ALIASES = (('tail_probability', 'tail'), ('mean_norm', 'norm'))
@@ -112,7 +113,8 @@ def render_report(root, summary):
     figures = root/'figures'
     figures.mkdir(exist_ok=True)
     cases, config = summary['cases'], summary['config']
-    boundary = config.get('protocol') == 'timed-boundary-dcs-scs-v1'
+    boundary = config.get('protocol') in ('timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2')
+    restored_controls = config.get('protocol') == 'timed-boundary-dcs-scs-v2'
     matched = config.get('protocol') == 'timed-matched-dcs-scs-v3' or boundary
     timed = config.get('mode') == 'time' or config.get('protocol') == 'timed-dcs-author-scs-v2' or matched
     if not cases or any(name not in METHODS for name in cases):
@@ -148,6 +150,8 @@ def render_report(root, summary):
     if boundary and 'step_scale_ceiling' in config:
         tuning_note = (f"All methods tune toward 0.234 with a shared step ceiling of {number(config['step_scale_ceiling'])}; "
                        'the ceiling may bind. Sampling steps stay fixed.')
+    if restored_controls:
+        tuning_note = 'Original BW/SCS calibration retained; reflected BW alone has step ceiling 2.00. All tune toward 0.234, then freeze.'
     metric_labels = (f'P(‖X‖ ≥ {threshold:g})', 'E[‖X‖]')
     x = np.arange(1, len(names)+1)
     colors = [COLORS[name] for name in names]
@@ -351,6 +355,10 @@ def render_report(root, summary):
             row[key+'_mse'] = mses[name][metric]
             row[key+'_bias_squared'] = biases[name][metric]
             row[key+'_variance_ddof0'] = variances[name][metric]
+        variability = mse_variability(means[name], truth)
+        for metric, key in enumerate(METRICS):
+            row[key+'_mse_empirical_mcse'] = variability['mse_empirical_mcse'][metric]
+            row[key+'_largest_chain_error_share'] = variability['largest_chain_squared_error_share'][metric]
         case_rows.append(row)
         records = case.get('records', [])
         if records and len(records) != case['chains']:
@@ -366,6 +374,7 @@ def render_report(root, summary):
                 row[key+'_truth'] = truth[metric]
                 row[key+'_squared_error'] = (estimate[metric]-truth[metric])**2
             chain_rows.append(row)
+    paired_rows = paired_mse_differences(means, {name: cases[name].get('records', []) for name in names}, truth)
     parameter_rows = []
     for family, parameters in summary.get('maps', {}).items():
         for key, value in parameters.items():
@@ -394,6 +403,8 @@ def render_report(root, summary):
     csvs = {'scs_100d_values.csv': case_rows, 'paper_values.csv': case_rows,
             'sample_counts.csv': count_rows, 'scs_100d_chains.csv': chain_rows,
             'tuned_parameters.csv': parameter_rows}
+    if paired_rows:
+        csvs['paired_mse_differences.csv'] = paired_rows
     if prefix_rows:
         csvs['scs_100d_prefix_mse.csv'] = prefix_rows
     if setup_rows:
@@ -433,12 +444,15 @@ def render_report(root, summary):
         notes[1] = 'All three methods use the same separate dual-averaging calibration toward acceptance 0.234 and freeze their scales during timed sampling. The first third of actual generated iterations is then discarded.'
         if 'step_scale_ceiling' in config:
             notes[1] += ' All three methods have a common upper step limit of '+number(config['step_scale_ceiling'])+'.'
+        if restored_controls:
+            notes[1] += ' Ordinary BW and SCS retain exactly the original main-comparison calibration, including its existing numerical guard exp(15). Only reflected BW has a step ceiling of 2. This method-specific constraint is explicit because its acceptance target can be unattainable; it is not a claim of optimal tuning.'
         notes[2] = 'Standard DCS-BW and DCS-BW-reflect share the same fitted ball map and initial physical point. The reflected variant folds an outside proposal back along its chord, then applies the transformed-density Metropolis test. Author SCS keeps its original cap step-out. Map fitting, recording and time budgets are matched.'
         notes[5] = 'The setup table reports fitting once per map; both BW variants share the ball fit. Compilation and step calibration are excluded from the sampling clock for all methods.'
         notes.append('Reflected-chord BW is a separate reversible kernel, not literal SCS step-out or specular billiards. No clipping onto the ball boundary is used. A numerical invalid endpoint becomes a rejected move.')
         reflected = cases.get('DCS-BW-reflect', {})
         if any(row.get('scale_ceiling_reached') for row in reflected.get('records', [])):
-            notes.append('Reflected BW reached the common step-size ceiling in at least one chain. Its acceptance target may be unattainable; do not interpret saturation as successful calibration. Inspect final scales and acceptance rates.')
+            notes.append('Reflected BW reached '+('its method-specific' if restored_controls else 'the common')+' step-size ceiling in at least one chain. Its acceptance target may be unattainable; do not interpret saturation as successful calibration. Inspect final scales and acceptance rates.')
+    notes.append('Empirical MSE MCSE is the sample standard deviation of chain squared errors divided by the square root of the number of chains. Largest-chain error share measures how much one chain contributes to total squared error. Paired differences align methods by saved seed; negative differences favor the named method over SCS. These are descriptive, conditional on the fitted maps, not formal confidence intervals or convergence diagnostics. Heavy-tailed norm errors can make variance-based uncertainty unreliable; fresh seed batches are needed to assess repeatability.')
     notes += [summary[key] for key in ('target_note', 'mse_note', 'time_scope') if isinstance(summary.get(key), str)]
     warning = '<p class="warning">Quick execution check only — do not interpret sampler rankings.</p>' if smoke else ''
     page = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -448,10 +462,16 @@ def render_report(root, summary):
         page += '<p>Recorded protocol: <code>'+html.escape(config['protocol'])+'</code>.</p>'
     if config.get('implementation_revision'):
         page += '<p>Implementation revision: <code>'+html.escape(config['implementation_revision'])+'</code>.</p>'
+    if 'seed' in config:
+        seed_label = ('unrecorded' if 'seed_batch' not in config else
+                      'custom' if config['seed_batch'] is None else str(config['seed_batch']))
+        page += '<p>Seed batch: '+html.escape(seed_label)+'; first chain seed: '+str(config['seed'])+'; map-fitting seed: '+str(config.get('fit_seed', 'unrecorded'))+'. Repeating a batch reuses its random streams; timed sample counts may still differ.</p>'
     page += '<p>'+' · '.join('<a href="'+filename+'">'+html.escape(filename)+'</a>' for filename in csvs)+'</p>'
     for filename in figure_names:
         page += '<figure><a href="figures/'+filename+'.pdf"><img src="figures/'+filename+'.png" alt="'+html.escape(filename.replace('_', ' '))+'"></a><figcaption>Click the figure to open its PDF.</figcaption></figure>'
     page += '<h2>Counts, errors and runtime</h2>'+_table(case_rows)
+    if paired_rows:
+        page += '<h2>Paired MSE differences from SCS</h2><p>Negative differences favor the named method. Empirical MCSE is descriptive; it is not a confidence interval.</p>'+_table(paired_rows)
     if setup_rows:
         page += '<h2>Map fitting excluded from production time</h2>'+_table(setup_rows)
     page += '<h2>Every chain</h2>'+_table(chain_rows)

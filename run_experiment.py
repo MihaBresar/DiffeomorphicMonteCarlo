@@ -28,6 +28,16 @@ def named_experiments():
     return sorted(set(experiment_names()) | {BOUNDARY_EXPERIMENT})
 
 
+def seed_batch_number(value):
+    try:
+        batch = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError('Seed batch must be an integer from 0 to 999')
+    if not 0 <= batch <= 999:
+        raise argparse.ArgumentTypeError('Seed batch must be an integer from 0 to 999')
+    return batch
+
+
 def parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('experiment', nargs='?', choices=named_experiments()+list(ALIASES))
@@ -40,8 +50,12 @@ def parser():
     p.add_argument('--recompute-diagnostics', action='store_true',
                    help='With --plot-only, recalculate statistics from saved chains instead of using the completed summary')
     p.add_argument('--dry-run', action='store_true')
-    for name in ('runs', 'iterations', 'warmup', 'thin', 'nuts-samples', 'nuts-max-depth', 'nuts-batch-size', 'optimizer-steps', 'optimizer-samples', 'reference-samples', 'reference-batch-size', 'seed', 'workers'):
+    for name in ('runs', 'iterations', 'warmup', 'thin', 'nuts-samples', 'nuts-max-depth', 'nuts-batch-size', 'optimizer-steps', 'optimizer-samples', 'reference-samples', 'reference-batch-size', 'workers'):
         p.add_argument('--'+name, type=int)
+    seeds = p.add_mutually_exclusive_group()
+    seeds.add_argument('--seed', type=int)
+    seeds.add_argument('--seed-batch', type=seed_batch_number,
+                       help='For either 100D SCS comparison: use sampling seed 901001 + 1000000 × batch (0–999); map-fitting seeds stay unchanged')
     p.add_argument('--time-budget', type=float)
     p.add_argument('--nuts-target-accept', type=float)
     p.add_argument('--ball-map-policy', choices=['mobius', 'vanilla'],
@@ -53,6 +67,8 @@ def parser():
 def main(argv=None):
     p = parser()
     args = p.parse_args(argv)
+    if args.seed_batch is not None and (args.plot_only or args.experiment not in ('skew-t-100d-fixed', BOUNDARY_EXPERIMENT)):
+        p.error('--seed-batch is available only when running one of the two 100D SCS comparisons')
     if args.recompute_diagnostics and not args.plot_only:
         p.error('--recompute-diagnostics requires --plot-only SAVED_RUN')
     if args.list:
@@ -62,7 +78,7 @@ def main(argv=None):
         summary_path = args.plot_only/'summary.json'
         if summary_path.exists():
             summary = json.loads(summary_path.read_text(encoding='utf-8'))
-            if summary.get('config', {}).get('protocol') in ('original-dcs-author-scs-v1', 'timed-dcs-author-scs-v2', 'timed-matched-dcs-scs-v3', 'timed-boundary-dcs-scs-v1'):
+            if summary.get('config', {}).get('protocol') in ('original-dcs-author-scs-v1', 'timed-dcs-author-scs-v2', 'timed-matched-dcs-scs-v3', 'timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2'):
                 from scripts.scs_100d_figures import render_report
                 render_report(args.plot_only, summary)
                 print(args.plot_only.resolve())
@@ -89,7 +105,7 @@ def main(argv=None):
             command += ['--output-dir', str(args.output_dir)]
         if args.dry_run:
             command.append('--dry-run')
-        for name in ('runs', 'time_budget', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples', 'seed'):
+        for name in ('runs', 'time_budget', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples', 'seed', 'seed_batch'):
             value = getattr(args, name)
             if value is not None:
                 command += ['--'+name.replace('_', '-'), str(value)]
@@ -102,7 +118,7 @@ def main(argv=None):
         return single_main(command)
     if args.experiment in ALIASES:
         print(f'Legacy name {args.experiment} now resolves to {ALIASES[args.experiment]} (d=200).', file=sys.stderr)
-    overrides = {k: v for k, v in vars(args).items() if k not in ('experiment', 'list', 'preset', 'output_dir', 'reference_dir', 'resume', 'plot_only', 'recompute_diagnostics', 'dry_run')}
+    overrides = {k: v for k, v in vars(args).items() if k not in ('experiment', 'list', 'preset', 'output_dir', 'reference_dir', 'resume', 'plot_only', 'recompute_diagnostics', 'dry_run', 'seed_batch')}
     config = load_config(args.experiment, args.preset, overrides)
     output = args.output_dir or Path('results')/config['experiment']/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
     if args.dry_run:

@@ -1,5 +1,13 @@
 # Changes
 
+## 2026-11-03 — boundary v2, seed batches and MSE variability
+
+- Restore ordinary DCS-BW and author SCS's original step calibration in the boundary comparison, including the numerical log-scale ceiling of 15. Apply the extra step ceiling of 2 only to reflected BW, whose acceptance target may be unattainable. Save this as `timed-boundary-dcs-scs-v2`; the main comparison's protocol is unchanged.
+- Preserve the historical boundary v1 runs and validation archive, which used a common ceiling of 2. A final scale below 2 does not prove that the old cap left warmup unchanged; rerun all three boundary methods for v2.
+- Add seed batches for both 100D comparisons: default batch 0 retains sampling seed 901001, and batch b adds 1,000,000 × b while leaving map-fitting seed 42 fixed. The launcher offers batches 0–5; `--seed-batch` accepts 0–999 and is mutually exclusive with `--seed`.
+- Export inexpensive empirical MSE uncertainty summaries from per-chain squared errors. These are descriptive, not formal 95% confidence intervals; the t(3) norm's infinite fourth moment limits variance-based MSE uncertainty.
+- Document full Windows reruns and why timed iteration counts and estimates can differ even when the sampling seed is repeated. No new performance ranking is claimed.
+
 ## 2026-11-03 — separate reflected-boundary comparison
 
 - Add a launcher experiment comparing direct-rejection DCS-BW, reversible reflected-chord DCS-BW and unchanged author SCS on the same 100D skewed t(3) target.

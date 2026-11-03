@@ -1,10 +1,11 @@
 """Full MH integration and separate experiment contract for chord reflection."""
 import unittest
+from unittest.mock import patch
 import numpy as np
 from dcs_bench import scs_paper, timed_radial as timed
 from dcs_bench.ball_boundary import reflect_ball_proposal
 from dcs_bench.targets import Target
-from dcs_bench.transforms import BallMap
+from dcs_bench.transforms import BallMap, SphereMap
 from scripts import reproduce_boundary_100d as boundary
 from scripts import reproduce_scs_100d as original
 
@@ -42,12 +43,88 @@ class BoundaryComparisonTests(unittest.TestCase):
         a, b = original.configuration('paper'), boundary.configuration('paper')
         self.assertEqual(a['algorithms'], ['DCS-RWM', 'DCS-BW', 'SCS'])
         self.assertEqual(b['algorithms'], ['DCS-BW', 'DCS-BW-reflect', 'SCS'])
-        self.assertEqual(b['protocol'], 'timed-boundary-dcs-scs-v1')
-        self.assertEqual(b['step_scale_ceiling'],2.)
+        self.assertEqual(b['protocol'], 'timed-boundary-dcs-scs-v2')
+        self.assertEqual(b['step_scale_ceilings'], {'DCS-BW-reflect': 2.})
+        self.assertNotIn('step_scale_ceiling', b)
         self.assertNotIn('step_scale_ceiling',a)
         for key in ('target','runs','time_budget','warmup','optimizer_steps','optimizer_samples',
                     'initial_scale','step_policy','burnin_fraction','seed','fit_seed'):
             self.assertEqual(a[key], b[key])
+
+    def test_ceiling_resolution_preserves_defaults_and_historical_scalar_limits(self):
+        for method in boundary.METHODS:
+            with self.subTest(method=method):
+                config = dict(boundary.configuration(), algorithm=method)
+                expected = 2. if method == 'DCS-BW-reflect' else None
+                self.assertEqual(timed.resolve_step_scale_ceiling(config), expected)
+                historical = dict(config, step_scale_ceiling=3.)
+                self.assertEqual(timed.resolve_step_scale_ceiling(historical),
+                                 2. if method == 'DCS-BW-reflect' else 3.)
+                historical.pop('step_scale_ceilings')
+                self.assertEqual(timed.resolve_step_scale_ceiling(historical), 3.)
+        config = dict(algorithm='DCS-BW', time_budget=.01, warmup=10, thin=10)
+        for change in ({'step_scale_ceilings': []}, {'step_scale_ceilings': {'DCS-BW-typo': 2.}},
+                       {'step_scale_ceilings': {'DCS-BW-reflect': np.inf}},
+                       {'step_scale_ceilings': {'DCS-BW': .01}},
+                       {'step_scale_ceilings': {'DCS-BW': True}},
+                       {'step_scale_ceilings': {'DCS-BW': None}},
+                       {'step_scale_ceiling': np.nan}, {'step_scale_ceiling': '2'},
+                       {'initial_scale': 0.}):
+            with self.subTest(change=change), patch.object(timed, '_backend') as backend:
+                with self.assertRaises(ValueError):
+                    timed.run_timed({}, {**config, **change}, 11)
+                backend.assert_not_called()
+
+    def test_v2_controls_reproduce_main_calibration_and_fixed_production_prefix(self):
+        # Use real 100D kernels and nontrivial maps. Equal-time stopping is not
+        # deterministic; compare a fixed prefix to isolate tuning and RNG use.
+        scs_paper._author()
+        import jax
+        centre = np.linspace(-.05, .05, 100)
+        shift = np.zeros(100)
+        shift[:2] = [.1, -.05]
+        mappings = {
+            'DCS-BW': BallMap(100, mu=centre, scale=1.7, delta=shift).parameters(),
+            'SCS': SphereMap(100, mu=centre, scale=1.7, observer=shift).parameters(),
+        }
+        main = original.configuration(overrides={'warmup': 128, 'thin': 10})
+        revised = boundary.configuration(overrides={'warmup': 128, 'thin': 10})
+        for method, mapping in mappings.items():
+            for seed in (901001, 903001):
+                with self.subTest(method=method, seed=seed):
+                    before = timed._Matched(mapping, dict(main, algorithm=method), seed)
+                    after = timed._Matched(mapping, dict(revised, algorithm=method), seed)
+                    np.testing.assert_array_equal(before.state, after.state)
+                    np.testing.assert_array_equal(jax.random.key_data(before.key), jax.random.key_data(after.key))
+                    self.assertEqual(before.scale, after.scale)
+                    self.assertEqual(before.warmup_acceptance, after.warmup_acceptance)
+                    for _ in range(2):
+                        old_prefixes, old_norms = before.batch()
+                        new_prefixes, new_norms = after.batch()
+                        np.testing.assert_array_equal(old_prefixes, new_prefixes)
+                        np.testing.assert_array_equal(old_norms, new_norms)
+                        np.testing.assert_array_equal(before.state, after.state)
+
+    def test_records_use_resolved_method_ceiling(self):
+        class Fake:
+            compile_seconds, warmup_seconds, warmup_acceptance = 0., 0., .5
+            scale, implementation = 2., 'test'
+            def batch(self):
+                return np.array([[0., 100., 50.], [0., 200., 100.], [0., 300., 150.]]), np.ones(30)
+        configs = [
+            (dict(algorithm='DCS-BW', step_scale_ceilings={'DCS-BW-reflect': 2.}), np.exp(15.), False),
+            (dict(algorithm='DCS-BW-reflect', step_scale_ceilings={'DCS-BW-reflect': 2.}), 2., True),
+            (dict(algorithm='DCS-BW', step_scale_ceiling=2.), 2., True),
+            (dict(algorithm='DCS-BW', step_scale_ceiling=2., step_scale_ceilings={'DCS-BW': 3.}), 3., False),
+        ]
+        for limits, expected, reached in configs:
+            config = dict(time_budget=.01, warmup=10, thin=10, **limits)
+            with self.subTest(limits=limits), patch.object(timed, '_backend', return_value=Fake()), \
+                    patch.object(timed.time, 'perf_counter', side_effect=[0., .02]), \
+                    patch.object(timed.time, 'process_time', side_effect=[0., .01]):
+                _, record = timed.run_timed({}, config, 11)
+            self.assertEqual(record['step_scale_ceiling'], expected)
+            self.assertEqual(record['scale_ceiling_reached'], reached)
 
     def test_mh_uses_reflected_endpoint_and_target_density_ratio(self):
         scs_paper._author()

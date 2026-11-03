@@ -25,6 +25,28 @@ def record(chain, means, seconds=1., iterations=300, acceptance=.2):
 
 
 class SCS100DRunnerTests(unittest.TestCase):
+    def test_seed_batches_are_disjoint_reproducible_and_keep_the_fit_fixed(self):
+        original = experiment.configuration('paper')
+        self.assertEqual(original['seed'],901001)
+        self.assertEqual(original['seed_batch'],0)
+        previous = None
+        for batch in (0,1,2,999):
+            config = experiment.configuration('paper',overrides={'seed_batch':batch})
+            self.assertEqual(config,experiment.configuration('paper',overrides={'seed_batch':batch}))
+            self.assertEqual(config['seed'],901001+1_000_000*batch)
+            self.assertEqual(config['fit_seed'],42)
+            seeds = set(range(config['seed'],config['seed']+config['runs']))
+            if previous is not None:
+                self.assertFalse(seeds & previous)
+            previous = seeds
+        self.assertIsNone(experiment.configuration(overrides={'seed':123})['seed_batch'])
+        for invalid in ({'seed_batch':-1},{'seed_batch':1000},{'seed_batch':True},
+                        {'seed_batch':1.5},{'seed_batch':0,'seed':901001},
+                        {'seed':2**32},{'seed':2**32-1,'runs':2},
+                        {'seed_batch':1,'runs':1_000_001}):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                experiment.configuration(overrides=invalid)
+
     def test_paper_prescribes_fifty_timed_chains_separate_tuning_and_one_target(self):
         config = experiment.configuration('paper', workers=1)
         self.assertEqual(config['runs'], 50)

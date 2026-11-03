@@ -1,9 +1,11 @@
 """Check GUI dispatch preserves the scientific pipeline and saved-run settings."""
 import json
+from io import BytesIO
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import START_HERE as launcher
 from dcs_bench.cpu import cpu_info
@@ -57,6 +59,75 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual([x['value'] for x in menu.options if 'selected' in x], ['skew-t-100d-fixed'])
         self.assertEqual(sum('SCS' in label for label in menu.labels), 2)
         self.assertIn('skew-t-100d-boundary', {x['value'] for x in menu.options})
+        seed_menu = ExperimentMenu()
+        seed_menu.feed((launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8')
+                       .replace('id="experiment"', 'id="other-menu"').replace('id="seed-batch"', 'id="experiment"'))
+        self.assertEqual([x['value'] for x in seed_menu.options], [str(x) for x in range(6)])
+        self.assertEqual([x['value'] for x in seed_menu.options if 'selected' in x], ['0'])
+
+    def test_seed_batches_reach_only_the_two_100d_runners(self):
+        for experiment in launcher.SCS_COMPARISONS:
+            for batch in (0, 1, 5, 999):
+                with self.subTest(experiment=experiment, batch=batch):
+                    command, = launcher.commands_for_run('quick', experiment, Path('results/test'), seed_batch=batch)
+                    if batch:
+                        self.assertEqual(command[command.index('--seed-batch')+1], str(batch))
+                    else:
+                        self.assertNotIn('--seed-batch', command)
+                    self.assertNotIn('--seed', command)
+                    self.assertNotIn('--fit-seed', command)
+        for experiment in set(launcher.EXPERIMENTS)-set(launcher.SCS_COMPARISONS):
+            with self.subTest(experiment=experiment):
+                commands = launcher.commands_for_run('quick', experiment, Path('results/test'))
+                self.assertTrue(all('--seed-batch' not in command for command in commands))
+                with self.assertRaisesRegex(ValueError, 'only for the two 100D'):
+                    launcher.commands_for_run('quick', experiment, Path('results/test'), seed_batch=1)
+
+    def test_invalid_seed_batches_fail_before_any_job_starts(self):
+        with patch.object(launcher, 'environment_ready', return_value=True):
+            controller = launcher.Controller()
+        with patch.object(controller, 'start_job') as start:
+            for batch in (True, False, None, '1', 1.0, 0.0, -1, 1000, [], {}):
+                with self.subTest(batch=batch), self.assertRaisesRegex(ValueError, 'integer from 0 to 999'):
+                    controller.run(seed_batch=batch)
+            start.assert_not_called()
+
+    def test_fresh_runs_record_batch_and_forward_it_to_sampling(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(launcher, 'RUNS', Path(tmp)), \
+                patch.object(launcher, 'environment_ready', return_value=True):
+            controller = launcher.Controller()
+            for experiment in launcher.SCS_COMPARISONS:
+                for batch in (0, 3):
+                    with self.subTest(experiment=experiment, batch=batch), \
+                            patch.object(controller, 'run_command') as execute, \
+                            patch.object(controller, 'start_job', side_effect=lambda work, status: work()):
+                        controller.run(experiment=experiment, seed_batch=batch)
+                        metadata = json.loads((Path(tmp)/controller.current_run/'launcher-run.json').read_text())
+                        self.assertEqual(metadata['seed_batch'], batch)
+                        self.assertEqual(metadata['experiment'], experiment)
+                        command = execute.call_args.args[0]
+                        if batch:
+                            self.assertEqual(command[command.index('--seed-batch')+1], str(batch))
+                        else:
+                            self.assertNotIn('--seed-batch', command)
+
+    def test_http_api_forwards_batch_without_coercing_invalid_types(self):
+        controller = Mock()
+        handler_type = launcher.make_handler(controller, 'test-token')
+        for batch in (4, True, '2'):
+            with self.subTest(batch=batch):
+                payload = json.dumps({'seed_batch': batch}).encode()
+                handler = handler_type.__new__(handler_type)
+                handler.server = SimpleNamespace(server_port=8000)
+                handler.headers = {'Host': '127.0.0.1:8000', 'X-Launcher-Token': 'test-token',
+                                   'Content-Length': str(len(payload))}
+                handler.path = '/run'
+                handler.rfile = BytesIO(payload)
+                handler.respond = Mock()
+                handler.do_POST()
+                forwarded = controller.run.call_args.kwargs['seed_batch']
+                self.assertEqual(forwarded, batch)
+                self.assertIs(type(forwarded), type(batch))
 
     def test_map_policy_reaches_production_not_reference_generation(self):
         commands = launcher.commands_for_run('paper', 'logistic-regression', Path('results/test'), ball_map_policy='vanilla')

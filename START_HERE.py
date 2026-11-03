@@ -24,6 +24,7 @@ RUNS = ROOT/'results'/'click-runs'
 PRESETS = ('quick', 'reproduce', 'paper')
 EXPERIMENTS = ('all', 'skew-t-200d-nuts', 'skew-t-200d-baselines', 'skew-t-100d-fixed',
                'skew-t-100d-boundary', 'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression')
+SCS_COMPARISONS = ('skew-t-100d-fixed', 'skew-t-100d-boundary')
 
 
 def environment_python():
@@ -71,21 +72,28 @@ def environment_ready():
         return False
 
 
-def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1, ball_map_policy='mobius'):
+def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=0):
     if preset not in PRESETS or experiment not in EXPERIMENTS:
         raise ValueError('Choose a listed preset and experiment')
+    if type(seed_batch) is not int or not 0 <= seed_batch <= 999:
+        raise ValueError('Seed batch must be an integer from 0 to 999')
+    if seed_batch and experiment not in SCS_COMPARISONS:
+        raise ValueError('Seed batches are available only for the two 100D SCS comparisons')
     if not plot_only:
         validate_workers(workers)
         if ball_map_policy not in ('mobius', 'vanilla'):
             raise ValueError('Choose a listed DCS map policy')
     py = str(environment_python())
     directory = Path(directory)
-    if experiment in ('skew-t-100d-fixed', 'skew-t-100d-boundary'):
+    if experiment in SCS_COMPARISONS:
         if resume or plot_only:
             raise ValueError('The 100D SCS comparison starts from scratch in a new results folder.')
         script = 'reproduce_boundary_100d.py' if experiment == 'skew-t-100d-boundary' else 'reproduce_scs_100d.py'
-        return [[py, '-u', str(ROOT/'scripts'/script), '--preset', preset,
-                 '--workers', str(workers), '--output-dir', str(directory/experiment)]]
+        command = [py, '-u', str(ROOT/'scripts'/script), '--preset', preset,
+                   '--workers', str(workers), '--output-dir', str(directory/experiment)]
+        if seed_batch:
+            command += ['--seed-batch', str(seed_batch)]
+        return [command]
     if experiment == 'all':
         command = [py, '-u', str(ROOT/'scripts/reproduce_all.py'), '--preset', preset, '--output-root', str(directory)]
         if plot_only:
@@ -207,7 +215,7 @@ class Controller:
                 raise RuntimeError('Environment validation failed; see installation output above')
         self.start_job(work, 'Setting up the environment…')
 
-    def run(self, preset='quick', experiment='skew-t-100d-fixed', run_id=None, plot_only=False, workers=1, ball_map_policy='mobius'):
+    def run(self, preset='quick', experiment='skew-t-100d-fixed', run_id=None, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=0):
         if not self.ready:
             raise ValueError('Click Set up environment first')
         if run_id:
@@ -218,17 +226,19 @@ class Controller:
             preset, experiment = saved['preset'], saved['experiment']
             workers = saved.get('workers', 1)
             ball_map_policy = saved.get('ball_map_policy', 'mobius')
+            seed_batch = saved.get('seed_batch', 0)
             if not plot_only and saved.get('ball_scale_policy', 'fit') != 'fit':
                 raise ValueError('The fixed R=sqrt(d) option has been removed. Start a new run with a Möbius or vanilla map.')
         else:
             run_id = datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'-'+preset
             directory = RUNS/run_id
         commands = commands_for_run(preset, experiment, directory, resume=bool(run_id and directory.exists()),
-                                    plot_only=plot_only, workers=workers, ball_map_policy=ball_map_policy)
+                                    plot_only=plot_only, workers=workers, ball_map_policy=ball_map_policy,
+                                    seed_batch=seed_batch)
         def work():
             directory.mkdir(parents=True, exist_ok=True)
             (directory/'launcher-run.json').write_text(json.dumps({'preset': preset, 'experiment': experiment,
-                'workers': workers, 'ball_map_policy': ball_map_policy}, indent=2)+'\n')
+                'workers': workers, 'ball_map_policy': ball_map_policy, 'seed_batch': seed_batch}, indent=2)+'\n')
             self.current_run = run_id
             with (directory/'launcher.log').open('a', encoding='utf-8') as logfile:
                 for command in commands:
@@ -309,7 +319,8 @@ def make_handler(controller, token):
                 data = json.loads(self.rfile.read(size) or b'{}')
                 if self.path == '/setup': controller.setup()
                 elif self.path == '/run': controller.run(data.get('preset', 'quick'), data.get('experiment', 'skew-t-100d-fixed'),
-                    workers=data.get('workers', 1), ball_map_policy=data.get('ball_map_policy', 'mobius'))
+                    workers=data.get('workers', 1), ball_map_policy=data.get('ball_map_policy', 'mobius'),
+                    seed_batch=data.get('seed_batch', 0))
                 elif self.path == '/resume': controller.run(run_id=data['id'])
                 elif self.path == '/replot': controller.run(run_id=data['id'], plot_only=True)
                 elif self.path == '/show':

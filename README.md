@@ -7,7 +7,11 @@ This corrected implementation centralizes target densities and transformations, 
 ## Run with clicks — no commands needed
 
 The separate **100D boundary comparison** adds reflected-chord DCS-BW alongside
-standard DCS-BW and author SCS. See [its protocol and reversibility argument](docs/BOUNDARY_100D.md).
+standard DCS-BW and author SCS. Current protocol v2 preserves ordinary BW and
+SCS's original step calibration and applies an extra step ceiling of 2 only
+to reflected BW. See [its protocol and reversibility argument](docs/BOUNDARY_100D.md).
+The common-cap results in its validation archive are historical v1 results;
+rerun all three methods to evaluate v2. The main comparison is unchanged.
 
 Download this repository using **Code → Download ZIP**, extract it, and install
 **Python 3.12 (64-bit)**. On Windows double-click **Start.bat**; on macOS open
@@ -23,6 +27,16 @@ for the publication runs. Links to the figures and tables appear automatically
 when the run finishes. See the [step-by-step click-to-run guide](docs/CLICK_TO_RUN.md)
 for installation, moving to another computer, and troubleshooting. These
 experiments run locally on your computer.
+
+For the revised boundary experiment on Windows, use the **latest ZIP**, open
+**Start.bat**, and select **100D boundary comparison → Full paper settings**.
+Choose **32 CPU workers** on the Ryzen 9 9950X3D, then **Original seeds (batch 0)**
+or **Fresh batch 1–5**, and click **Start run**. Both 100D comparisons offer
+these batches: the original uses sampling seed 901001; fresh batches change
+sampling and warmup streams while keeping map-fitting seed 42 fixed. Repeating
+a batch reuses its streams, but timed counts and the burn-in cutoff can vary,
+so identical seeds do not guarantee identical MSE. Compare fresh batches to
+assess sampling variability conditional on those fitted maps.
 
 ## Install and check from a terminal
 
@@ -88,6 +102,15 @@ The shared target is the original DCS normal-CDF skew-t; the SCS paper’s
 Student-t-CDF target is different. See [the exact protocol](docs/SCS_100D.md).
 The command-line identifier routes to the same runner as the launcher.
 
+For either 100D comparison, `--seed-batch b` accepts integers 0–999 and sets
+sampling seed 901001 + 1,000,000 × b; the default is batch 0. It leaves
+map-fitting seed 42 unchanged and is mutually exclusive with a custom `--seed`.
+For example:
+
+```bash
+python run_experiment.py skew-t-100d-boundary --preset paper --workers 32 --seed-batch 1 --output-dir results/boundary-batch-1
+```
+
 Earlier fitting, symmetric, equal-time and joint-radius audits remain in `scripts`,
 `validation` and their protocol documents for provenance. They are no longer
 launcher choices.
@@ -117,6 +140,13 @@ and MSE-uncertainty plots live in `figures/supplementary`. Plot labels and HTML
 tables use two decimals, with scientific notation for MSE and small values.
 Integer sample counts stay exact; CSV and JSON files retain full numerical
 precision. See [the figure guide](docs/FIGURES.md).
+
+The two current 100D comparisons also export inexpensive empirical MSE
+uncertainty summaries computed from per-chain squared errors. These describe
+the saved run; they are not formal 95% confidence intervals or uncertainty
+over refitting the maps. The t(3) norm has an infinite fourth moment, so its
+squared-error variance need not exist and empirical error bars can miss rare
+large errors. Keep this limitation in mind when comparing MSE across batches.
 
 For experiments other than the default 100D comparison, the **DCS map** selector offers **Möbius map** (the default VI fit of R, centre
 and Möbius parameters) and **Vanilla map** (fully untuned R=1, centre=0 and

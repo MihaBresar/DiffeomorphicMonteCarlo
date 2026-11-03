@@ -23,8 +23,11 @@ from dcs_bench.engine import environment, write_json
 from dcs_bench.references import radial_truth
 from dcs_bench.targets import Target
 from dcs_bench.tuning import fit_map
+from dcs_bench.simulation_error import mse_variability, paired_mse_differences
 
 METHODS = ('DCS-RWM', 'DCS-BW', 'SCS')
+SEED_BATCH_STRIDE = 1_000_000
+MAX_SEED_BATCH = 999
 TARGET = {'kind': 'skew_t', 'dimension': 100, 'nu': 3., 'alpha': {'0': 100., '1': -100.}}
 PRESETS = {
     'quick': dict(runs=2, time_budget=.05, warmup=100, thin=1, optimizer_steps=20, optimizer_samples=128),
@@ -45,16 +48,24 @@ def configuration(preset='quick', workers=1, overrides=None):
                   experiment='skew-t-100d-fixed', protocol='timed-matched-dcs-scs-v3',
                   implementation_revision='jax-dcs-exact-ball-v1',
                   dimension=100, nu=3., alpha=TARGET['alpha'], target=TARGET,
-                  beta=2., latitude=1.1, threshold=50., seed=901001, algorithms=list(METHODS),
+                  beta=2., latitude=1.1, threshold=50., seed=901001, seed_batch=0, algorithms=list(METHODS),
                   step_policy='shared_indicator_dual_averaging_0.234_then_frozen', initial_scale=.1,
                   vi_batch_policy='fresh', ball_map_policy='mobius', map_scale_initialization='unit',
                   fit_seed=42,
                   fitting_policy='Shared fresh-batch reverse KL, Adam 0.01, gradient-norm cap 10; no coordinate/CDF clipping')
+    supplied = {key: value for key, value in (overrides or {}).items() if value is not None}
+    batch = supplied.pop('seed_batch', None)
+    if batch is not None:
+        if isinstance(batch, bool) or not isinstance(batch, int) or not 0 <= batch <= MAX_SEED_BATCH:
+            raise ValueError('seed_batch must be an integer from 0 to 999')
+        if 'seed' in supplied:
+            raise ValueError('Choose either seed or seed_batch, not both')
+        config.update(seed_batch=batch, seed=901001 + batch * SEED_BATCH_STRIDE)
+    elif 'seed' in supplied:
+        config['seed_batch'] = None
     allowed = {'runs', 'time_budget', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples',
                'fit_seed', 'seed', 'workers'}
-    for key, value in (overrides or {}).items():
-        if value is None:
-            continue
+    for key, value in supplied.items():
         if key not in allowed:
             raise ValueError(f'{key} is not an override for the single SCS comparison')
         config[key] = value
@@ -63,8 +74,12 @@ def configuration(preset='quick', workers=1, overrides=None):
         if isinstance(value, bool) or not isinstance(value, int) or value < 1:
             raise ValueError(f'{key} must be a positive integer')
     for key in ('seed', 'fit_seed'):
-        if isinstance(config[key], bool) or not isinstance(config[key], int) or config[key] < 0:
-            raise ValueError(f'{key} must be a nonnegative integer')
+        if isinstance(config[key], bool) or not isinstance(config[key], int) or not 0 <= config[key] <= 2**32-1:
+            raise ValueError(f'{key} must be an integer from 0 to 2**32-1')
+    if config['seed'] + config['runs'] - 1 > 2**32-1:
+        raise ValueError('The chain seed range must fit within 32 bits')
+    if config['seed_batch'] is not None and config['runs'] > SEED_BATCH_STRIDE:
+        raise ValueError('Seed batches allow at most 1000000 chains to keep batches disjoint')
     if not np.isfinite(config['time_budget']) or config['time_budget'] <= 0:
         raise ValueError('time_budget must be finite and positive')
     if 100 % config['thin']:
@@ -200,8 +215,11 @@ def summarize(config, maps, fitting, records):
             mean_estimation_iterations=float(np.mean([r['estimation_iterations'] for r in rows])),
             mean_acceptance=float(np.mean([r['acceptance'] for r in rows])),
             final_scales=[r['final_scale'] for r in rows], records=rows)
+        cases[name].update(mse_variability(means, truth))
     return dict(config=config, truth=truth.tolist(), functionals=['tail_probability', 'mean_norm'],
                 maps=maps, fitting=fitting, cases=cases, time_scope=TIME_SCOPE,
+                paired_mse_differences=paired_mse_differences(
+                    {name: case['chain_means'] for name, case in cases.items()}, records, truth),
                 target_note='Shared normal-CDF-skewed t target from the DCS experiment. The SCS paper uses a '
                             'Student-t CDF and nu=1 or2; this applies the SCS kernel with common benchmark tuning to our nu=3 target.',
                 mse_note='All post-burn-in iterations, including repeats after rejections; exact radial truth. '
@@ -246,8 +264,12 @@ def main(argv=None, *, configuration_factory=None):
     parser.add_argument('--output-dir', type=Path)
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--time-budget', type=float)
+    seeds = parser.add_mutually_exclusive_group()
+    seeds.add_argument('--seed', type=int)
+    seeds.add_argument('--seed-batch', type=int,
+                       help='0 repeats original seeds; 1..999 select disjoint sampling seed batches. Map-fitting seed stays fixed.')
     for name in ('runs', 'warmup', 'thin', 'optimizer-steps', 'optimizer-samples',
-                 'fit-seed', 'seed'):
+                 'fit-seed'):
         parser.add_argument('--'+name, type=int)
     args = parser.parse_args(argv)
     overrides = {k: v for k, v in vars(args).items() if k not in ('preset', 'workers', 'output_dir', 'dry_run')}

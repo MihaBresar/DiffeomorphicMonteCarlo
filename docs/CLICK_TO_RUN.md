@@ -67,8 +67,28 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 See [the full protocol](SCS_100D.md) for matched fitting and step calibration, the unmodified SCS author transition, and separate timing clocks.
 
 To compare boundary handling, choose **100D boundary comparison** instead.
-It compares standard DCS-BW, reflected-chord DCS-BW, and author SCS; see the
-[separate protocol](BOUNDARY_100D.md), including its step-size ceiling.
+It compares standard DCS-BW, reflected-chord DCS-BW, and author SCS. The current
+v2 protocol preserves ordinary BW and SCS's original step calibration; only
+reflected BW has an extra step ceiling of 2 because its acceptance target can
+be unattainable. See the [separate protocol](BOUNDARY_100D.md). Its older
+validation table used a common ceiling of 2 and is labelled historical v1.
+
+For a new full boundary comparison on Windows, download the **latest ZIP**,
+extract it into a new folder, open **Start.bat**, and set up the environment.
+Select **100D boundary comparison → Full paper settings → 32 CPU workers**
+on the Ryzen 9 9950X3D. Choose **Original seeds (batch 0)** or **Fresh batch 1–5**,
+then click **Start run**. Rerun all three methods together; old tables are
+retained but do not evaluate the revised boundary protocol.
+
+Both 100D comparisons offer a seed-batch selector. **Original seeds (batch 0)** uses
+sampling seed 901001; **Fresh batch 1–5** use new sampling and warmup streams
+while keeping map-fitting seed 42 fixed. Choose a different batch to check
+whether an observed MSE ordering persists. Repeating the same batch reuses
+its streams, but timing can change how many iterations finish and where
+first-third burn-in ends, so counts and estimates can still differ. These
+batches assess sampling variability conditional on the fitted maps, not
+variability from fitting new maps. The main comparison's sampling and
+calibration protocol is unchanged.
 
 The default comparison contains exactly **DCS-RWM, DCS-BW and SCS** on one
 100D skewed Student-t target with **3 degrees of freedom**. Each method runs
@@ -82,6 +102,10 @@ for the same production sampling time:
 
 The figures report generated iteration counts, mean-norm and tail-probability
 estimates, MSE, and the observed bias/variance decomposition across chains.
+The exact-value exports also include inexpensive empirical MSE uncertainty
+summaries from the per-chain errors. Treat these as descriptive; they are not
+formal 95% confidence intervals, and the heavy tail of the norm statistic
+makes rare large errors especially important.
 The comparison fits both map families with the same training budget and tunes
 all three proposal steps automatically, then freezes them for sampling. The
 **DCS map** selector is disabled for this matched protocol.
