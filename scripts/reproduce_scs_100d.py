@@ -75,7 +75,7 @@ def configuration(preset='quick', workers=1, overrides=None):
 
 def source_hashes():
     paths = list((ROOT/'dcs_bench').glob('*.py')) + list((ROOT/'third_party/scs_paper').rglob('*.py'))
-    paths += [Path(__file__), ROOT/'scripts/scs_100d_figures.py', ROOT/'requirements-cpu.txt']
+    paths += [Path(__file__), ROOT/'scripts/reproduce_boundary_100d.py', ROOT/'scripts/scs_100d_figures.py', ROOT/'requirements-cpu.txt']
     return {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 
 
@@ -133,9 +133,10 @@ def chain_job(job):
 
 
 def run_chains(root, config, maps):
+    methods = tuple(config['algorithms'])
     count = min(config['workers'], config['runs'])
     context = multiprocessing.get_context('spawn')
-    records = {name: [] for name in METHODS}
+    records = {name: [] for name in methods}
     with context.Manager() as manager:
         slots = manager.Queue()
         for cpu in cpu_info()['cpu_ids'][:count]:
@@ -144,7 +145,7 @@ def run_chains(root, config, maps):
                 initializer=initialize_worker, initargs=(slots,)) as pool:
             for wave, start in enumerate(range(0, config['runs'], count)):
                 chains = list(range(start, min(start+count, config['runs'])))
-                order = METHODS[wave % 3:]+METHODS[:wave % 3]
+                order = methods[wave % len(methods):]+methods[:wave % len(methods)]
                 for algorithm in order:
                     barrier = manager.Barrier(len(chains))
                     jobs = [dict(algorithm=algorithm, chain=chain, seed=config['seed']+chain,
@@ -168,7 +169,7 @@ def run_chains(root, config, maps):
 def summarize(config, maps, fitting, records):
     truth = radial_truth(Target(TARGET), 50.)[1]
     cases = {}
-    for name in METHODS:
+    for name in config['algorithms']:
         rows = records[name]
         if len(rows) != config['runs'] or any(r['iterations'] <= 0 for r in rows):
             raise ValueError('Incomplete chains cannot be summarized as a completed comparison')
@@ -238,7 +239,7 @@ def run(config, output):
         raise
 
 
-def main(argv=None):
+def main(argv=None, *, configuration_factory=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--preset', choices=list(PRESETS), default='quick')
     parser.add_argument('--workers', type=int, default=1)
@@ -250,8 +251,9 @@ def main(argv=None):
         parser.add_argument('--'+name, type=int)
     args = parser.parse_args(argv)
     overrides = {k: v for k, v in vars(args).items() if k not in ('preset', 'workers', 'output_dir', 'dry_run')}
-    config = configuration(args.preset, args.workers, overrides)
-    output = args.output_dir or ROOT/'results'/'skew-t-100d-fixed'/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
+    factory = configuration_factory or configuration
+    config = factory(args.preset, args.workers, overrides)
+    output = args.output_dir or ROOT/'results'/config['experiment']/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
     if args.dry_run:
         print(json.dumps({'output_dir': str(output), 'configuration': config}, indent=2))
         return 0

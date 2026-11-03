@@ -1,8 +1,9 @@
 """Equal-time comparison using the author SCS and matched JAX DCS execution.
 
 Both methods materialize the same 300-state scan and run the same vectorized
-radial bookkeeping. DCS evaluates both densities for admissible proposals and
-directly rejects outside-ball proposals. Compilation and
+radial bookkeeping. DCS evaluates both densities for admissible proposals;
+standard BW rejects outside-ball proposals and its separate reflected variant
+relocates them along the proposal chord. Compilation and
 shared separate step calibration are untimed; all production steps are frozen.
 """
 from functools import lru_cache
@@ -79,18 +80,22 @@ def _dcs_components(mapping_dict, target, algorithm):
         def step(carry, index):
             x, key = carry
             key, subkey = jax.random.split(key)
-            if algorithm == 'DCS-BW':
+            if algorithm in ('DCS-BW', 'DCS-BW-reflect'):
                 eps = stepsize * _uniform_ball(subkey, dimension)
             else:
                 eps = stepsize * jax.random.normal(subkey, shape=x.shape)
             proposed = x + eps
+            valid = jnp.asarray(True)
+            if algorithm == 'DCS-BW-reflect':
+                from .ball_boundary import reflect_ball_proposal
+                proposed, valid = reflect_ball_proposal(x, eps)
             key, subkey = jax.random.split(key)
             logu = jnp.log(jax.random.uniform(subkey))
             # No current-state cache: both densities are recomputed for every
             # admissible proposal. Outside-ball proposals reject by definition,
             # so neither evaluation is necessary. Keep key advancement common
             # to both branches. The initial and all accepted states are valid.
-            accept = jax.lax.cond(jnp.sum(proposed * proposed) < 1.,
+            accept = jax.lax.cond(valid & (jnp.sum(proposed * proposed) < 1.),
                 lambda _: (logu < interior(proposed) - interior(x)) * 1.,
                 lambda _: jnp.asarray(0.), operand=None)
             x = x * (1. - accept) + proposed * accept
@@ -121,10 +126,11 @@ def _components(mapping, spec, algorithm):
     return author_block, lambda states: model.projection(params, states), initial, density
 
 
-def _calibrate(block, initial, key, warmup, initial_scale):
+def _calibrate(block, initial, key, warmup, initial_scale, scale_ceiling=None):
     """Identical raw dual averaging of observed 0/1 acceptance for all methods."""
     import jax
     import jax.numpy as jnp
+    log_ceiling = 15. if scale_ceiling is None else jnp.log(scale_ceiling)
     def step(carry, iteration):
         state, key, scale, hbar, logbar, accepts = carry
         key, subkey = jax.random.split(key)
@@ -135,12 +141,12 @@ def _calibrate(block, initial, key, warmup, initial_scale):
         logscale = jnp.log(10. * initial_scale) - jnp.sqrt(iteration) / .05 * hbar
         weight = iteration ** (-.75)
         logbar = weight * logscale + (1. - weight) * logbar
-        scale = jnp.exp(jnp.clip(logscale, -30., 15.))
+        scale = jnp.exp(jnp.clip(logscale, -30., log_ceiling))
         return (states[-1], key, scale, hbar, logbar, accepts + accept), None
     carry = (initial, key, initial_scale, jnp.asarray(0.),
              jnp.log(initial_scale), jnp.asarray(0.))
     final, _ = jax.lax.scan(step, carry, jnp.arange(1, warmup + 1, dtype=jnp.float64))
-    return final[0], jnp.exp(jnp.clip(final[4], -30., 15.)), final[5]
+    return final[0], jnp.exp(jnp.clip(final[4], -30., log_ceiling)), final[5]
 
 
 def _radial_batch(block, projection, state, key, scale, thin, threshold):
@@ -154,7 +160,7 @@ def _radial_batch(block, projection, state, key, scale, thin, threshold):
 
 
 @lru_cache(maxsize=8)
-def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initial_scale):
+def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initial_scale, scale_ceiling=None):
     """Compile both phases without consuming a chain's RNG or timing budget."""
     import jax
     import jax.numpy as jnp
@@ -162,7 +168,7 @@ def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initi
         json.loads(mapping_json), json.loads(spec_json), algorithm)
     if not np.isfinite(float(density(initial))) or not np.all(np.isfinite(np.asarray(projection(initial)))):
         raise ValueError('Nonfinite initial density or physical point')
-    burn = lambda state, key: _calibrate(block, state, key, warmup, initial_scale)
+    burn = lambda state, key: _calibrate(block, state, key, warmup, initial_scale, scale_ceiling)
     batch = lambda state, key, scale: _radial_batch(block, projection, state, key, scale, thin, threshold)
     device = jax.local_devices(backend='cpu')[0]
     initial, key, scale = jax.device_put((initial, jax.random.key(0), jnp.asarray(initial_scale)), device)
@@ -184,11 +190,14 @@ class _Matched:
         self.initial_scale = float(config.get('initial_scale', .1))
         if not np.isfinite(self.initial_scale) or self.initial_scale <= 0.:
             raise ValueError('initial_scale must be positive and finite')
+        scale_ceiling = config.get('step_scale_ceiling')
+        if scale_ceiling is not None and (not np.isfinite(scale_ceiling) or scale_ceiling < self.initial_scale):
+            raise ValueError('step_scale_ceiling must be finite and at least initial_scale')
         previous = _programs.cache_info().misses
         burn, self.program, initial, compile_seconds = _programs(
             json.dumps(mapping, sort_keys=True), json.dumps(spec, sort_keys=True),
             config['algorithm'], config['warmup'], config['thin'],
-            float(config.get('threshold', 50.)), self.initial_scale)
+            float(config.get('threshold', 50.)), self.initial_scale, scale_ceiling)
         self.compile_seconds = compile_seconds if _programs.cache_info().misses > previous else 0.
         key = jax.device_put(jax.random.key(seed), jax.local_devices(backend='cpu')[0])
         burn_key, self.key = jax.random.split(key)
@@ -213,7 +222,7 @@ def _backend(mapping, config, seed):
 
 
 def _validate(config):
-    if config['algorithm'] not in ('DCS-RWM', 'DCS-BW', 'SCS'):
+    if config['algorithm'] not in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', 'SCS'):
         raise ValueError('Timed radial comparison supports DCS-RWM, DCS-BW and SCS')
     if not np.isfinite(config['time_budget']) or config['time_budget'] <= 0:
         raise ValueError('time_budget must be positive and finite')
@@ -299,8 +308,12 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         'step_policy': STEP_POLICY,
         'target_acceptance': .234,
         'common_cpu_backend': 'JAX',
-        'implementation_revision': IMPLEMENTATION_REVISION,
-        'proposal_generator': ('normal_d_plus_2_projection' if config['algorithm'] == 'DCS-BW'
+        'implementation_revision': config.get('implementation_revision', IMPLEMENTATION_REVISION),
+        'boundary_policy': ('reflect_along_proposal_chord' if config['algorithm'] == 'DCS-BW-reflect'
+                            else 'author_cap_stepout' if config['algorithm'] == 'SCS' else 'direct_rejection'),
+        'step_scale_ceiling': float(config.get('step_scale_ceiling', np.exp(15.))),
+        'scale_ceiling_reached': bool(backend.scale >= config.get('step_scale_ceiling', np.exp(15.))*(1-1e-10)),
+        'proposal_generator': ('normal_d_plus_2_projection' if config['algorithm'] in ('DCS-BW', 'DCS-BW-reflect')
                                else 'author_tangent_normal' if config['algorithm'] == 'SCS'
                                else 'isotropic_normal'),
         'common_statistic_policy': 'Full 300-state scans; physical projection and norm for every state, including rejection repeats',

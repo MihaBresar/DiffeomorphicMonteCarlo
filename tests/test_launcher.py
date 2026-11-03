@@ -31,7 +31,7 @@ class LauncherTests(unittest.TestCase):
             with self.subTest(experiment=experiment), self.assertRaises(ValueError):
                 launcher.commands_for_run('quick', experiment, Path('results/test'))
 
-    def test_visible_menu_has_one_scs_comparison_and_defaults_to_it(self):
+    def test_visible_menu_keeps_main_scs_default_and_adds_boundary_comparison(self):
         from html.parser import HTMLParser
         class ExperimentMenu(HTMLParser):
             def __init__(self):
@@ -55,7 +55,8 @@ class LauncherTests(unittest.TestCase):
         menu.feed((launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8'))
         self.assertEqual({x['value'] for x in menu.options}, set(launcher.EXPERIMENTS))
         self.assertEqual([x['value'] for x in menu.options if 'selected' in x], ['skew-t-100d-fixed'])
-        self.assertEqual(sum('SCS' in label for label in menu.labels), 1)
+        self.assertEqual(sum('SCS' in label for label in menu.labels), 2)
+        self.assertIn('skew-t-100d-boundary', {x['value'] for x in menu.options})
 
     def test_map_policy_reaches_production_not_reference_generation(self):
         commands = launcher.commands_for_run('paper', 'logistic-regression', Path('results/test'), ball_map_policy='vanilla')

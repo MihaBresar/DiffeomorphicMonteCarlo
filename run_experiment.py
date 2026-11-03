@@ -21,10 +21,16 @@ import json
 import sys
 from dcs_bench.engine import ALIASES, experiment_names, load_config, run
 
+BOUNDARY_EXPERIMENT = 'skew-t-100d-boundary'
+
+
+def named_experiments():
+    return sorted(set(experiment_names()) | {BOUNDARY_EXPERIMENT})
+
 
 def parser():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('experiment', nargs='?', choices=experiment_names()+list(ALIASES))
+    p.add_argument('experiment', nargs='?', choices=named_experiments()+list(ALIASES))
     p.add_argument('--list', action='store_true')
     p.add_argument('--preset', choices=['quick', 'reproduce', 'paper'], default='quick')
     p.add_argument('--output-dir', type=Path)
@@ -50,13 +56,13 @@ def main(argv=None):
     if args.recompute_diagnostics and not args.plot_only:
         p.error('--recompute-diagnostics requires --plot-only SAVED_RUN')
     if args.list:
-        print('\n'.join(experiment_names()))
+        print('\n'.join(named_experiments()))
         return 0
     if args.plot_only:
         summary_path = args.plot_only/'summary.json'
         if summary_path.exists():
             summary = json.loads(summary_path.read_text(encoding='utf-8'))
-            if summary.get('config', {}).get('protocol') in ('original-dcs-author-scs-v1', 'timed-dcs-author-scs-v2', 'timed-matched-dcs-scs-v3'):
+            if summary.get('config', {}).get('protocol') in ('original-dcs-author-scs-v1', 'timed-dcs-author-scs-v2', 'timed-matched-dcs-scs-v3', 'timed-boundary-dcs-scs-v1'):
                 from scripts.scs_100d_figures import render_report
                 render_report(args.plot_only, summary)
                 print(args.plot_only.resolve())
@@ -71,10 +77,13 @@ def main(argv=None):
         return 0
     if args.experiment is None:
         p.error('choose an experiment or --plot-only SAVED_RUN')
-    if args.experiment == 'skew-t-100d-fixed':
+    if args.experiment in ('skew-t-100d-fixed', BOUNDARY_EXPERIMENT):
         if args.resume:
             p.error('The single SCS comparison starts from scratch; choose a fresh output folder.')
-        from scripts.reproduce_scs_100d import main as single_main
+        if args.experiment == BOUNDARY_EXPERIMENT:
+            from scripts.reproduce_boundary_100d import main as single_main
+        else:
+            from scripts.reproduce_scs_100d import main as single_main
         command = ['--preset', args.preset, '--workers', str(args.workers or 1)]
         if args.output_dir:
             command += ['--output-dir', str(args.output_dir)]

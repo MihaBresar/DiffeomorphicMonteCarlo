@@ -34,6 +34,8 @@ jobs:
       - run: python -m examples.basic_sampler
       - run: python run_experiment.py skew-t-100d-fixed --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-single-scs
       - run: python run_experiment.py --plot-only results/ci-single-scs
+      - run: python run_experiment.py skew-t-100d-boundary --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-boundary-scs
+      - run: python run_experiment.py --plot-only results/ci-boundary-scs
       - run: python prepare_reference.py --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-reference
       - run: python run_experiment.py skew-t-200d-nuts --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci
       - run: python run_experiment.py --plot-only results/ci
@@ -61,6 +63,7 @@ jobs:
             results/ci-joint-r-step
             results/ci-superheavy-counts
             results/ci-single-scs
+            results/ci-boundary-scs
             results/ci-baselines
             results/ci-eight-schools
             results/ci-processing*.json

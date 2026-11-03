@@ -1,5 +1,12 @@
 # Changes
 
+## 2026-11-03 — separate reflected-boundary comparison
+
+- Add a launcher experiment comparing direct-rejection DCS-BW, reversible reflected-chord DCS-BW and unchanged author SCS on the same 100D skewed t(3) target.
+- Preserve the main comparison; both BW variants share their fitted map, with matched fitting, separate step calibration, recording, timing and first-third burn-in.
+- Document proposal reversibility and distinguish chord reflection from SCS's spherical step-out. Test stationarity, transition symmetry, multiple reflections and numerical safeguards.
+- Record and report step-ceiling saturation when the common acceptance target is unattainable.
+
 ## 2026-11-03 — exact DCS JAX efficiency improvements
 
 - Generate uniform-ball proposals from one normalized vector of d+2 Gaussian draws, preserving the proposal law while removing the separate radial random draw.

@@ -66,6 +66,10 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 
 See [the full protocol](SCS_100D.md) for matched fitting and step calibration, the unmodified SCS author transition, and separate timing clocks.
 
+To compare boundary handling, choose **100D boundary comparison** instead.
+It compares standard DCS-BW, reflected-chord DCS-BW, and author SCS; see the
+[separate protocol](BOUNDARY_100D.md), including its step-size ceiling.
+
 The default comparison contains exactly **DCS-RWM, DCS-BW and SCS** on one
 100D skewed Student-t target with **3 degrees of freedom**. Each method runs
 for the same production sampling time:

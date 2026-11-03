@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent
 RUNS = ROOT/'results'/'click-runs'
 PRESETS = ('quick', 'reproduce', 'paper')
 EXPERIMENTS = ('all', 'skew-t-200d-nuts', 'skew-t-200d-baselines', 'skew-t-100d-fixed',
-               'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression')
+               'skew-t-100d-boundary', 'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression')
 
 
 def environment_python():
@@ -80,10 +80,11 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
             raise ValueError('Choose a listed DCS map policy')
     py = str(environment_python())
     directory = Path(directory)
-    if experiment == 'skew-t-100d-fixed':
+    if experiment in ('skew-t-100d-fixed', 'skew-t-100d-boundary'):
         if resume or plot_only:
             raise ValueError('The 100D SCS comparison starts from scratch in a new results folder.')
-        return [[py, '-u', str(ROOT/'scripts/reproduce_scs_100d.py'), '--preset', preset,
+        script = 'reproduce_boundary_100d.py' if experiment == 'skew-t-100d-boundary' else 'reproduce_scs_100d.py'
+        return [[py, '-u', str(ROOT/'scripts'/script), '--preset', preset,
                  '--workers', str(workers), '--output-dir', str(directory/experiment)]]
     if experiment == 'all':
         command = [py, '-u', str(ROOT/'scripts/reproduce_all.py'), '--preset', preset, '--output-root', str(directory)]

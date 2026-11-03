@@ -6,6 +6,9 @@ This corrected implementation centralizes target densities and transformations, 
 
 ## Run with clicks — no commands needed
 
+The separate **100D boundary comparison** adds reflected-chord DCS-BW alongside
+standard DCS-BW and author SCS. See [its protocol and reversibility argument](docs/BOUNDARY_100D.md).
+
 Download this repository using **Code → Download ZIP**, extract it, and install
 **Python 3.12 (64-bit)**. On Windows double-click **Start.bat**; on macOS open
 **Start.command**. Alternatively, open **START_HERE.py** in Python's IDLE editor

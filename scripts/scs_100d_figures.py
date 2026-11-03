@@ -15,8 +15,8 @@ from dcs_bench.display import number, cell, figure_ticks
 
 METRICS = ('tail_probability', 'mean_norm')
 ALIASES = (('tail_probability', 'tail'), ('mean_norm', 'norm'))
-METHODS = ('DCS-RWM', 'DCS-BW', 'SCS')
-COLORS = {'DCS-RWM': '#FF8C00', 'DCS-BW': '#9370db', 'SCS': '#ff1493'}
+METHODS = ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', 'SCS')
+COLORS = {'DCS-RWM': '#FF8C00', 'DCS-BW': '#9370db', 'DCS-BW-reflect': '#159a8c', 'SCS': '#ff1493'}
 
 
 def _pair(value):
@@ -112,7 +112,8 @@ def render_report(root, summary):
     figures = root/'figures'
     figures.mkdir(exist_ok=True)
     cases, config = summary['cases'], summary['config']
-    matched = config.get('protocol') == 'timed-matched-dcs-scs-v3'
+    boundary = config.get('protocol') == 'timed-boundary-dcs-scs-v1'
+    matched = config.get('protocol') == 'timed-matched-dcs-scs-v3' or boundary
     timed = config.get('mode') == 'time' or config.get('protocol') == 'timed-dcs-author-scs-v2' or matched
     if not cases or any(name not in METHODS for name in cases):
         raise ValueError('Expected completed DCS-RWM, DCS-BW, or SCS cases')
@@ -133,6 +134,8 @@ def render_report(root, summary):
     threshold = config.get('threshold', 50.)
     smoke = config.get('preset') == 'quick'
     title = ('EXECUTION CHECK — ' if smoke else '')+f'{dimension}D skewed Student-t, ν = {nu:g}'
+    if boundary:
+        title += ' — boundary comparison'
     budget = (f"{config['runs']} chains per method; {number(config['time_budget'])} s of timed sampling per chain; "
               'first third of generated iterations discarded' if timed else
               f"{config['runs']} chains × {config['iterations']} production iterations per method; "
@@ -142,6 +145,9 @@ def render_report(root, summary):
     tuning_note = ('All methods use matched map fitting and step tuning toward 0.234; sampling steps stay fixed.' if matched else
                   'DCS steps are pretuned; author SCS uses h = 0.10 after untimed equilibration. All sampling steps stay fixed.' if timed else
                    'DCS adapts during sampling; SCS uses h = 0.1.')
+    if boundary and 'step_scale_ceiling' in config:
+        tuning_note = (f"All methods tune toward 0.234 with a shared step ceiling of {number(config['step_scale_ceiling'])}; "
+                       'the ceiling may bind. Sampling steps stay fixed.')
     metric_labels = (f'P(‖X‖ ≥ {threshold:g})', 'E[‖X‖]')
     x = np.arange(1, len(names)+1)
     colors = [COLORS[name] for name in names]
@@ -177,7 +183,9 @@ def render_report(root, summary):
         ax.set_ylim(0, largest*1.18 if largest > 0 else 1.)
         ax.grid(axis='y', linestyle='--', alpha=.5)
         ax.ticklabel_format(axis='y', style='plain', useOffset=False)
-    fig.suptitle(('EXECUTION CHECK — ' if smoke else '')+'Performance & Mean Squared Error Comparison\n'+
+    comparison_title = ('Boundary Handling: Performance & Mean Squared Error' if boundary else
+                        'Performance & Mean Squared Error Comparison')
+    fig.suptitle(('EXECUTION CHECK — ' if smoke else '')+comparison_title+'\n'+
                  f'{dimension}D skewed Student-t, ν = {nu:g}', fontsize=14, fontweight='bold')
     fig.text(.5, .079, budget+'.', ha='center', fontsize=9)
     fig.text(.5, .049, tuning_note+' '+estimation_note,
@@ -373,7 +381,7 @@ def render_report(root, summary):
         if total_draws is None and fitting.get('steps') is not None and fitting.get('samples_per_step') is not None:
             total_draws = fitting['steps']*fitting['samples_per_step']
             count_source = 'steps × samples_per_step'
-        setup_rows.append({'map': family, 'used_by': 'DCS-RWM and DCS-BW' if family == 'ball' else 'SCS',
+        setup_rows.append({'map': family, 'used_by': ' and '.join(n for n in names if n != 'SCS') if family == 'ball' else 'SCS',
                            'fitting_seconds': fitting.get('seconds'), 'steps': fitting.get('steps'),
                            'training_draws': fitting.get('training_draws'),
                            'samples_per_step': fitting.get('samples_per_step'),
@@ -421,6 +429,16 @@ def render_report(root, summary):
         if config.get('implementation_revision') == 'jax-dcs-exact-ball-v1':
             notes[2] = 'Both map families use the same fresh-batch reverse-KL fitting framework, optimizer budget, Adam updates and gradient clipping. All three samplers use compiled JAX CPU scans and the same full-state recording policy. DCS rejects outside-ball proposals before either density evaluation and recomputes both current and proposed densities for every admissible proposal. Physical projection and radial estimation run after each batch for every method. DCS-RWM and DCS-BW share the ball map.'
             notes.append('This implementation generates the same uniform-ball BW proposal distribution from d+2 Gaussian draws and simplifies the β=2 map using an exact Möbius identity. The BW random-number sequence for a given seed changes, while its proposal law is preserved. The author SCS transition, shared fitting and tuning budgets, recording and timing remain unchanged.')
+    if boundary:
+        notes[1] = 'All three methods use the same separate dual-averaging calibration toward acceptance 0.234 and freeze their scales during timed sampling. The first third of actual generated iterations is then discarded.'
+        if 'step_scale_ceiling' in config:
+            notes[1] += ' All three methods have a common upper step limit of '+number(config['step_scale_ceiling'])+'.'
+        notes[2] = 'Standard DCS-BW and DCS-BW-reflect share the same fitted ball map and initial physical point. The reflected variant folds an outside proposal back along its chord, then applies the transformed-density Metropolis test. Author SCS keeps its original cap step-out. Map fitting, recording and time budgets are matched.'
+        notes[5] = 'The setup table reports fitting once per map; both BW variants share the ball fit. Compilation and step calibration are excluded from the sampling clock for all methods.'
+        notes.append('Reflected-chord BW is a separate reversible kernel, not literal SCS step-out or specular billiards. No clipping onto the ball boundary is used. A numerical invalid endpoint becomes a rejected move.')
+        reflected = cases.get('DCS-BW-reflect', {})
+        if any(row.get('scale_ceiling_reached') for row in reflected.get('records', [])):
+            notes.append('Reflected BW reached the common step-size ceiling in at least one chain. Its acceptance target may be unattainable; do not interpret saturation as successful calibration. Inspect final scales and acceptance rates.')
     notes += [summary[key] for key in ('target_note', 'mse_note', 'time_scope') if isinstance(summary.get(key), str)]
     warning = '<p class="warning">Quick execution check only — do not interpret sampler rankings.</p>' if smoke else ''
     page = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
