@@ -1,148 +1,183 @@
-"""Equal-time, frozen-kernel radial comparison with exact first-third burn-in.
+"""Equal-time comparison using the author SCS and matched JAX DCS execution.
 
-All methods finish batches of 300 transitions. Prefix sums every 100 steps
-therefore locate one third of the final iteration count exactly, without
-retaining every state. Compilation and separate DCS step tuning are untimed.
+Both methods materialize the same 300-state scan, evaluate current and proposed
+log densities, and run the same vectorized radial bookkeeping. Compilation and
+shared separate step calibration are untimed; all production steps are frozen.
 """
 from functools import lru_cache
 import json
 import time
 
 import numpy as np
-from numba import njit, typeof
 
-from . import fast_dcs
+from . import scs_paper
+from .targets import Target
+from .transforms import BallMap, mobius
 
 BATCH_SIZE = 300
 PREFIX_STRIDE = 100
+STEP_POLICY = 'common raw dual averaging of observed acceptance to 0.234 during separate warmup; smoothed final scale frozen'
 
 
-@njit(nogil=True)
-def _frozen_dcs(rng, z, lp, radius, scale, thin, threshold, ball_walk,
-                mu, delta, alpha, constants):
-    """Same compiled DCS transition, with no adaptation inside production."""
-    prefixes = np.empty((3, 3))
-    norms = np.empty(BATCH_SIZE // thin)
-    tail_count, norm_sum, accepted = 0, 0., 0
-    for index in range(BATCH_SIZE):
-        z, lp, radius, probability, did_accept = fast_dcs._transition(
-            rng, z, lp, radius, scale, ball_walk, mu, delta, alpha, constants)
-        tail_count += int(radius >= threshold)
-        norm_sum += radius
-        accepted += int(did_accept)
-        if (index + 1) % thin == 0:
-            norms[(index + 1) // thin - 1] = radius
-        if (index + 1) % PREFIX_STRIDE == 0:
-            row = (index + 1) // PREFIX_STRIDE - 1
-            prefixes[row, 0] = tail_count
-            prefixes[row, 1] = norm_sum
-            prefixes[row, 2] = accepted
-    return z, lp, radius, prefixes, norms
-
-
-class _DCS:
-    def __init__(self, mapping_dict, config, seed):
-        mapping, mu, delta, alpha, constants = fast_dcs._inputs(mapping_dict, config)
-        self.extra = (config['thin'], float(config.get('threshold', 50.)),
-                      config['algorithm'] == 'DCS-BW', mu, delta, alpha, constants)
-        z = np.ascontiguousarray(mapping.inverse(np.ones(mapping.d)))
-        started = time.perf_counter()
-        lp, radius = fast_dcs._evaluate(z, mu, delta, alpha, constants)
-        fast_dcs._run_block(np.random.default_rng(0), z.copy(), lp, radius,
-            .1, 0., 0., 0, 0, 1, self.extra[1], self.extra[2], mu, delta, alpha, constants)
-        # Compile without executing production transitions or consuming the
-        # actual chain RNG. Each process resolves its own SciPy CDF address.
-        signature_values = (np.random.default_rng(0), z.copy(), lp, radius, .1, *self.extra)
-        _frozen_dcs.compile(tuple(typeof(value) for value in signature_values))
-        self.compile_seconds = time.perf_counter() - started
-        if not np.isfinite(lp) or not np.isfinite(radius):
-            raise ValueError('Nonfinite initial DCS density or radius')
-        self.rng = np.random.default_rng(seed)
-        warmup = config['warmup']
-        started = time.perf_counter()
-        warm = fast_dcs._run_block(self.rng, z, lp, radius, .1, 0., 0., 0, warmup,
-            max(1, warmup + 1), self.extra[1], self.extra[2], mu, delta, alpha, constants)
-        self.warmup_seconds = time.perf_counter() - started
-        self.state, self.lp, self.radius, self.scale = warm[:4]
-        self.warmup_acceptance = warm[8] / warmup if warmup else None
-        self.implementation = 'Numba DCS transition; step tuned separately then frozen'
-
-    def batch(self):
-        self.state, self.lp, self.radius, prefixes, norms = _frozen_dcs(
-            self.rng, self.state, self.lp, self.radius, self.scale, *self.extra)
-        return prefixes, norms
-
-
-@lru_cache(maxsize=8)
-def _scs_programs(mapping_json, spec_json, warmup, thin, threshold):
-    from . import scs_paper
-    core = scs_paper._author()
+def _dcs_components(mapping_dict, target, algorithm):
+    """DCS scan written in the same JAX style as the unmodified SCS scan."""
     import jax
     import jax.numpy as jnp
-    from .targets import Target
-    mapping = json.loads(mapping_json)
-    target = Target(json.loads(spec_json))
+    mapping = BallMap(**mapping_dict)
+    mu, delta = jnp.asarray(mapping.mu), jnp.asarray(mapping.delta)
+    beta, scale, dimension = mapping.beta, mapping.scale, mapping.d
+
+    def transform(z):
+        w, logmobius = mobius(z, delta, jnp)
+        radius = jnp.linalg.norm(w, axis=-1)
+        logeps = jnp.log(-jnp.expm1(beta * jnp.log(radius)))
+        physical = mu + scale * w / jnp.exp(logeps / beta)[..., None]
+        logjac = dimension * jnp.log(scale) - (1 + dimension / beta) * logeps + logmobius
+        return physical, logjac
+
+    def density(z):
+        def interior(z):
+            x, logjac = transform(z)
+            value = target.log_prob(x, 'jax') + logjac
+            return jnp.where(jnp.isfinite(value), value, -jnp.inf)
+        # An outside-ball proposal is a genuine direct rejection. No target
+        # call is needed there; interior current and proposal densities are
+        # recomputed on every step, just as in the author SCS implementation.
+        return jax.lax.cond(jnp.sum(z * z) < 1., interior,
+                            lambda _: jnp.asarray(-jnp.inf), z)
+
+    def block(x0, key, count, stepsize):
+        def step(carry, index):
+            x, key = carry
+            key, subkey = jax.random.split(key)
+            direction = jax.random.normal(subkey, shape=x.shape)
+            if algorithm == 'DCS-BW':
+                key, subkey = jax.random.split(key)
+                radius = jax.random.uniform(subkey) ** (1. / dimension)
+                eps = stepsize * radius * direction / jnp.linalg.norm(direction)
+            else:
+                eps = stepsize * direction
+            proposed = x + eps
+            log_accept = density(proposed) - density(x)
+            key, subkey = jax.random.split(key)
+            accept = (jnp.log(jax.random.uniform(subkey)) < log_accept) * 1.
+            x = x * (1. - accept) + proposed * accept
+            return (x, key), (x, accept)
+        return jax.lax.scan(step, (x0, key), jnp.arange(count))[1]
+
+    initial = jnp.asarray(mapping.inverse(np.ones(dimension)))
+    return block, lambda states: transform(states)[0], initial, density
+
+
+def _components(mapping, spec, algorithm):
+    """Return a full-state scan, physical projection, initial point and density."""
+    core = scs_paper._author()  # Also enables the same float64 policy for DCS.
+    import jax.numpy as jnp
+    target = Target(spec)
+    if algorithm != 'SCS':
+        return _dcs_components(mapping, target, algorithm)
     model = core.SCP(target.d, scs_paper.LATITUDE)
     params = scs_paper._parameters(model, mapping)
     density = model.transform_target(lambda x: target.log_prob(x, 'jax'), params)
     initial = model.inverse_projection(params, jnp.ones(target.d, dtype=jnp.float64))
 
-    def author(x, key, count):
+    def author_block(x, key, count, stepsize):
+        # Invoke the original function unchanged, including its complete scan,
+        # proposal, bright-cap stepout and Metropolis decision.
         return core.rwm_bright_side_stepout(density, x, scs_paper.LATITUDE,
-            key, nsample=count, stepsize=scs_paper.STEP_SIZE)
+                                           key, nsample=count, stepsize=stepsize)
+    return author_block, lambda states: model.projection(params, states), initial, density
 
-    def burn(x, key):
-        if not warmup:
-            return x, jnp.asarray(0., dtype=jnp.float64)
-        states, accepted = author(x, key, warmup)
-        return states[-1], accepted.sum()
 
-    def batch(x, key):
-        # The original author's complete scan is invoked unchanged.
-        states, accepted = author(x, key, BATCH_SIZE)
-        norm = jnp.linalg.norm(model.projection(params, states), axis=1)
-        values = jnp.stack((norm >= threshold, norm, accepted), axis=1)
-        # A 3x100 reduction gives exactly the same checkpoints used by DCS.
-        prefixes = jnp.cumsum(values.reshape(3, PREFIX_STRIDE, 3).sum(axis=1), axis=0)
-        return states[-1], prefixes, norm[thin-1::thin]
+def _calibrate(block, initial, key, warmup, initial_scale):
+    """Identical raw dual averaging of observed 0/1 acceptance for all methods."""
+    import jax
+    import jax.numpy as jnp
+    def step(carry, iteration):
+        state, key, scale, hbar, logbar, accepts = carry
+        key, subkey = jax.random.split(key)
+        states, accepted = block(state, subkey, 1, scale)
+        accept = accepted[0]
+        eta = 1. / (iteration + 10.)
+        hbar = (1. - eta) * hbar + eta * (.234 - accept)
+        logscale = jnp.log(10. * initial_scale) - jnp.sqrt(iteration) / .05 * hbar
+        weight = iteration ** (-.75)
+        logbar = weight * logscale + (1. - weight) * logbar
+        scale = jnp.exp(jnp.clip(logscale, -30., 15.))
+        return (states[-1], key, scale, hbar, logbar, accepts + accept), None
+    carry = (initial, key, initial_scale, jnp.asarray(0.),
+             jnp.log(initial_scale), jnp.asarray(0.))
+    final, _ = jax.lax.scan(step, carry, jnp.arange(1, warmup + 1, dtype=jnp.float64))
+    return final[0], jnp.exp(jnp.clip(final[4], -30., 15.)), final[5]
 
-    key = jax.random.key(0)
+
+def _radial_batch(block, projection, state, key, scale, thin, threshold):
+    """The same full-state projection and statistic work, including rejections."""
+    import jax.numpy as jnp
+    states, accepted = block(state, key, BATCH_SIZE, scale)
+    norms = jnp.linalg.norm(projection(states), axis=1)
+    values = jnp.stack((norms >= threshold, norms, accepted), axis=1)
+    prefixes = jnp.cumsum(values.reshape(3, PREFIX_STRIDE, 3).sum(axis=1), axis=0)
+    return states[-1], prefixes, norms[thin - 1::thin]
+
+
+@lru_cache(maxsize=8)
+def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initial_scale):
+    """Compile both phases without consuming a chain's RNG or timing budget."""
+    import jax
+    import jax.numpy as jnp
+    block, projection, initial, density = _components(
+        json.loads(mapping_json), json.loads(spec_json), algorithm)
+    if not np.isfinite(float(density(initial))) or not np.all(np.isfinite(np.asarray(projection(initial)))):
+        raise ValueError('Nonfinite initial density or physical point')
+    burn = lambda state, key: _calibrate(block, state, key, warmup, initial_scale)
+    batch = lambda state, key, scale: _radial_batch(block, projection, state, key, scale, thin, threshold)
+    device = jax.local_devices(backend='cpu')[0]
+    initial, key, scale = jax.device_put((initial, jax.random.key(0), jnp.asarray(initial_scale)), device)
     started = time.perf_counter()
     burn_program = jax.jit(burn).lower(initial, key).compile()
-    batch_program = jax.jit(batch).lower(initial, key).compile()
+    batch_program = jax.jit(batch).lower(initial, key, scale).compile()
     return burn_program, batch_program, initial, time.perf_counter() - started
 
 
-class _SCS:
+class _Matched:
+    """Common JAX driver, calibration, recording and clocks for DCS and SCS."""
     def __init__(self, mapping, config, seed):
-        from . import scs_paper
         scs_paper._author()
         import jax
+        import jax.numpy as jnp
         spec = scs_paper.target_spec(config)
         if int(mapping['dimension']) != int(spec['dimension']):
-            raise ValueError('SCS map and target dimensions differ')
-        previous = _scs_programs.cache_info().misses
-        burn, self.program, initial, compile_seconds = _scs_programs(
+            raise ValueError('Map and target dimensions differ')
+        self.initial_scale = float(config.get('initial_scale', .1))
+        if not np.isfinite(self.initial_scale) or self.initial_scale <= 0.:
+            raise ValueError('initial_scale must be positive and finite')
+        previous = _programs.cache_info().misses
+        burn, self.program, initial, compile_seconds = _programs(
             json.dumps(mapping, sort_keys=True), json.dumps(spec, sort_keys=True),
-            config['warmup'], config['thin'], float(config.get('threshold', 50.)))
-        self.compile_seconds = compile_seconds if _scs_programs.cache_info().misses > previous else 0.
-        burn_key, self.key = jax.random.split(jax.random.key(seed))
+            config['algorithm'], config['warmup'], config['thin'],
+            float(config.get('threshold', 50.)), self.initial_scale)
+        self.compile_seconds = compile_seconds if _programs.cache_info().misses > previous else 0.
+        key = jax.device_put(jax.random.key(seed), jax.local_devices(backend='cpu')[0])
+        burn_key, self.key = jax.random.split(key)
         started = time.perf_counter()
-        self.state, accepts = jax.block_until_ready(burn(initial, burn_key))
+        self.state, scale, accepts = jax.block_until_ready(burn(initial, burn_key))
         self.warmup_seconds = time.perf_counter() - started
+        self.scale = float(scale)
+        self._scale = scale
         self.warmup_acceptance = float(accepts) / config['warmup'] if config['warmup'] else None
-        self.scale = scs_paper.STEP_SIZE
-        self.implementation = 'Original author JAX SCS transition, fixed paper step 0.1'
+        self.implementation = ('Original author JAX SCS transition' if config['algorithm'] == 'SCS'
+            else 'DCS JAX transition') + '; shared calibration, full-state scans and radial recording'
 
     def batch(self):
         import jax
         self.key, subkey = jax.random.split(self.key)
-        self.state, prefixes, norms = jax.block_until_ready(self.program(self.state, subkey))
+        self.state, prefixes, norms = jax.block_until_ready(self.program(self.state, subkey, self._scale))
         return np.asarray(prefixes), np.asarray(norms)
 
 
 def _backend(mapping, config, seed):
-    return (_SCS if config['algorithm'] == 'SCS' else _DCS)(mapping, config, seed)
+    return _Matched(mapping, config, seed)
 
 
 def _validate(config):
@@ -227,10 +262,12 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         'batch_size': BATCH_SIZE, 'prefix_stride': PREFIX_STRIDE, 'batches': batches,
         'compile_seconds': backend.compile_seconds, 'warmup_seconds': backend.warmup_seconds,
         'warmup_iterations': config['warmup'], 'warmup_acceptance': backend.warmup_acceptance,
-        'initial_scale': .1, 'scale': float(backend.scale), 'final_scale': float(backend.scale),
+        'initial_scale': float(config.get('initial_scale', .1)), 'scale': float(backend.scale), 'final_scale': float(backend.scale),
         'frozen_scale': float(backend.scale), 'adaptation_during_sampling': False,
-        'step_policy': ('fixed SCS paper step' if config['algorithm'] == 'SCS'
-                        else 'original smoothed dual averaging to 0.234 during separate warmup only'),
+        'step_policy': STEP_POLICY,
+        'target_acceptance': .234,
+        'common_cpu_backend': 'JAX',
+        'common_statistic_policy': 'Full 300-state scans; physical projection and norm for every state, including rejection repeats',
         'accepted': int(totals[2]), 'acceptance': float(totals[2] / iterations),
         'postburn_accepted': int(sums[2]), 'postburn_acceptance': float(sums[2] / count),
         'tail_count': int(sums[0]), 'norm_sum': float(sums[1]),
@@ -246,5 +283,6 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
     if config['algorithm'] == 'SCS':
         from .scs_paper import UPSTREAM_COMMIT
         record['source_commit'] = UPSTREAM_COMMIT
-        record['rng_note'] = 'Independent keys per 300-step block; unchanged original author transition'
+        record['rng_note'] = 'JAX PRNG for all methods; independent keys between warmup steps and production blocks preserve the transition law'
+        record['scs_implementation'] = 'Unmodified author rwm_bright_side_stepout; shared external step calibration and radial recording'
     return traces, record

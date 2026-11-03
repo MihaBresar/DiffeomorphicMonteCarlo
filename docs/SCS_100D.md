@@ -5,7 +5,7 @@ sampling time per chain** on the existing 100-dimensional normal-CDF-skewed
 Student-t target, with ν=3 and α=(100,−100,0,…). It estimates P(‖X‖≥50) and E‖X‖
 against exact radial truth. All three methods start at the physical vector of
 ones, using the correct inverse map. The protocol identifier is
-`timed-dcs-author-scs-v2`.
+`timed-matched-dcs-scs-v3`.
 
 | Preset | Independent chains per method | Timed sampling seconds per chain | Separate warmup iterations | Stored radial trace interval |
 |---|---:|---:|---:|---:|
@@ -24,71 +24,75 @@ Quick check uses abbreviated fitting and cannot support a performance ranking.
 Fifty independent chains improve precision of the empirical error assessment;
 they do not remove bias caused by insufficient exploration within a chain.
 
-## DCS fitting and separate step calibration
+## Matched map fitting and separate step calibration
 
-The original DCS VI function is extracted from the byte-preserved
-`validation/legacy_fixed_step.py`, with ν explicitly set to 3. The full fit uses
-1,501 optimizer updates, 2,000 fresh base draws per update, seed 42, Adam with
-learning rate 0.01, and β=2. The fitted R, centre and Möbius vector are shared by
-DCS-RWM and DCS-BW and fixed during sampling. Quick/reproduction budgets use
-21/401 updates and 128/500 draws. Original clipping in the VI objective is
-preserved and recorded; the production target has no CDF clipping or artificial
-interior-ball cutoff.
+Both the DCS ball map and the SCS sphere map use the shared reverse-KL fitting
+framework in `dcs_bench/tuning.py`. They receive the same optimizer budget and
+fresh base draws at every update, seed 42, Adam learning rate 0.01, and gradient
+norm clipping at 10. They start from the same parameter convention: unit scale,
+zero centre and zero Möbius shift. Their fitted scales, centres and Möbius
+parameters may differ because the map geometries differ. DCS uses β=2 and SCS
+uses latitude 1.10. DCS-RWM and DCS-BW share the fitted ball map.
 
-DCS-RWM proposes isotropic Gaussian increments. DCS-BW proposes uniformly in a
-Euclidean ball. Both reject proposals outside the open unit ball. Each chain
-starts with proposal scale 0.10 and calibrates it using the original smoothed
-dual-averaging update toward acceptance 0.234 during the separate warmup listed
-above. **The resulting scale is frozen before timed sampling starts.** The map
-and step therefore remain fixed during the timed first-third burn-in and all
-subsequent estimation. This differs from the historical fixed-count comparison,
-which continued step adaptation throughout production.
+| Preset | Optimizer updates per map | Fresh draws per update | Total training draws per map |
+|---|---:|---:|---:|
+| Quick check | 20 | 128 | 2,560 |
+| Smaller reproduction | 400 | 500 | 200,000 |
+| Full paper settings | 1,500 | 2,000 | 3,000,000 |
 
-`dcs_bench/fast_dcs.py` compiles the transition using Numba without fast-math;
-`dcs_bench/timed_radial.py` runs the timed frozen-step batches. Map and target
-constants are cached. Density evaluation also computes the physical radius;
-rejection reuses the current radius. Normal log-CDF values come from the actual
-SciPy double-precision routine. Tests compare the frozen transitions and random
-state with the reference transition, including warmup and rejection repeats.
+Fitting uses the same target as production, without the old clipped-CDF or
+physical-coordinate-clipping objectives. Both fitted maps remain fixed during
+warmup and sampling. Parameters, optimizer settings, fitting costs and training
+histories are saved, so the comparison is conditional on the recorded fits.
 
-## SCS: original author implementation
+Every chain starts with proposal scale 0.10 and calibrates it with the same raw
+dual-averaging rule toward acceptance 0.234 during the separate warmup listed
+above. Both implementations feed the observed accept/reject indicator to that
+rule. **Each resulting scale is frozen before timed sampling starts.** The map
+and step remain fixed during the timed first-third burn-in and all subsequent
+estimation. Matching this rule does not assume that 0.234 is optimal for each
+method, or that equal numerical step sizes have equal geometric meanings.
 
-The MIT-licensed source is vendored without modification at
+DCS-RWM proposes isotropic Gaussian increments; DCS-BW proposes uniformly in a
+Euclidean ball. Both reject proposals outside the open unit ball. SCS uses its
+tangent-Gaussian proposal, normalization, cap step-out, projection, Jacobian and
+Metropolis transition. All three kernels run in compiled JAX CPU scans with the
+same batch size and state-output policy. Each transition evaluates current and
+proposed densities; DCS skips target evaluation for proposals outside its ball,
+which are direct rejections by definition. Physical projection and radial estimation run after each
+batch with the same recording policy for all methods. Compilation finishes
+before timing; completed JAX work is synchronized at each timing boundary.
+
+## Unmodified author SCS transition
+
+The primary comparison directly calls the authors' unmodified
+`rwm_bright_side_stepout` transition under the common map-fitting,
+step-calibration and JAX CPU timing protocol above. DCS uses the same scan and
+recording structure. This is **not a literal execution of the authors' original
+experiment runner**: the author sampler is retained, while fitting and proposal
+calibration are matched to the other methods.
+
+The MIT-licensed author source remains vendored without modification at
 [`ea6f27a6cb1d0ca90d8c1cd92c32fc3dcf8ea565`](https://github.com/liusf15/sub-cauchy-sampler/tree/ea6f27a6cb1d0ca90d8c1cd92c32fc3dcf8ea565),
-the paper-date revision. The adapter invokes its tangent-Gaussian proposal,
-normalization, cap step-out, projection, Jacobian and Metropolis transition.
-Source hashes and licence are in `third_party/scs_paper`.
-
-The full fit uses the original fixed batch of 2,000 base draws, seed 0, 1,000
-Adam updates with learning rate 0.01 and its original objective clipping.
-Latitude is 1.10. The step stays fixed at 0.10 during both separate warmup and
-timed sampling, as in the authors'
-[`run_skewt.py`](https://github.com/liusf15/sub-cauchy-sampler/blob/ea6f27a6cb1d0ca90d8c1cd92c32fc3dcf8ea565/experiments/run_skewt.py).
-SCS receives the same number of separate warmup transitions as DCS, with no
-step adaptation. The original fitting budget differs from DCS: this comparison
-uses their original VI recipes. Setup time is reported separately. Quick and
-smaller settings shorten SCS fitting to 20/400 updates and 128/500 fixed draws.
-
-The author transition runs inside compiled JAX scans. Progress callbacks are
-suppressed outside the vendored code. Independent keys per timed batch preserve
-the transition law, but do not reproduce the author's bitwise random sequence.
-Tests compare the timed adapter with full-state executions of the original
-transition and radial accumulation.
+the paper-date revision. Source hashes and licence are in `third_party/scs_paper`.
+The current SCS runs invoke that source directly; it also remains the reference
+for transition validation and historical reports.
+The authors' [`run_skewt.py`](https://github.com/liusf15/sub-cauchy-sampler/blob/ea6f27a6cb1d0ca90d8c1cd92c32fc3dcf8ea565/experiments/run_skewt.py)
+uses a fixed proposal step of 0.10; that fixed-step policy is not used by the
+current matched comparison.
 
 **Target distinction:** the [SCS paper §4.1](https://arxiv.org/html/2601.11066v1#S4.SS1)
-uses a Student-t CDF skewing factor and ν=1 or 2. This comparison applies its
-original algorithm and VI to our existing normal-CDF-skewed ν=3 target. It does
-not reproduce the SCS paper's target or plotted values. All three methods here
-evaluate the same normal-CDF target; its radial truth is unchanged by skewing.
+uses a Student-t CDF skewing factor and ν=1 or 2. All three methods here evaluate
+the same existing normal-CDF-skewed ν=3 target; its radial truth is unchanged by
+skewing. These runs do not reproduce the SCS paper's target or plotted values.
 
 ## Timing, burn-in and outputs
 
 Fitting, compilation and separate warmup finish before the sampling clock
 starts. The timed phase includes its first-third burn-in, transitions, radial
-accumulation and compact in-memory recording. JAX results are synchronized
-before reading the clock. Setup, inter-worker synchronization waits, disk
-writes and plotting are outside that clock; setup costs and total invocation
-wall time are recorded separately.
+accumulation and compact in-memory recording. Setup, inter-worker
+synchronization waits, disk writes and plotting are outside that clock; setup
+costs and total invocation wall time are recorded separately.
 
 All methods check elapsed time after the same **300-transition batches**. A
 chain stops at the first completed batch meeting its budget; actual elapsed
@@ -109,19 +113,20 @@ the recorded concurrent CPU workload. Keep the machine otherwise idle when
 measuring speed.
 
 `VsSCS.png`/PDF preserve the manuscript's three linear panels: tail MSE, norm
-MSE and average sampling time. `scs_100d_estimates` adds radial estimate boxplots
-and MSE panels. Every chain estimate is shown, so a small spread around an
-incorrect value remains visible. Other plots show timing, actual iteration
-counts, throughput and empirical bias squared plus variance. The timed protocol
-uses the final post-burn estimates; it does not infer equal-time MSE by scaling
-errors from fixed-count runs.
+MSE and, for the equal-time design, average generated iteration count.
+`scs_100d_estimates` adds radial estimate boxplots and MSE panels. Every chain
+estimate is shown, so a small spread around an incorrect value remains visible.
+Other plots show timing, actual iteration counts, throughput and empirical bias
+squared plus variance. The timed protocol uses the final post-burn estimates;
+it does not infer equal-time MSE by scaling errors from fixed-count runs.
+Historical fixed-count reports retain runtime in the third `VsSCS` panel.
 
-`paper_values.html` displays readable values, while CSV and JSON retain full
-stored precision. The reports include actual total iterations, discarded and
-estimation counts, per-chain errors, elapsed times and tuned parameters. Each
-independent chain has equal weight in MSE, even when iteration counts differ.
-Variance uses divisor n, so **MSE = empirical bias² + variance**, up to
-floating-point rounding.
+`paper_values.html` displays two decimals, with scientific notation for MSE and
+small values; counts remain exact integers. CSV and JSON retain full stored
+precision. Reports include actual total iterations, discarded and estimation
+counts, per-chain errors, elapsed times and tuned parameters. Each independent
+chain has equal weight in MSE, even when iteration counts differ. Variance uses
+divisor n, so **MSE = empirical bias² + variance**, up to floating-point rounding.
 
 Use **Start.bat → Set up environment → 100D skewed t (ν=3) → Start run** on
 Windows, or **Start.command** on macOS. Run environment setup again after an
@@ -134,9 +139,62 @@ python run_experiment.py skew-t-100d-fixed --preset paper --workers 32 --output-
 The historical `skew-t-100d-fixed` identifier is retained for compatibility;
 its default protocol now fixes **time**. `--time-budget` overrides seconds per
 chain. The launcher and compatibility entry points route this identifier to
-the same runner. Historical plots remain available. New fixed-time plots
-require rerunning this one experiment; old fixed-count runs cannot be converted
-into this protocol because the adaptation and burn-in rules have also changed.
+the same runner. Rerun this one experiment for the current matched comparison;
+existing sampling results cannot be converted by replotting.
+
+## Short matched checks, 3 November 2026
+
+Two prespecified local checks used 20 chains per method, one worker, 1.00 second
+of timed sampling per chain, 1,500 separate warmup steps and 1,500 × 2,000 VI
+draws per map. Run A used fit seed 42 and chain seed 901001; run B used fit seed
+43 and chain seed 902001. Actual mean sampling times were 1.00 seconds to two
+decimals for every row. These short macOS ARM64 checks are conditional on two
+map fits and do not replace the longer Full paper run.
+
+| Run | Method | Mean generated iterations | Tail MSE | Mean-norm MSE |
+|---|---|---:|---:|---:|
+| A | DCS-RWM | 148,035 | 1.29e-06 | 1.59e-02 |
+| A | DCS-BW | 106,335 | 2.08e-06 | 2.47e-02 |
+| A | SCS | 115,740 | 7.19e-07 | 9.58e-03 |
+| B | DCS-RWM | 146,895 | 8.92e-07 | 1.26e-02 |
+| B | DCS-BW | 106,845 | 1.58e-06 | 2.21e-02 |
+| B | SCS | 117,045 | 1.37e-06 | 1.18e-02 |
+
+SCS had lower mean-norm MSE in both checks. The lowest tail MSE switched from
+SCS to DCS-RWM. DCS-BW had higher MSE than SCS for both functions in both checks.
+The observed DCS-RWM throughput advantage was about 1.26–1.28×; DCS-BW generated
+about 0.91–0.92× as many iterations as SCS. Mean production acceptances were
+0.22–0.23 for DCS and 0.18 for SCS despite the shared 0.234 warmup target.
+Equal calibration rules therefore should not be read as a guarantee of equally
+optimal proposal scales.
+
+An archived before-update run used the same chain count and one-second budget
+at commit `879297a0df348828f31b36a647d6ade9d98ac46c`; it generated about 14.46×
+and 13.20× as many DCS-RWM and DCS-BW iterations as SCS, respectively. Fitting,
+tuning and execution all changed together, so this before/after comparison
+does not isolate each change's effect. The old ratio cannot be treated as an
+algorithm-only speed advantage.
+
+Full-precision settings, fitted maps, per-chain estimates, counts, times,
+acceptances, source hashes and the before-update results are in
+[`validation/scs_100d_matched_comparison.json`](../validation/scs_100d_matched_comparison.json).
+The first third is removed from every count before estimation. To repeat the
+two current checks in fresh folders:
+
+```bash
+python scripts/reproduce_scs_100d.py --preset reproduce --workers 1 --runs 20 --time-budget 1 --warmup 1500 --optimizer-steps 1500 --optimizer-samples 2000 --output-dir results/matched-check-a
+python scripts/reproduce_scs_100d.py --preset reproduce --workers 1 --runs 20 --time-budget 1 --warmup 1500 --optimizer-steps 1500 --optimizer-samples 2000 --fit-seed 43 --seed 902001 --output-dir results/matched-check-b
+```
+
+## Superseded comparison protocols
+
+The v2 protocol (`timed-dcs-author-scs-v2`) used separate original map-fitting
+recipes, DCS-only proposal calibration, and different compiled timing drivers
+for DCS and SCS. V3 matches these three parts. Old reports retain their recorded
+policies when replotted; their values do not describe the current protocol.
+The earlier fixed-count evidence below is also historical, including its
+continuous DCS step adaptation. Neither historical set establishes the outcome
+of a new v3 run.
 
 ## Historical fixed-count evidence, 11 September 2026
 

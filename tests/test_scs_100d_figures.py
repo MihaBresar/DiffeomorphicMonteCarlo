@@ -139,6 +139,39 @@ class SCS100DFiguresTests(unittest.TestCase):
             self.assertNotIn('DCS-RWM and DCS-BW use the original VI fitting and continuously adapt', page)
             self.assertIn('two decimals', page)
 
+    def test_matched_protocol_labels_all_methods_without_rewriting_old_policies(self):
+        summary = example_summary()
+        summary['config'].pop('iterations')
+        summary['config'].update(mode='time', time_budget=2., protocol='timed-matched-dcs-scs-v3')
+        for case in summary['cases'].values():
+            for record in case['records']:
+                record.update(iterations=1500, discarded_iterations=500,
+                              estimation_iterations=1000, retained_draws=100)
+            case['total_iterations'] = 4500
+        for fitting in summary['fitting'].values():
+            fitting.update(steps=1500, training_draws=2000, total_training_draws=3000000,
+                           batch_policy='fresh', training_batch_policy='fresh')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            render_report(root, summary)
+            with (root/'paper_values.csv').open(newline='', encoding='utf-8') as stream:
+                rows = list(csv.DictReader(stream))
+            policies = {row['production_step_policy'] for row in rows}
+            self.assertEqual(len(policies), 1)
+            self.assertIn('0.234', policies.pop())
+            for row in rows:
+                self.assertEqual(row['total_iterations'], '4500')
+                self.assertEqual(row['total_estimation_iterations'], '3000')
+                self.assertEqual(float(row['mean_norm_mse']), summary['cases'][row['method']]['mse'][1])
+            page = (root/'paper_values.html').read_text(encoding='utf-8')
+            self.assertIn('same dual-averaging rule', page)
+            self.assertIn('timed-matched-dcs-scs-v3', page)
+            self.assertIn('compiled JAX CPU scans', page)
+            self.assertIn('unmodified author SCS transition is called directly', page)
+            self.assertNotIn('Author SCS keeps its fixed', page)
+            self.assertNotIn('adaptation continues afterward', page)
+            self.assertNotIn('SCS author VI and paper-date sampler are applied', page)
+
 
 if __name__ == '__main__':
     unittest.main()

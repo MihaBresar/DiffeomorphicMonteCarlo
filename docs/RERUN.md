@@ -12,7 +12,15 @@ the final measured iteration count; thinning keeps its original iteration grid.
 For 500,000 iterations, discard 166,667 and use the remaining 333,333 before
 thinning. At thinning 10 this stores 33,334 post-burn-in states.
 
-## Which figures need new runs
+## November 2026 matched SCS comparison
+
+If you already ran the compiled, first-third-burn-in release described below,
+only the **100D skewed t (ν=3) equal-time comparison** needs rerunning for this
+update. It now keeps the authors' SCS transition and implements DCS in the same
+JAX framework, with matched VI resources, shared step-size tuning and equivalent
+output processing. Previous 100D timings are not measurements of this protocol.
+
+## Earlier compiled-kernel and burn-in update
 
 The compiled implementation and burn-in policy require fresh runs for **all
 seven experiments**, including the two posterior table rows. Old runs remain
@@ -33,8 +41,10 @@ exact integers, and CSV/JSON retain full precision.
 
 The 100D comparison uses 2 chains of 0.05 seconds for Quick check, 20 chains of
 2 seconds for Smaller reproduction, and 50 chains of 20 seconds for Full paper
-settings. DCS uses the original VI fit and smoothed step tuning toward 0.234,
-then freezes the step. SCS uses the authors' original VI and fixed step 0.1.
+settings. Both map families use equal fresh-batch VI budgets. All three methods
+use separate dual-averaging warmup toward 0.234 using observed acceptances,
+then freeze their steps. SCS invokes the unmodified author JAX transition;
+DCS uses the same JAX framework and output processing.
 See [the exact comparison protocol](SCS_100D.md). The identifier
 `skew-t-100d-fixed` is retained only for compatibility; it now launches this
 equal-time comparison.

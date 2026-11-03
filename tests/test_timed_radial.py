@@ -5,7 +5,7 @@ from unittest.mock import patch
 import numpy as np
 
 from dcs_bench import timed_radial as timed
-from dcs_bench import fast_dcs, scs_paper
+from dcs_bench import scs_paper
 from dcs_bench.transforms import BallMap, SphereMap
 from dcs_bench.targets import Target
 
@@ -68,56 +68,125 @@ class TimedRadialTests(unittest.TestCase):
         self.assertEqual(result['compile_seconds'], 4.)
         self.assertEqual(result['frozen_scale'], .125)
         self.assertFalse(result['adaptation_during_sampling'])
+        self.assertEqual(result['step_policy'], timed.STEP_POLICY)
+        self.assertEqual(result['target_acceptance'], .234)
+        self.assertEqual(result['common_cpu_backend'], 'JAX')
         self.assertEqual(result['acceptance'], .5)
         self.assertEqual(result['postburn_acceptance'], .5)
 
-    def test_frozen_dcs_batch_matches_original_transition_without_adapting(self):
-        for algorithm in ('DCS-RWM', 'DCS-BW'):
-            with self.subTest(algorithm=algorithm):
-                config = dict(algorithm=algorithm, dimension=5, nu=3.,
-                              alpha={0: 3., 1: -3.}, thin=10, warmup=37)
-                mapping = BallMap(5, beta=2.)
-                backend = timed._DCS(mapping.parameters(), config, 774)
-                _, mu, delta, alpha, constants = fast_dcs._inputs(mapping, config)
-                z = mapping.inverse(np.ones(5))
-                lp, radius = fast_dcs._evaluate(z, mu, delta, alpha, constants)
-                rng = np.random.default_rng(774)
-                warm = fast_dcs._run_block(rng, z, lp, radius, .1, 0., 0., 0, 37,
-                    38, 50., algorithm == 'DCS-BW', mu, delta, alpha, constants)
-                z, lp, radius, frozen = warm[:4]
-                reference, accepted = [], []
-                for _ in range(300):
-                    z, lp, radius, _, accept = fast_dcs._transition(rng, z, lp, radius,
-                        frozen, algorithm == 'DCS-BW', mu, delta, alpha, constants)
-                    reference.append(radius)
-                    accepted.append(accept)
-                prefix, saved = backend.batch()
-                np.testing.assert_allclose(prefix, prefixes_from(np.array(reference), accepted), rtol=1e-12)
-                np.testing.assert_allclose(saved, np.array(reference)[9::10], rtol=1e-12)
-                np.testing.assert_allclose(backend.state, z, rtol=1e-12, atol=1e-12)
-                self.assertEqual(backend.scale, frozen)
-
-    def test_scs_batch_is_original_author_scan_with_equivalent_summaries(self):
-        core = scs_paper._author()
+    def test_original_scs_full_scan_and_shared_recording_are_unchanged(self):
+        scs_paper._author()
         import jax
         import jax.numpy as jnp
         config = dict(algorithm='SCS', dimension=5, nu=3., alpha={0: 3., 1: -3.},
-                      thin=10, warmup=17)
-        mapping = SphereMap(5).parameters()
-        backend = timed._SCS(mapping, config, 877)
-        state, key = backend.state, backend.key
-        _, subkey = jax.random.split(key)
-        model = core.SCP(5, 1.1)
+                      thin=10, warmup=37)
+        mapping = SphereMap(5, mu=np.linspace(-.3, .2, 5), scale=1.7,
+                            observer=np.array([.1, -.05, 0., 0., 0.])).parameters()
+        backend = timed._backend(mapping, config, 774)
+        core = scs_paper._author()
+        model = core.SCP(5, scs_paper.LATITUDE)
         params = scs_paper._parameters(model, mapping)
         target = Target(scs_paper.target_spec(config))
         density = model.transform_target(lambda x: target.log_prob(x, 'jax'), params)
-        states, accepted = core.rwm_bright_side_stepout(density, state, 1.1, subkey, 300, stepsize=.1)
+        _, subkey = jax.random.split(backend.key)
+        states, accepted = core.rwm_bright_side_stepout(density, backend.state,
+            scs_paper.LATITUDE, subkey, nsample=300, stepsize=backend.scale)
+        # Compare the whole shared scan, not just a derived aggregate.
+        block, project, initial, _ = timed._components(mapping, target.spec, 'SCS')
+        matched_states, matched_accepts = block(backend.state, subkey, 300, backend.scale)
+        np.testing.assert_array_equal(matched_states, states)
+        np.testing.assert_array_equal(matched_accepts, accepted)
+        np.testing.assert_allclose(project(initial), np.ones(5), atol=1e-12)
         norms = np.linalg.norm(np.asarray(model.projection(params, states)), axis=1)
-        prefix, saved = backend.batch()
-        np.testing.assert_allclose(prefix, prefixes_from(norms, np.asarray(accepted)), rtol=1e-12)
+        frozen = backend.scale
+        prefixes, saved = backend.batch()
+        np.testing.assert_allclose(prefixes, prefixes_from(norms, accepted), rtol=1e-12)
         np.testing.assert_allclose(saved, norms[9::10], rtol=1e-12)
-        np.testing.assert_allclose(backend.state, states[-1], atol=1e-12)
-        self.assertEqual(backend.scale, .1)
+        np.testing.assert_allclose(backend.state, states[-1], rtol=1e-12)
+        self.assertEqual(backend.scale, frozen)
+        self.assertNotEqual(backend.scale, .1)
+        self.assertTrue(0 <= backend.warmup_acceptance <= 1)
+
+    def test_dcs_jax_proposal_density_and_acceptance_match_reference(self):
+        scs_paper._author()
+        import jax
+        import jax.numpy as jnp
+        target = Target(dict(kind='skew_t', dimension=5, nu=3., alpha={0: 3., 1: -3.}))
+        mapping = BallMap(5, mu=np.linspace(-.3, .2, 5), scale=1.7,
+                          delta=np.array([.1, -.05, 0., 0., 0.]))
+        for algorithm in ('DCS-RWM', 'DCS-BW'):
+            block, project, initial, density = timed._components(mapping.parameters(), target.spec, algorithm)
+            np.testing.assert_allclose(project(initial), np.ones(5), atol=1e-12)
+            for point in (np.zeros(5), np.asarray(initial), np.array([.99, 0., 0., 0., 0.])):
+                self.assertAlmostEqual(float(density(jnp.asarray(point))), mapping.log_density(target, point), places=10)
+            self.assertEqual(float(density(jnp.ones(5))), -np.inf)
+            for scale in (.01, .3, 10.):
+                with self.subTest(algorithm=algorithm, scale=scale):
+                    key = jax.random.key(113)
+                    key, subkey = jax.random.split(key)
+                    direction = np.array(jax.random.normal(subkey, shape=initial.shape))
+                    if algorithm == 'DCS-BW':
+                        key, subkey = jax.random.split(key)
+                        direction *= float(jax.random.uniform(subkey)) ** (1./5) / np.linalg.norm(direction)
+                    proposed = np.asarray(initial) + scale * direction
+                    logratio = mapping.log_density(target, proposed) - mapping.log_density(target, np.asarray(initial))
+                    key, subkey = jax.random.split(key)
+                    accepted = float(np.log(float(jax.random.uniform(subkey))) < logratio)
+                    expected = proposed if accepted else np.asarray(initial)
+                    states, accepts = block(initial, jax.random.key(113), 1, scale)
+                    np.testing.assert_allclose(states[0], expected, rtol=1e-12, atol=1e-14)
+                    self.assertEqual(float(accepts[0]), accepted)
+
+    def test_shared_warmup_uses_observed_acceptance_and_smoothed_final_scale(self):
+        scs_paper._author()
+        import jax
+        import jax.numpy as jnp
+        outcomes = np.array([1., 0., 0., 1., 1., 0., 1., 0., 0., 1., 0., 1.])
+        # Save each scale in the synthetic state, so this checks every raw
+        # warmup update as well as the final smoothed, frozen scale.
+        def controlled_block(state, key, count, scale):
+            index = state[0].astype(jnp.int32)
+            state = state.at[index + 1].set(scale).at[0].add(1)
+            return state[None, :], jnp.asarray(outcomes)[index][None]
+        initial = jnp.zeros(len(outcomes) + 1)
+        state, scale, accepts = timed._calibrate(controlled_block, initial, jax.random.key(2), len(outcomes), .1)
+        raw, hbar, logbar, expected_scales = .1, 0., np.log(.1), []
+        for iteration, accepted in enumerate(outcomes, 1):
+            expected_scales.append(raw)
+            eta = 1. / (iteration + 10.)
+            hbar = (1 - eta) * hbar + eta * (.234 - accepted)
+            lograw = np.log(10 * .1) - np.sqrt(iteration) / .05 * hbar
+            weight = iteration ** (-.75)
+            logbar = weight * lograw + (1 - weight) * logbar
+            raw = np.exp(np.clip(lograw, -30, 15))
+        np.testing.assert_allclose(state[1:], expected_scales, rtol=1e-12)
+        np.testing.assert_allclose(float(scale), np.exp(logbar), rtol=1e-14)
+        self.assertEqual(float(accepts), outcomes.sum())
+        unchanged, untuned, accepts = timed._calibrate(controlled_block, initial, jax.random.key(2), 0, .1)
+        np.testing.assert_array_equal(unchanged, initial)
+        self.assertAlmostEqual(float(untuned), .1)
+        self.assertEqual(float(accepts), 0.)
+
+    def test_dcs_full_scan_shared_recording_and_frozen_step(self):
+        scs_paper._author()
+        import jax
+        for algorithm in ('DCS-RWM', 'DCS-BW'):
+            with self.subTest(algorithm=algorithm):
+                config = dict(algorithm=algorithm, dimension=5, nu=3., alpha={0: 3.},
+                              thin=10, warmup=23)
+                mapping = BallMap(5, scale=1.7).parameters()
+                backend = timed._backend(mapping, config, 774)
+                block, projection, _, _ = timed._components(mapping, scs_paper.target_spec(config), algorithm)
+                _, subkey = jax.random.split(backend.key)
+                states, accepted = block(backend.state, subkey, 300, backend.scale)
+                norms = np.linalg.norm(np.asarray(projection(states)), axis=1)
+                frozen = backend.scale
+                prefixes, saved = backend.batch()
+                np.testing.assert_allclose(prefixes, prefixes_from(norms, accepted), rtol=1e-12)
+                np.testing.assert_allclose(saved, norms[9::10], rtol=1e-12)
+                np.testing.assert_allclose(backend.state, states[-1], rtol=1e-12)
+                self.assertEqual(backend.scale, frozen)
+                self.assertTrue(np.any(np.asarray(accepted) == 0))
 
     def test_invalid_protocol_inputs_fail_before_backend_creation(self):
         base = dict(algorithm='SCS', time_budget=.05, warmup=100, thin=10)

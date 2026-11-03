@@ -12,8 +12,12 @@ SCS code at paper-date revision
 Byte-for-byte source copies, checksums and Sifan Liu's MIT licence are preserved
 in `third_party/scs_paper/`. The adapter disables progress callbacks, records
 separate compilation/warmup clocks, and accumulates radial estimates in bounded
-memory while invoking the unmodified author transition. It applies the author's
-algorithm and VI optimizer to the original DCS normal-CDF skew target; it does
-not claim to reproduce the paper's Student-t-CDF skew target or ν=1/2 figures.
+memory while invoking the unmodified author transition. The current 100D
+comparison implements DCS in the same JAX scan framework, with equivalent state
+recording and projection work. Both maps use our common VI fitting protocol and
+both methods receive the same separate, acceptance-based step-size tuning.
+This applies the author's SCS transition to the original DCS normal-CDF skew
+target; it does not reproduce the author's original tuning recipe, Student-t-CDF
+skew target or ν=1/2 figures. See [the comparison protocol](docs/SCS_100D.md).
 
 NumPy, SciPy, JAX, NumPyro, BlackJAX, ArviZ and Matplotlib are installed as dependencies and retain their own licenses. Cite relevant computational libraries when reporting the experiments.

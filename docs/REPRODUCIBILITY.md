@@ -1,8 +1,14 @@
 # Reproducibility and timing policy
 
-The default 100D original-DCS/author-SCS comparison has its own explicitly
-recorded [protocol](SCS_100D.md): DCS continues smoothed adaptation, SCS uses
-its published example step, and both compiled production loops are timed.
+The default 100D DCS/SCS comparison has its own explicitly recorded
+[protocol](SCS_100D.md), `timed-matched-dcs-scs-v3`: both maps receive the same
+fresh-batch VI budget and all three methods tune their proposal steps toward
+acceptance 0.234 during separate warmup. Steps are then frozen. All methods use
+compiled JAX CPU scans with the same timing and recording work, with the first
+third of actual sampling iterations discarded. The primary comparison calls
+the unmodified SCS author transition directly under this common fitting and
+calibration protocol. Both methods tune from observed accept/reject indicators.
+Historical v1/v2 reports retain their recorded policies and values.
 The policies below describe the other main experiments.
 
 All paper inputs are explicit JSON files. The manifest records their resolved values, scientific source hashes, Git commit/status when available, Python and package versions, OS/CPU count, JAX devices, float64/CPU policy and numerical-library thread settings. A run made from a dirty or uncommitted checkout records that fact; use a tagged clean checkout for the publication archive.

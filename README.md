@@ -2,7 +2,7 @@
 
 Reproducible experiments for *Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions*, by Miha Brešar and Aleksandar Mijatović.
 
-This corrected implementation centralizes target densities and transformations, saves individual chains, and regenerates figures and tables from saved results. The default 100D comparison uses original DCS fitting and separate step tuning and uses the SCS authors’ original implementation. All experiments freeze proposal tuning before sampling, then discard the first third of generated sampling iterations. The synthetic and logistic targets are local constructions; only Eight Schools and GARCH use PosteriorDB. Empirical examples are not required to satisfy the paper's sufficient theorem assumptions.
+This corrected implementation centralizes target densities and transformations, saves individual chains, and regenerates figures and tables from saved results. The default 100D comparison matches map-fitting budgets, proposal-step calibration and the compiled JAX CPU timing driver across DCS and SCS. SCS calls the unmodified author transition directly. All experiments freeze proposal tuning before sampling, then discard the first third of generated sampling iterations. The synthetic and logistic targets are local constructions; only Eight Schools and GARCH use PosteriorDB. Empirical examples are not required to satisfy the paper's sufficient theorem assumptions.
 
 ## Run with clicks — no commands needed
 
@@ -66,7 +66,7 @@ The full run is substantial. Timed synthetic/regression comparisons require thou
 |---|---|---|
 | `skew-t-200d-nuts` | d=200, ν=3, α=(20,-30,0,…) | 50 chains/method, 20 s each |
 | `skew-t-200d-baselines` | Same target | 50 chains/method, 10 s each |
-| `skew-t-100d-fixed` | d=100, ν=3, α=(100,-100,0,…) | 50 chains/method, 20 seconds each; original DCS-RWM/BW and author SCS |
+| `skew-t-100d-fixed` | d=100, ν=3, α=(100,-100,0,…) | 50 chains/method, 20 seconds each; matched DCS-RWM/BW and SCS |
 | `skew-t-50d-nu-0.5` | Symmetric t, d=50, ν=0.5 | 50 chains/method, 500,000 steps each; discard 166,667 |
 | `logistic-regression` | d=20, independent t priors, ν=4 and 6 | 20 chains/method/ν, 30 s each |
 | `eight-schools` | Centered hierarchy, log τ coordinate | 50 chains, 150,000 NUTS steps; DCS matched to mean NUTS production time |
@@ -75,10 +75,13 @@ The full run is substantial. Timed synthetic/regression comparisons require thou
 The legacy name `skew-t-100d-baselines` forwards to the corrected **200-dimensional** configuration with a message. The default comparison’s presets are explicit in `scripts/reproduce_scs_100d.py`; other experiment settings are in `configs/<identifier>.json`. `--dry-run` displays the resolved configuration.
 
 The default **100D skewed t (ν=3): DCS-RWM, DCS-BW and SCS** is one equal-time comparison,
-with equal sampling time and measured iteration counts. The first third of each sampling run is discarded after separate tuning. DCS uses its original
-VI and separate smoothed step tuning toward 0.234, frozen before timed sampling; SCS uses the author’s original
-VI and fixed step 0.1. Both implementations compile their production loops before
-timing. The shared target is the original DCS normal-CDF skew-t; the SCS paper’s
+with equal sampling time and measured iteration counts. The first third of each
+sampling run is discarded after separate tuning. Both maps receive the same
+fresh-batch VI budget, and all three methods tune their proposal steps toward
+acceptance 0.234 before freezing them for sampling. Both implementations use
+compiled JAX CPU scans with the same timing and recording work. SCS calls the
+unmodified author transition under the common fitting and calibration protocol.
+The shared target is the original DCS normal-CDF skew-t; the SCS paper’s
 Student-t-CDF target is different. See [the exact protocol](docs/SCS_100D.md).
 The command-line identifier routes to the same runner as the launcher.
 

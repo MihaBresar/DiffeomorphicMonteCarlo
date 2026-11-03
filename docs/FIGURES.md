@@ -13,9 +13,15 @@ keep their identity maps. Old fixed-R=√d results retain their historical label
 |---|---|
 | `NUTS_PBW_vs` | Radial tail and norm boxplots with numerical reference lines |
 | `VsRWM_NUTS` | Linear MSE bars for tail probability and mean norm |
-| `VsSCS` | Linear MSE bars for tail probability, mean norm, then average runtime |
+| `VsSCS` | Linear MSE bars for tail probability and mean norm, then average iteration count at equal time (runtime for historical fixed-count runs) |
 | `SuperInfiniteFirstTest` | Linear MSE bars for tail probability, mean log norm, then average runtime at equal iterations |
 | `QQ-regresssion` | Two-by-two marginal Q–Q plots for β₁, with ν=4 and ν=6 |
+
+The current 100D report identifies the matched `timed-matched-dcs-scs-v3`
+protocol: shared fitting budgets, separate step calibration for all methods,
+and frozen production steps. Replotting an older v1/v2 summary preserves its
+recorded tuning policy and design; it does not relabel historical results as a
+new matched run. All existing 100D figure families and exact-value exports remain.
 
 The compact **200D random-walk baselines** report keeps just `VsRWM_NUTS`
 (two MSE panels), `VsRWM_NUTS_ergodic_averages` (tail and norm estimates), and

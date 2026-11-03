@@ -70,7 +70,9 @@ def _table(rows):
     return '<div class="table-wrap"><table><thead><tr>'+header+'</tr></thead><tbody>'+body+'</tbody></table></div>'
 
 
-def _policy(name, timed=False):
+def _policy(name, timed=False, matched=False):
+    if matched:
+        return 'Shared dual-averaging step calibration toward 0.234, then frozen during timed sampling'
     if timed:
         return ('Author SCS: fixed h = 0.10 with separate untimed equilibration' if name == 'SCS' else
                 'Separate proposal-step tuning, then frozen during timed sampling')
@@ -110,7 +112,8 @@ def render_report(root, summary):
     figures = root/'figures'
     figures.mkdir(exist_ok=True)
     cases, config = summary['cases'], summary['config']
-    timed = config.get('mode') == 'time' or config.get('protocol') == 'timed-dcs-author-scs-v2'
+    matched = config.get('protocol') == 'timed-matched-dcs-scs-v3'
+    timed = config.get('mode') == 'time' or config.get('protocol') == 'timed-dcs-author-scs-v2' or matched
     if not cases or any(name not in METHODS for name in cases):
         raise ValueError('Expected completed DCS-RWM, DCS-BW, or SCS cases')
     names = [name for name in METHODS if name in cases]
@@ -136,7 +139,8 @@ def render_report(root, summary):
               f"{config['warmup']} warmup iterations discarded")
     estimation_note = ('Estimates use the remaining two thirds, including repeated states after rejection.' if timed else
                        'All production iterations contribute, including rejected states.')
-    tuning_note = ('DCS steps are pretuned; author SCS uses h = 0.10 after untimed equilibration. All sampling steps stay fixed.' if timed else
+    tuning_note = ('All methods use matched map fitting and step tuning toward 0.234; sampling steps stay fixed.' if matched else
+                  'DCS steps are pretuned; author SCS uses h = 0.10 after untimed equilibration. All sampling steps stay fixed.' if timed else
                    'DCS adapts during sampling; SCS uses h = 0.1.')
     metric_labels = (f'P(‖X‖ ≥ {threshold:g})', 'E[‖X‖]')
     x = np.arange(1, len(names)+1)
@@ -324,7 +328,7 @@ def render_report(root, summary):
         count = counts[name]
         per_chain = count['generated'][0] if len(set(count['generated'])) == 1 else 'varies; see chain table'
         retained = (count['retained'][0] if len(set(count['retained'])) == 1 else 'varies; see chain table')
-        row = {'method': name, 'production_step_policy': _policy(name, timed), 'chains': case['chains'],
+        row = {'method': name, 'production_step_policy': _policy(name, timed, matched), 'chains': case['chains'],
                'iterations_per_chain': per_chain, 'mean_iterations': count['mean_generated'],
                'total_iterations': case['total_iterations'],
                'mean_estimation_iterations': count['mean_used'], 'total_estimation_iterations': sum(count['used']),
@@ -345,7 +349,7 @@ def render_report(root, summary):
             raise ValueError('Each chain must have exactly one record')
         for index, estimate in enumerate(means[name]):
             row = dict(records[index]) if records else {'chain': index}
-            row.update(method=name, production_step_policy=_policy(name, timed))
+            row.update(method=name, production_step_policy=_policy(name, timed, matched))
             row.setdefault('iterations', count['generated'][index])
             row.setdefault('discarded_iterations', count['discarded'][index])
             row.setdefault('estimation_iterations', count['used'][index])
@@ -407,11 +411,20 @@ def render_report(root, summary):
             'The sample-count panel reports all generated iterations. Exact generated, discarded and estimation counts are listed for every chain below. Final scales are the steps used during timed sampling.',
         ]
         notes[4] = 'Production time includes sampling burn-in and estimation, and excludes map fitting, compilation, separate step tuning or equilibration, and saving. Times describe this hardware, worker count and competing load.'
+    if matched:
+        notes[1:4] = [
+            'DCS-RWM, DCS-BW and SCS all calibrate their proposal steps with the same dual-averaging rule toward acceptance 0.234, using observed accept/reject indicators during separate warmup. Each resulting step is held fixed during timed sampling. The first-third discard is additional sampling burn-in inside that clock.',
+            'Both map families use the same fresh-batch reverse-KL fitting framework, optimizer budget, Adam updates and gradient clipping. All three samplers use compiled JAX CPU scans with the same density-evaluation and state-recording policy. Physical projection and radial estimation run after each batch for every method. DCS-RWM and DCS-BW share the ball map.',
+            'The sample-count panel reports all generated iterations. Exact generated, discarded and estimation counts are listed for every chain below. Matching tuning rules does not assert that acceptance 0.234 is optimal for every method; the frozen steps differ because their geometries differ.',
+        ]
+        notes[7] = 'The unmodified author SCS transition is called directly under the common benchmark fitting and tuning protocol. DCS uses the same compiled scan and recording structure. All methods sample the same normal-CDF-skewed Student-t target at ν = 3; this is not a literal reproduction of the SCS publication target, which uses a Student-t CDF.'
     notes += [summary[key] for key in ('target_note', 'mse_note', 'time_scope') if isinstance(summary.get(key), str)]
     warning = '<p class="warning">Quick execution check only — do not interpret sampler rankings.</p>' if smoke else ''
     page = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>100D original SCS comparison</title><style>body{font:15px/1.55 system-ui,sans-serif;max-width:1450px;margin:auto;padding:28px;color:#24354b;background:#f6f8fb}h1,h2{line-height:1.2}h2{margin-top:32px}a{color:#5a429c}figure{margin:24px 0;padding:10px;background:white;border-radius:8px}img{max-width:100%;height:auto}figcaption{font-size:13px;color:#566579}.table-wrap{overflow:auto;background:white}table{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}td,th{padding:8px;border:1px solid #dee4ee;text-align:left;white-space:nowrap}td{font-family:ui-monospace,monospace}th{background:#eaf0f8}.warning{padding:12px;background:#fff0cf;border-left:4px solid #a4670d}li{margin-bottom:8px}</style></head><body>'''
+<title>100D SCS comparison</title><style>body{font:15px/1.55 system-ui,sans-serif;max-width:1450px;margin:auto;padding:28px;color:#24354b;background:#f6f8fb}h1,h2{line-height:1.2}h2{margin-top:32px}a{color:#5a429c}figure{margin:24px 0;padding:10px;background:white;border-radius:8px}img{max-width:100%;height:auto}figcaption{font-size:13px;color:#566579}.table-wrap{overflow:auto;background:white}table{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}td,th{padding:8px;border:1px solid #dee4ee;text-align:left;white-space:nowrap}td{font-family:ui-monospace,monospace}th{background:#eaf0f8}.warning{padding:12px;background:#fff0cf;border-left:4px solid #a4670d}li{margin-bottom:8px}</style></head><body>'''
     page += '<h1>'+html.escape(title)+(' — equal sampling time' if timed else ' — original comparison protocol')+'</h1>'+warning+'<p>'+html.escape(budget)+'.</p>'
+    if config.get('protocol'):
+        page += '<p>Recorded protocol: <code>'+html.escape(config['protocol'])+'</code>.</p>'
     page += '<p>'+' · '.join('<a href="'+filename+'">'+html.escape(filename)+'</a>' for filename in csvs)+'</p>'
     for filename in figure_names:
         page += '<figure><a href="figures/'+filename+'.pdf"><img src="figures/'+filename+'.png" alt="'+html.escape(filename.replace('_', ' '))+'"></a><figcaption>Click the figure to open its PDF.</figcaption></figure>'

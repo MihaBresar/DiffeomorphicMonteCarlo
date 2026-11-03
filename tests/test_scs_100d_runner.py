@@ -32,25 +32,53 @@ class SCS100DRunnerTests(unittest.TestCase):
         self.assertEqual(config['time_budget'], 20.)
         self.assertEqual(config['warmup'], 1500)
         self.assertEqual(config['mode'], 'time')
-        self.assertEqual(config['protocol'], 'timed-dcs-author-scs-v2')
+        self.assertEqual(config['protocol'], 'timed-matched-dcs-scs-v3')
         self.assertEqual(config['burnin_fraction'], 1/3)
-        self.assertEqual(config['dcs_step_policy'], 'smoothed_tuning_0.234_then_frozen')
+        self.assertEqual(config['step_policy'], 'shared_indicator_dual_averaging_0.234_then_frozen')
         self.assertEqual(config['thin'], 50)
         self.assertEqual(config['algorithms'], ['DCS-RWM', 'DCS-BW', 'SCS'])
         self.assertEqual(config['target']['dimension'], 100)
         self.assertEqual(config['target']['nu'], 3.)
         self.assertEqual(config['target']['alpha'], {'0': 100., '1': -100.})
-        self.assertEqual(config['scs_step'], .1)
-        self.assertEqual(config['scs_optimizer_samples'], 2000)
-        self.assertEqual(config['scs_optimizer_steps'], 1000)
+        self.assertEqual(config['initial_scale'], .1)
+        self.assertEqual(config['optimizer_samples'], 2000)
+        self.assertEqual(config['optimizer_steps'], 1500)
+        self.assertEqual(config['vi_batch_policy'], 'fresh')
+        self.assertNotIn('scs_step', config)
         for preset, warmup, seconds in [('quick', 100, .05), ('reproduce', 1000, 2.), ('paper', 1500, 20.)]:
             selected = experiment.configuration(preset, workers=1)
             self.assertEqual(selected['warmup'], warmup)
             self.assertEqual(selected['time_budget'], seconds)
         for overrides in ({'runs': 0}, {'runs': True}, {'thin': 3}, {'iterations': 500},
-                          {'warmup': -1}, {'time_budget': 0}, {'time_budget': np.inf}):
+                          {'warmup': -1}, {'time_budget': 0}, {'time_budget': np.inf},
+                          {'scs_optimizer_steps': 1000}, {'scs_step': .1}, {'fit_seed': -1}):
             with self.subTest(overrides=overrides), self.assertRaises(ValueError):
                 experiment.configuration('quick', workers=1, overrides=overrides)
+
+    def test_both_maps_receive_identical_fitting_resources(self):
+        config = experiment.configuration('paper', workers=1)
+        calls = []
+
+        def fake_fit(target, settings, family, seed):
+            calls.append((target, settings.copy(), family, seed))
+            class Mapping:
+                def parameters(self):
+                    return {'family': family}
+            return Mapping(), {'steps': settings['optimizer_steps'],
+                'training_draws': settings['optimizer_samples'], 'seconds': 1.}
+
+        with patch.object(experiment, 'fit_map', side_effect=fake_fit), redirect_stdout(StringIO()):
+            maps, fitting = experiment.prepare(config)
+        self.assertEqual([call[2] for call in calls], ['ball', 'sphere'])
+        self.assertIs(calls[0][0], calls[1][0])
+        self.assertEqual(calls[0][1], calls[1][1])
+        self.assertEqual([call[3] for call in calls], [42, 42])
+        self.assertEqual(set(maps), {'ball', 'sphere'})
+        for family in maps:
+            self.assertEqual(fitting[family]['steps'], 1500)
+            self.assertEqual(fitting[family]['training_draws'], 2000)
+            self.assertFalse(fitting[family]['coordinate_clipping'])
+            self.assertFalse(fitting[family]['cdf_clipping'])
 
     def test_summary_uses_postburn_means_and_variable_actual_iteration_counts(self):
         config = experiment.configuration('quick', workers=1, overrides={'runs': 3, 'time_budget': 1.})

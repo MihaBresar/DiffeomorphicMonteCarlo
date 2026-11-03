@@ -1,5 +1,13 @@
 # Changes
 
+## 2026-11-03 — matched 100D comparison using author SCS
+
+- Retain the byte-for-byte author SCS transition and implement DCS-RWM/BW in the same JAX scan framework, with equivalent full-state recording, projection and radial reduction.
+- Give both map families the same fresh-batch VI resources, Adam settings and gradient-norm clipping; remove separate SCS fitting overrides.
+- Tune every method on separate warmup draws toward acceptance 0.234 using the same observed-acceptance dual averaging, then freeze the scale.
+- Preserve equal sampling time, physical initialization, first-third burn-in, exact all-iteration estimates, integer sample counts and existing figure families.
+- Save the protocol as `timed-matched-dcs-scs-v3`; keep historical reports plot-compatible. Other experiments retain their existing optimized kernels.
+
 ## Native kernels across experiments, equal-time SCS and first-third burn-in
 
 - Compile all canonical DCS, HnR, ordinary random-walk and spherical comparison loops.

@@ -64,7 +64,7 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
    open `paper_values.html` to read estimates, MSE, sample counts and timing
    values. The page uses two decimals; its CSV downloads retain full precision.
 
-See [the full protocol](SCS_100D.md) for the original DCS adaptation, author SCS code, and separate timing clocks.
+See [the full protocol](SCS_100D.md) for matched fitting and step calibration, the unmodified SCS author transition, and separate timing clocks.
 
 The default comparison contains exactly **DCS-RWM, DCS-BW and SCS** on one
 100D skewed Student-t target with **3 degrees of freedom**. Each method runs
@@ -78,8 +78,9 @@ for the same production sampling time:
 
 The figures report generated iteration counts, mean-norm and tail-probability
 estimates, MSE, and the observed bias/variance decomposition across chains.
-The comparison includes its specified original DCS map fitting and proposal-step
-adaptation automatically, so the **DCS map** selector is disabled for it.
+The comparison fits both map families with the same training budget and tunes
+all three proposal steps automatically, then freezes them for sampling. The
+**DCS map** selector is disabled for this matched protocol.
 The three methods run separately with the same worker setting. Selecting
 32 workers allows 2, 20 or 32 simultaneous chains in Quick check, Smaller
 reproduction or Full paper settings respectively; it does not multiply the

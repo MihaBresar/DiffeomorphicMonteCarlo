@@ -1,4 +1,4 @@
-"""One 100D skewed Student-t(3) comparison: original DCS-RWM/BW and author SCS.
+"""One 100D skewed Student-t(3) comparison with matched fitting and CPU kernels.
 
 Fresh runs only. Exact radial estimates use every post-burn-in iteration, including
 rejections. The first third of each timed sampling run is discarded. Each method runs alone in synchronized waves at the same concurrency.
@@ -22,21 +22,18 @@ import numpy as np
 from dcs_bench.engine import environment, write_json
 from dcs_bench.references import radial_truth
 from dcs_bench.targets import Target
-from dcs_bench.transforms import BallMap
+from dcs_bench.tuning import fit_map
 
 METHODS = ('DCS-RWM', 'DCS-BW', 'SCS')
 TARGET = {'kind': 'skew_t', 'dimension': 100, 'nu': 3., 'alpha': {'0': 100., '1': -100.}}
 PRESETS = {
-    'quick': dict(runs=2, time_budget=.05, warmup=100, thin=1, optimizer_steps=20, optimizer_samples=128,
-                  scs_optimizer_steps=20, scs_optimizer_samples=128),
-    'reproduce': dict(runs=20, time_budget=2., warmup=1000, thin=10, optimizer_steps=400, optimizer_samples=500,
-                      scs_optimizer_steps=400, scs_optimizer_samples=500),
-    'paper': dict(runs=50, time_budget=20., warmup=1500, thin=50, optimizer_steps=1500, optimizer_samples=2000,
-                  scs_optimizer_steps=1000, scs_optimizer_samples=2000),
+    'quick': dict(runs=2, time_budget=.05, warmup=100, thin=1, optimizer_steps=20, optimizer_samples=128),
+    'reproduce': dict(runs=20, time_budget=2., warmup=1000, thin=10, optimizer_steps=400, optimizer_samples=500),
+    'paper': dict(runs=50, time_budget=20., warmup=1500, thin=50, optimizer_steps=1500, optimizer_samples=2000),
 }
 TIME_SCOPE = ('Equal per-chain sampling time includes first-third burn-in and radial accumulation. '
-              'Fitting, compilation and step tuning are outside the clock. DCS steps are frozen after '
-              'separate smoothed 0.234 tuning; author SCS uses fixed step 0.1. Only post-burn-in '
+              'Fitting, compilation and step tuning are outside the clock. All methods use the same '
+              'JAX scan framework and separate dual-averaging tuning toward 0.234 using observed acceptances, then freeze their steps. Only post-burn-in '
               'states contribute estimates. All methods use the same 300-transition timing batches, '
               'with actual elapsed time and overshoot recorded. Methods run in equal-size synchronized waves.')
 
@@ -45,23 +42,26 @@ _ALLOCATION = {}
 
 def configuration(preset='quick', workers=1, overrides=None):
     config = dict(PRESETS[preset], preset=preset, workers=workers, mode='time', burnin_fraction=1/3,
-                  experiment='skew-t-100d-fixed', protocol='timed-dcs-author-scs-v2',
+                  experiment='skew-t-100d-fixed', protocol='timed-matched-dcs-scs-v3',
                   dimension=100, nu=3., alpha=TARGET['alpha'], target=TARGET,
                   beta=2., latitude=1.1, threshold=50., seed=901001, algorithms=list(METHODS),
-                  dcs_step_policy='smoothed_tuning_0.234_then_frozen', scs_step=.1)
+                  step_policy='shared_indicator_dual_averaging_0.234_then_frozen', initial_scale=.1,
+                  vi_batch_policy='fresh', ball_map_policy='mobius', map_scale_initialization='unit',
+                  fit_seed=42,
+                  fitting_policy='Shared fresh-batch reverse KL, Adam 0.01, gradient-norm cap 10; no coordinate/CDF clipping')
     allowed = {'runs', 'time_budget', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples',
-               'scs_optimizer_steps', 'scs_optimizer_samples', 'seed', 'workers'}
+               'fit_seed', 'seed', 'workers'}
     for key, value in (overrides or {}).items():
         if value is None:
             continue
         if key not in allowed:
             raise ValueError(f'{key} is not an override for the single SCS comparison')
         config[key] = value
-    for key in allowed-{'seed', 'time_budget'}:
+    for key in allowed-{'seed', 'fit_seed', 'time_budget'}:
         value = config[key]
         if isinstance(value, bool) or not isinstance(value, int) or value < 1:
             raise ValueError(f'{key} must be a positive integer')
-    for key in ('seed',):
+    for key in ('seed', 'fit_seed'):
         if isinstance(config[key], bool) or not isinstance(config[key], int) or config[key] < 0:
             raise ValueError(f'{key} must be a nonnegative integer')
     if not np.isfinite(config['time_budget']) or config['time_budget'] <= 0:
@@ -74,28 +74,21 @@ def configuration(preset='quick', workers=1, overrides=None):
 
 def source_hashes():
     paths = list((ROOT/'dcs_bench').glob('*.py')) + list((ROOT/'third_party/scs_paper').rglob('*.py'))
-    paths += [Path(__file__), ROOT/'scripts/legacy_fixed_step_loader.py', ROOT/'validation/legacy_fixed_step.py',
-              ROOT/'scripts/scs_100d_figures.py', ROOT/'requirements-cpu.txt']
+    paths += [Path(__file__), ROOT/'scripts/scs_100d_figures.py', ROOT/'requirements-cpu.txt']
     return {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 
 
 def prepare(config):
-    from scripts.legacy_fixed_step_loader import load_legacy
-    from dcs_bench.scs_paper import fit
-    print('Fitting the original DCS map (shared by RWM and BW)', flush=True)
-    started = time.perf_counter()
-    legacy = load_legacy(nu=3., dimension=100, optimizer_steps=config['optimizer_steps'],
-                         optimizer_samples=config['optimizer_samples'])
-    mu, delta, scale = legacy['optimize_prwm_hyperparameters']()
-    ball = BallMap(100, beta=2., mu=mu, delta=delta, scale=scale).parameters()
-    ball_metadata = dict(seconds=time.perf_counter()-started, seed=42,
-                         steps=config['optimizer_steps']+1, samples_per_step=config['optimizer_samples'],
-                         training_batch_policy='fresh', source='validation/legacy_fixed_step.py, VI function only',
-                         note='Original VI clips its CDF argument to [-35,35]. Production density is unclipped.')
-    print('Fitting SCS with the original author VI on the shared target', flush=True)
-    sphere, sphere_metadata = fit({**config, 'optimizer_steps': config['scs_optimizer_steps'],
-                                  'optimizer_samples': config['scs_optimizer_samples']})
-    return {'ball': ball, 'sphere': sphere}, {'ball': ball_metadata, 'sphere': sphere_metadata}
+    target = Target(config['target'])
+    maps, fitting = {}, {}
+    for family in ('ball', 'sphere'):
+        print(f'Fitting {family} map with the shared VI protocol', flush=True)
+        mapping, metadata = fit_map(target, config, family, config['fit_seed'])
+        maps[family] = mapping.parameters()
+        fitting[family] = dict(metadata, learning_rate=.01, gradient_norm_cap=10.,
+            coordinate_clipping=False, cdf_clipping=False,
+            fitting_policy=config['fitting_policy'])
+    return maps, fitting
 
 
 def initialize_worker(slots):
@@ -208,7 +201,7 @@ def summarize(config, maps, fitting, records):
     return dict(config=config, truth=truth.tolist(), functionals=['tail_probability', 'mean_norm'],
                 maps=maps, fitting=fitting, cases=cases, time_scope=TIME_SCOPE,
                 target_note='Shared normal-CDF-skewed t target from the DCS experiment. The SCS paper uses a '
-                            'Student-t CDF and nu=1 or2; this applies its author algorithm/settings to our nu=3 target.',
+                            'Student-t CDF and nu=1 or2; this applies the SCS kernel with common benchmark tuning to our nu=3 target.',
                 mse_note='All post-burn-in iterations, including repeats after rejections; exact radial truth. '
                          'Empirical bias squared plus between-chain variance with divisor number of chains equals MSE. '
                          'More chains estimate error more precisely but cannot repair insufficient chain mixing.')
@@ -252,7 +245,7 @@ def main(argv=None):
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--time-budget', type=float)
     for name in ('runs', 'warmup', 'thin', 'optimizer-steps', 'optimizer-samples',
-                 'scs-optimizer-steps', 'scs-optimizer-samples', 'seed'):
+                 'fit-seed', 'seed'):
         parser.add_argument('--'+name, type=int)
     args = parser.parse_args(argv)
     overrides = {k: v for k, v in vars(args).items() if k not in ('preset', 'workers', 'output_dir', 'dry_run')}
