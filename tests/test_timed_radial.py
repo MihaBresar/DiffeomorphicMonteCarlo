@@ -124,10 +124,11 @@ class TimedRadialTests(unittest.TestCase):
                 with self.subTest(algorithm=algorithm, scale=scale):
                     key = jax.random.key(113)
                     key, subkey = jax.random.split(key)
-                    direction = np.array(jax.random.normal(subkey, shape=initial.shape))
                     if algorithm == 'DCS-BW':
-                        key, subkey = jax.random.split(key)
-                        direction *= float(jax.random.uniform(subkey)) ** (1./5) / np.linalg.norm(direction)
+                        gaussian = np.array(jax.random.normal(subkey, shape=(7,)))
+                        direction = gaussian[:5] / np.linalg.norm(gaussian)
+                    else:
+                        direction = np.array(jax.random.normal(subkey, shape=initial.shape))
                     proposed = np.asarray(initial) + scale * direction
                     logratio = mapping.log_density(target, proposed) - mapping.log_density(target, np.asarray(initial))
                     key, subkey = jax.random.split(key)

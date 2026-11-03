@@ -418,6 +418,9 @@ def render_report(root, summary):
             'The sample-count panel reports all generated iterations. Exact generated, discarded and estimation counts are listed for every chain below. Matching tuning rules does not assert that acceptance 0.234 is optimal for every method; the frozen steps differ because their geometries differ.',
         ]
         notes[7] = 'The unmodified author SCS transition is called directly under the common benchmark fitting and tuning protocol. DCS uses the same compiled scan and recording structure. All methods sample the same normal-CDF-skewed Student-t target at ν = 3; this is not a literal reproduction of the SCS publication target, which uses a Student-t CDF.'
+        if config.get('implementation_revision') == 'jax-dcs-exact-ball-v1':
+            notes[2] = 'Both map families use the same fresh-batch reverse-KL fitting framework, optimizer budget, Adam updates and gradient clipping. All three samplers use compiled JAX CPU scans and the same full-state recording policy. DCS rejects outside-ball proposals before either density evaluation and recomputes both current and proposed densities for every admissible proposal. Physical projection and radial estimation run after each batch for every method. DCS-RWM and DCS-BW share the ball map.'
+            notes.append('This implementation generates the same uniform-ball BW proposal distribution from d+2 Gaussian draws and simplifies the β=2 map using an exact Möbius identity. The BW random-number sequence for a given seed changes, while its proposal law is preserved. The author SCS transition, shared fitting and tuning budgets, recording and timing remain unchanged.')
     notes += [summary[key] for key in ('target_note', 'mse_note', 'time_scope') if isinstance(summary.get(key), str)]
     warning = '<p class="warning">Quick execution check only — do not interpret sampler rankings.</p>' if smoke else ''
     page = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -425,6 +428,8 @@ def render_report(root, summary):
     page += '<h1>'+html.escape(title)+(' — equal sampling time' if timed else ' — original comparison protocol')+'</h1>'+warning+'<p>'+html.escape(budget)+'.</p>'
     if config.get('protocol'):
         page += '<p>Recorded protocol: <code>'+html.escape(config['protocol'])+'</code>.</p>'
+    if config.get('implementation_revision'):
+        page += '<p>Implementation revision: <code>'+html.escape(config['implementation_revision'])+'</code>.</p>'
     page += '<p>'+' · '.join('<a href="'+filename+'">'+html.escape(filename)+'</a>' for filename in csvs)+'</p>'
     for filename in figure_names:
         page += '<figure><a href="figures/'+filename+'.pdf"><img src="figures/'+filename+'.png" alt="'+html.escape(filename.replace('_', ' '))+'"></a><figcaption>Click the figure to open its PDF.</figcaption></figure>'

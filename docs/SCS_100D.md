@@ -5,7 +5,9 @@ sampling time per chain** on the existing 100-dimensional normal-CDF-skewed
 Student-t target, with ν=3 and α=(100,−100,0,…). It estimates P(‖X‖≥50) and E‖X‖
 against exact radial truth. All three methods start at the physical vector of
 ones, using the correct inverse map. The protocol identifier is
-`timed-matched-dcs-scs-v3`.
+`timed-matched-dcs-scs-v3`. Current runs also record implementation revision
+`jax-dcs-exact-ball-v1`, distinguishing the DCS implementation improvements
+below from the initial JAX implementation of this same experimental protocol.
 
 | Preset | Independent chains per method | Timed sampling seconds per chain | Separate warmup iterations | Stored radial trace interval |
 |---|---:|---:|---:|---:|
@@ -57,11 +59,101 @@ DCS-RWM proposes isotropic Gaussian increments; DCS-BW proposes uniformly in a
 Euclidean ball. Both reject proposals outside the open unit ball. SCS uses its
 tangent-Gaussian proposal, normalization, cap step-out, projection, Jacobian and
 Metropolis transition. All three kernels run in compiled JAX CPU scans with the
-same batch size and state-output policy. Each transition evaluates current and
-proposed densities; DCS skips target evaluation for proposals outside its ball,
-which are direct rejections by definition. Physical projection and radial estimation run after each
-batch with the same recording policy for all methods. Compilation finishes
+same batch size and state-output policy. SCS evaluates current and proposed
+densities at each transition. DCS recomputes both densities for every admissible
+proposal; an outside-ball proposal rejects before either density evaluation.
+Physical projection and radial estimation run after each batch with the same
+recording policy for all methods. Compilation finishes
 before timing; completed JAX work is synchronized at each timing boundary.
+
+## Exact DCS implementation improvements
+
+The current DCS JAX code preserves the proposal distributions, transformed
+target and acceptance rule while removing three avoidable costs:
+
+- **Uniform-ball generation:** for independent standard normals
+  $G\in\mathbb{R}^{d+2}$, use $G_{1:d}/\|G\|$. Its squared radius is
+  $\chi_d^2/(\chi_d^2+\chi_2^2)\sim\operatorname{Beta}(d/2,1)$, so the radius
+  has CDF $r^d$ and an independent uniform direction. This gives the same
+  uniform-ball proposal as a normalized d-dimensional Gaussian multiplied by
+  $U^{1/d}$, using one Gaussian-vector call instead of a separate radial draw.
+  It is the p=2 case of the uniform-ball representation in
+  [Barthe et al., Theorem 1](https://arxiv.org/abs/math/0503650).
+- **The β=2 map:** use the exact Möbius identity
+  $1-\|M_\delta(z)\|^2=(1-\|\delta\|^2)(1-\|z\|^2)/(1+2z^\top\delta+\|\delta\|^2\|z\|^2)$.
+  The radial denominator is its square root. This avoids the general-power
+  calculation and subtracting the rounded transformed norm from one. Other β
+  values retain the general formula.
+- **Direct boundary rejection:** an outside-ball proposal has acceptance
+  probability zero. Reject it before computing either density, while advancing
+  the random key consistently. For admissible proposals, recompute both
+  densities; no current-state density cache is introduced.
+
+The authors' SCS transition is unchanged. All methods retain the same target,
+map-fitting budgets, step-size calibration, 300-state output batches, physical
+projection, radial reduction and timing boundaries. These changes do not assert
+that fewer geometric operations always imply lower runtime or lower MSE.
+
+The new BW construction changes the sequence of random draws for a given seed,
+including warmup, while preserving its transition law. New equal-time runs also
+generate different iteration counts. Keep prior results with their recorded
+source hashes and rerun the entire three-method 100D comparison for new figures.
+Other experiments retain their existing implementations.
+
+`scripts/benchmark_jax_dcs.py` measures throughput at fixed saved maps,
+calibrated starting states and proposal scales. It excludes compilation,
+synchronizes completed JAX work, and rotates method order. Supplying
+`--baseline-root` for a checkout of commit
+`289f3bf6624a38fc49644fef78a425a7c6be1cc5` adds the initial JAX implementation
+as a paired timing baseline. The benchmark checks that target, transform and
+author-SCS dependencies match; its fixed-count measurements isolate
+implementation cost rather than estimating equal-time MSE.
+
+On the local macOS ARM64 CPU, five paired 45,000-iteration measurements gave
+the following median throughput. The map, baseline warmup endpoint and proposal
+scale were fixed within each method; cases ran sequentially in rotated order.
+
+| Method | Earlier JAX iterations/s | Optimized iterations/s | Speed factor |
+|---|---:|---:|---:|
+| DCS-RWM | 147,566.36 | 178,791.81 | 1.21 |
+| DCS-BW | 110,428.19 | 159,548.37 | 1.44 |
+| Author SCS | 120,675.11 | 121,113.72 | 1.00 |
+
+Optimized DCS-RWM and DCS-BW generated 1.48× and 1.32× as many iterations per
+second as author SCS in this controlled check. SCS's scientific outputs were
+identical before and after; its 0.36% timing variation provides a stability
+check. These hardware-specific throughput ratios do not imply lower MSE or
+predict Ryzen timings. Full precision, individual timings, frozen states,
+parameters, environment and source hashes are archived in
+[`validation/jax_dcs_efficiency_benchmark.json`](../validation/jax_dcs_efficiency_benchmark.json).
+
+```bash
+python scripts/benchmark_jax_dcs.py --baseline-root /path/to/earlier-checkout --output results/jax-speed-check.json
+```
+
+Without `--baseline-root`, the script measures the current three methods using
+the saved map settings. It does not refit or select parameters for speed.
+
+Two fresh equal-time checks used the same settings and fitting/sampling seeds
+as the initial JAX checks archived below: 20 chains per method, 1.00 second per
+chain, 1,500 separate warmup steps and full VI budgets. Both fitted maps and
+their training histories were unchanged. The optimized implementation gave:
+
+| Run | Method | Mean generated iterations | Tail MSE | Mean-norm MSE |
+|---|---|---:|---:|---:|
+| A | DCS-RWM | 180,795 | 1.27e-06 | 1.55e-02 |
+| A | DCS-BW | 158,940 | 1.53e-06 | 1.32e-02 |
+| A | SCS | 119,820 | 8.71e-07 | 9.07e-03 |
+| B | DCS-RWM | 178,260 | 6.16e-07 | 1.58e-02 |
+| B | DCS-BW | 157,290 | 1.19e-06 | 1.89e-02 |
+| B | SCS | 118,095 | 1.23e-06 | 1.19e-02 |
+
+SCS retained the lowest mean-norm MSE in both checks; the tail-MSE ordering
+varied. BW's mean-norm MSE decreased relative to the earlier JAX runs, but its
+random draws also changed, so that decrease cannot be attributed solely to
+speed. These are short local checks, not a full-paper ranking. Full-precision
+settings and chain records are in
+[`validation/jax_dcs_optimized_comparison.json`](../validation/jax_dcs_optimized_comparison.json).
 
 ## Unmodified author SCS transition
 
@@ -142,7 +234,12 @@ chain. The launcher and compatibility entry points route this identifier to
 the same runner. Rerun this one experiment for the current matched comparison;
 existing sampling results cannot be converted by replotting.
 
-## Short matched checks, 3 November 2026
+## Initial JAX implementation: short matched checks, 3 November 2026
+
+These archived checks used commit
+`289f3bf6624a38fc49644fef78a425a7c6be1cc5`, before the exact DCS implementation
+improvements above. Their timings and iteration counts describe that initial
+JAX implementation.
 
 Two prespecified local checks used 20 chains per method, one worker, 1.00 second
 of timed sampling per chain, 1,500 separate warmup steps and 1,500 × 2,000 VI
@@ -178,8 +275,10 @@ algorithm-only speed advantage.
 Full-precision settings, fitted maps, per-chain estimates, counts, times,
 acceptances, source hashes and the before-update results are in
 [`validation/scs_100d_matched_comparison.json`](../validation/scs_100d_matched_comparison.json).
-The first third is removed from every count before estimation. To repeat the
-two current checks in fresh folders:
+The first third is removed from every count before estimation. To repeat these
+archived settings, run the following commands from that earlier checkout in
+fresh folders. Running them from the current checkout measures the updated
+implementation instead:
 
 ```bash
 python scripts/reproduce_scs_100d.py --preset reproduce --workers 1 --runs 20 --time-budget 1 --warmup 1500 --optimizer-steps 1500 --optimizer-samples 2000 --output-dir results/matched-check-a

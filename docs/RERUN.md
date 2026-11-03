@@ -20,6 +20,16 @@ update. It now keeps the authors' SCS transition and implements DCS in the same
 JAX framework, with matched VI resources, shared step-size tuning and equivalent
 output processing. Previous 100D timings are not measurements of this protocol.
 
+The subsequent DCS efficiency update records implementation revision
+`jax-dcs-exact-ball-v1` within the same matched protocol. It uses an equivalent
+uniform-ball proposal generator, an exact β=2 map simplification and earlier
+rejection of outside-ball proposals. The authors' SCS transition and all shared
+fitting, tuning and recording policies remain unchanged. Rerun **all three
+methods in the 100D comparison**, including SCS, to measure them under the same
+machine conditions. The new BW generator preserves its proposal distribution
+but changes seeded trajectories; existing graphs cannot be updated by changing
+their time labels. No other experiment needs rerunning for this efficiency update.
+
 ## Earlier compiled-kernel and burn-in update
 
 The compiled implementation and burn-in policy require fresh runs for **all

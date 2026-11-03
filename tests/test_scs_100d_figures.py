@@ -100,6 +100,7 @@ class SCS100DFiguresTests(unittest.TestCase):
             self.assertIn('fixed proposal step h = 0.1', page)
             self.assertIn('not a literal reproduction of the SCS publication target', page)
             self.assertIn('equal production iteration counts', page)
+            self.assertNotIn('Implementation revision:', page)
             self.assertIn(f"{summary['cases']['DCS-BW']['mse'][0]:.2e}", page)
             self.assertNotIn(repr(summary['cases']['DCS-BW']['mse'][0]), page)
 
@@ -136,13 +137,15 @@ class SCS100DFiguresTests(unittest.TestCase):
             self.assertIn('first third', page)
             self.assertIn('held fixed during timed sampling', page)
             self.assertIn('Author SCS keeps its fixed h = 0.10', page)
+            self.assertNotIn('Implementation revision:', page)
             self.assertNotIn('DCS-RWM and DCS-BW use the original VI fitting and continuously adapt', page)
             self.assertIn('two decimals', page)
 
     def test_matched_protocol_labels_all_methods_without_rewriting_old_policies(self):
         summary = example_summary()
         summary['config'].pop('iterations')
-        summary['config'].update(mode='time', time_budget=2., protocol='timed-matched-dcs-scs-v3')
+        summary['config'].update(mode='time', time_budget=2., protocol='timed-matched-dcs-scs-v3',
+                                 implementation_revision='jax-dcs-exact-ball-v1')
         for case in summary['cases'].values():
             for record in case['records']:
                 record.update(iterations=1500, discarded_iterations=500,
@@ -166,6 +169,9 @@ class SCS100DFiguresTests(unittest.TestCase):
             page = (root/'paper_values.html').read_text(encoding='utf-8')
             self.assertIn('same dual-averaging rule', page)
             self.assertIn('timed-matched-dcs-scs-v3', page)
+            self.assertIn('Implementation revision: <code>jax-dcs-exact-ball-v1</code>', page)
+            self.assertIn('outside-ball proposals before either density evaluation', page)
+            self.assertIn('its proposal law is preserved', page)
             self.assertIn('compiled JAX CPU scans', page)
             self.assertIn('unmodified author SCS transition is called directly', page)
             self.assertNotIn('Author SCS keeps its fixed', page)

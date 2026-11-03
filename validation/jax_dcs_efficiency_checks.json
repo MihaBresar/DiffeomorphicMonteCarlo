@@ -1,0 +1,21 @@
+{
+  "audit_date": "2026-11-03",
+  "implementation_revision": "jax-dcs-exact-ball-v1",
+  "tests_passed": 161,
+  "focused_report_tests_passed": 4,
+  "parallel_two_worker_run": "passed",
+  "historical_v3_replot": "passed",
+  "independent_review": "No blocking correctness or fairness issue",
+  "unchanged_author_scs": true,
+  "unchanged_maps_and_vi_histories_for_both_repeats": true,
+  "paired_scs_outputs_identical": true,
+  "checks": [
+    "Uniform-ball radial CDF, moments, isotropy and coordinate symmetry in dimensions 1,5,100",
+    "Independent beta2 transform/density checks including near-boundary points and large Mobius shifts",
+    "General-beta fallback checks",
+    "Guaranteed direct rejections repeat finite states",
+    "Exact original SCS scan parity",
+    "Shared separate calibration and frozen steps",
+    "All rejection repeats and exact first-third burn-in accounting"
+  ]
+}

@@ -1,5 +1,14 @@
 # Changes
 
+## 2026-11-03 — exact DCS JAX efficiency improvements
+
+- Generate uniform-ball proposals from one normalized vector of d+2 Gaussian draws, preserving the proposal law while removing the separate radial random draw.
+- Simplify the β=2 radial map with the exact Möbius boundary-gap identity; retain the general formula for other β values.
+- Reject outside-ball proposals before either target-density calculation, while recomputing both densities for admissible proposals.
+- Preserve the original author SCS code, common fitting and warmup budgets, full-state recording, timing and first-third burn-in.
+- Record `jax-dcs-exact-ball-v1` separately from the unchanged v3 experimental protocol. BW seeded trajectories change, so regenerate the full 100D comparison; other experiments are unchanged.
+- Add a reproducible fixed-map, fixed-scale JAX implementation benchmark and preserve the earlier JAX results as historical evidence.
+
 ## 2026-11-03 — matched 100D comparison using author SCS
 
 - Retain the byte-for-byte author SCS transition and implement DCS-RWM/BW in the same JAX scan framework, with equivalent full-state recording, projection and radial reduction.

@@ -43,6 +43,7 @@ _ALLOCATION = {}
 def configuration(preset='quick', workers=1, overrides=None):
     config = dict(PRESETS[preset], preset=preset, workers=workers, mode='time', burnin_fraction=1/3,
                   experiment='skew-t-100d-fixed', protocol='timed-matched-dcs-scs-v3',
+                  implementation_revision='jax-dcs-exact-ball-v1',
                   dimension=100, nu=3., alpha=TARGET['alpha'], target=TARGET,
                   beta=2., latitude=1.1, threshold=50., seed=901001, algorithms=list(METHODS),
                   step_policy='shared_indicator_dual_averaging_0.234_then_frozen', initial_scale=.1,

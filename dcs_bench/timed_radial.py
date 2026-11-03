@@ -1,7 +1,8 @@
 """Equal-time comparison using the author SCS and matched JAX DCS execution.
 
-Both methods materialize the same 300-state scan, evaluate current and proposed
-log densities, and run the same vectorized radial bookkeeping. Compilation and
+Both methods materialize the same 300-state scan and run the same vectorized
+radial bookkeeping. DCS evaluates both densities for admissible proposals and
+directly rejects outside-ball proposals. Compilation and
 shared separate step calibration are untimed; all production steps are frozen.
 """
 from functools import lru_cache
@@ -17,6 +18,21 @@ from .transforms import BallMap, mobius
 BATCH_SIZE = 300
 PREFIX_STRIDE = 100
 STEP_POLICY = 'common raw dual averaging of observed acceptance to 0.234 during separate warmup; smoothed final scale frozen'
+IMPLEMENTATION_REVISION = 'jax-dcs-exact-ball-v1'
+
+
+def _uniform_ball(key, dimension):
+    """Uniform d-ball draw with one Gaussian-vector call and no radial RNG.
+
+    For independent standard normals G in R^(d+2), G[:d]/||G|| has an
+    independent uniform direction and squared radius Beta(d/2, 1). Thus its
+    radius has CDF r^d, exactly as direction * U**(1/d). The random stream
+    differs from that older construction; the proposal distribution does not.
+    """
+    import jax
+    import jax.numpy as jnp
+    gaussian = jax.random.normal(key, shape=(dimension + 2,))
+    return gaussian[:dimension] / jnp.linalg.norm(gaussian)
 
 
 def _dcs_components(mapping_dict, target, algorithm):
@@ -28,21 +44,34 @@ def _dcs_components(mapping_dict, target, algorithm):
     beta, scale, dimension = mapping.beta, mapping.scale, mapping.d
 
     def transform(z):
-        w, logmobius = mobius(z, delta, jnp)
-        radius = jnp.linalg.norm(w, axis=-1)
-        logeps = jnp.log(-jnp.expm1(beta * jnp.log(radius)))
-        physical = mu + scale * w / jnp.exp(logeps / beta)[..., None]
+        if beta == 2.:
+            r2 = jnp.sum(z * z, axis=-1)
+            delta2 = jnp.sum(delta * delta)
+            dot = z @ delta
+            denominator = 1. + 2. * dot + delta2 * r2
+            w = ((1. - delta2) * z +
+                 (1. + 2. * dot + r2)[..., None] * delta) / denominator[..., None]
+            logmobius = dimension * (jnp.log1p(-delta2) - jnp.log(denominator))
+            # Exact identity for 1-||Mobius_delta(z)||^2. This avoids both
+            # general powers and subtracting the rounded norm of w from one.
+            eps = (1. - delta2) * (1. - r2) / denominator
+            logeps = jnp.log(eps)
+            radial_denominator = jnp.sqrt(eps)
+        else:
+            w, logmobius = mobius(z, delta, jnp)
+            radius = jnp.linalg.norm(w, axis=-1)
+            logeps = jnp.log(-jnp.expm1(beta * jnp.log(radius)))
+            radial_denominator = jnp.exp(logeps / beta)
+        physical = mu + scale * w / radial_denominator[..., None]
         logjac = dimension * jnp.log(scale) - (1 + dimension / beta) * logeps + logmobius
         return physical, logjac
 
+    def interior(z):
+        x, logjac = transform(z)
+        value = target.log_prob(x, 'jax') + logjac
+        return jnp.where(jnp.isfinite(value), value, -jnp.inf)
+
     def density(z):
-        def interior(z):
-            x, logjac = transform(z)
-            value = target.log_prob(x, 'jax') + logjac
-            return jnp.where(jnp.isfinite(value), value, -jnp.inf)
-        # An outside-ball proposal is a genuine direct rejection. No target
-        # call is needed there; interior current and proposal densities are
-        # recomputed on every step, just as in the author SCS implementation.
         return jax.lax.cond(jnp.sum(z * z) < 1., interior,
                             lambda _: jnp.asarray(-jnp.inf), z)
 
@@ -50,17 +79,20 @@ def _dcs_components(mapping_dict, target, algorithm):
         def step(carry, index):
             x, key = carry
             key, subkey = jax.random.split(key)
-            direction = jax.random.normal(subkey, shape=x.shape)
             if algorithm == 'DCS-BW':
-                key, subkey = jax.random.split(key)
-                radius = jax.random.uniform(subkey) ** (1. / dimension)
-                eps = stepsize * radius * direction / jnp.linalg.norm(direction)
+                eps = stepsize * _uniform_ball(subkey, dimension)
             else:
-                eps = stepsize * direction
+                eps = stepsize * jax.random.normal(subkey, shape=x.shape)
             proposed = x + eps
-            log_accept = density(proposed) - density(x)
             key, subkey = jax.random.split(key)
-            accept = (jnp.log(jax.random.uniform(subkey)) < log_accept) * 1.
+            logu = jnp.log(jax.random.uniform(subkey))
+            # No current-state cache: both densities are recomputed for every
+            # admissible proposal. Outside-ball proposals reject by definition,
+            # so neither evaluation is necessary. Keep key advancement common
+            # to both branches. The initial and all accepted states are valid.
+            accept = jax.lax.cond(jnp.sum(proposed * proposed) < 1.,
+                lambda _: (logu < interior(proposed) - interior(x)) * 1.,
+                lambda _: jnp.asarray(0.), operand=None)
             x = x * (1. - accept) + proposed * accept
             return (x, key), (x, accept)
         return jax.lax.scan(step, (x0, key), jnp.arange(count))[1]
@@ -267,6 +299,10 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         'step_policy': STEP_POLICY,
         'target_acceptance': .234,
         'common_cpu_backend': 'JAX',
+        'implementation_revision': IMPLEMENTATION_REVISION,
+        'proposal_generator': ('normal_d_plus_2_projection' if config['algorithm'] == 'DCS-BW'
+                               else 'author_tangent_normal' if config['algorithm'] == 'SCS'
+                               else 'isotropic_normal'),
         'common_statistic_policy': 'Full 300-state scans; physical projection and norm for every state, including rejection repeats',
         'accepted': int(totals[2]), 'acceptance': float(totals[2] / iterations),
         'postburn_accepted': int(sums[2]), 'postburn_acceptance': float(sums[2] / count),
