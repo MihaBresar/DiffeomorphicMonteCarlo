@@ -1,5 +1,29 @@
 # Validation of the corrected implementation
 
+## Reflected-BW/rotation mixture (4 November 2026)
+
+Version 4 adds **DCS-BW-rotate** in both JAX and optimized Numba. Each
+iteration chooses one reflected BW or one fixed-radius angular update with
+equal probability. Both scales are pretuned within the existing shared
+warmup-transition budget and then frozen. With VI enabled, rotation takes
+place after the Möbius transformation and preserves distance from the fitted
+centre, with the corresponding proposal correction.
+
+All **271 automated tests** and **eight quick comparison configurations**
+passed locally on the Apple M4 Pro laptop, covering **72 chains**. Tests cover
+reversibility, the independent physical-density ratio, target invariance,
+50/50 component selection, complete pilot accounting, all-state statistics,
+exact first-third burn-in and preservation of the existing plot families.
+Matching JAX and Numba cases selected identical pairs of calibrated scales
+and used identical fitted maps. The existing transition implementations,
+map fitting and author SCS code are unchanged.
+
+See the [rotation check record](../validation/rotation_checks.json), including
+the actual quick-check scales and angles. These checks validate execution and
+implementation consistency; they do not establish performance rankings.
+Fresh full-paper runs are needed to assess the new sampler. Windows/Linux
+checks for this revision run separately in GitHub Actions.
+
 ## Three-coordinate extension (4 November 2026)
 
 Version 3 retains the version-2 radial and X₁ measurements and adds the X₂

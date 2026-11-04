@@ -8,10 +8,10 @@ This corrected implementation centralizes target densities and transformations, 
 
 Choose one of two comparisons:
 
-- **Sampler comparison (JAX):** DCS-RWM, DCS-BW, author SCS and reflected DCS-BW, all in the same JAX timing/recording framework.
-- **Optimized Numba comparison:** DCS-BW and reflected DCS-BW with fused native loops, versus the unmodified author SCS in JAX. This measures implementation efficiency; it does not equalize framework and output-processing costs.
+- **Sampler comparison (JAX):** DCS-RWM, DCS-BW, author SCS, reflected DCS-BW and DCS-BW-rotate, all in the same JAX timing/recording framework.
+- **Optimized Numba comparison:** DCS-BW, reflected DCS-BW and DCS-BW-rotate with fused native loops, versus the unmodified author SCS in JAX. This measures implementation efficiency; it does not equalize framework and output-processing costs.
 
-Each offers **100D skewed t(3)** or **500D skewed t(3)**, both with DCS β=2, and **VI on/off for both map families**. Step sizes are always pretuned separately and frozen before sampling. Reflected BW uses ball-movement calibration without a hard ceiling of 2; ordinary BW, RWM and SCS target acceptance 0.234. Reports preserve all radial plots and add means and prespecified tails for X₁, X₂ and X₃, with analytic or independent references and their precision shown. See [the comparison protocol](docs/COMPARISONS.md).
+Each offers **100D skewed t(3)** or **500D skewed t(3)**, both with DCS β=2, and **VI on/off for both map families**. Step sizes are always pretuned separately and frozen before sampling. Reflected BW uses ball-movement calibration without a hard ceiling of 2; ordinary BW, RWM and SCS target acceptance 0.234. DCS-BW-rotate chooses reflected BW or a fixed-radius angular move with equal probability; it splits the same tuning budget between the two proposal scales and freezes both. Reports preserve all radial plots and add means and prespecified tails for X₁, X₂ and X₃, with analytic or independent references and their precision shown. See [the comparison protocol](docs/COMPARISONS.md).
 
 Download this repository using **Code → Download ZIP**, extract it, and install
 **Python 3.12 (64-bit)**. On Windows double-click **Start.bat**; on macOS open
@@ -75,8 +75,8 @@ The full run is substantial. Timed synthetic/regression comparisons require thou
 |---|---|---|
 | `skew-t-200d-nuts` | d=200, ν=3, α=(20,-30,0,…) | 50 chains/method, 20 s each |
 | `skew-t-200d-baselines` | Same target | 50 chains/method, 10 s each |
-| `sampler-comparison` | 100D/500D skew-t(3), DCS β=2 | 50 chains/method, 20 s each; DCS-RWM/BW/reflect and SCS in JAX |
-| `sampler-comparison-numba` | Same two selectable targets | Same budgets; optimized Numba DCS-BW/reflect versus author JAX SCS |
+| `sampler-comparison` | 100D/500D skew-t(3), DCS β=2 | 50 chains/method, 20 s each; DCS-RWM/BW/reflect/rotate and SCS in JAX |
+| `sampler-comparison-numba` | Same two selectable targets | Same budgets; optimized Numba DCS-BW/reflect/rotate versus author JAX SCS |
 | `skew-t-50d-nu-0.5` | Symmetric t, d=50, ν=0.5 | 50 chains/method, 500,000 steps each; discard 166,667 |
 | `logistic-regression` | d=20, independent t priors, ν=4 and 6 | 20 chains/method/ν, 30 s each |
 | `eight-schools` | Centered hierarchy, log τ coordinate | 50 chains, 150,000 NUTS steps; DCS matched to mean NUTS production time |
@@ -96,7 +96,7 @@ Old SCS and boundary comparisons are removed from the launcher. Their command-li
 
 All canonical benchmark kernels now use compiled sampling loops, including hit-and-run and the ordinary/spherical baselines. See [native implementation checks and measured speedups](docs/NATIVE_KERNELS.md) and [the HnR/NUTS audit](docs/HNR_NUTS.md).
 
-The [4 November laptop results](docs/COMPARISON_RESULTS.md) cover all eight original-target/VI/backend combinations under version 2, with its four measurements (radial quantities and X₁): 560 chains, with full-precision errors, counts and timings. Coordinate and radial rankings differ. The earlier 3 November radial-only results remain documented separately; these smaller runs do not establish universal rankings. The new version-3 X₂/X₃ measurements require fresh runs; they are not present in those archived results.
+The [4 November laptop results](docs/COMPARISON_RESULTS.md) cover all eight original-target/VI/backend combinations under version 2, with its four measurements (radial quantities and X₁): 560 chains, with full-precision errors, counts and timings. Coordinate and radial rankings differ. The earlier 3 November radial-only results remain documented separately; these smaller runs do not establish universal rankings. Version 3 added X₂/X₃ measurements; version 4 adds the BW/rotation mixture. Neither addition is present in those archived results. Run every method together in a fresh version-4 comparison.
 
 ## Saved artifacts
 

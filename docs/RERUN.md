@@ -17,11 +17,11 @@ thinning. At thinning 10 this stores 33,334 post-burn-in states.
 The previous three-method 100D and separate boundary launcher entries have
 been replaced by two choices:
 
-- **Four samplers: DCS-RWM, DCS-BW, SCS and DCS-BW-reflect**, using the same
-  JAX framework and full-state processing (`timed-sampler-comparison-v3`).
-- **Optimized Numba DCS-BW and reflected BW versus SCS**, using optimized
+- **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and BW + rotation**, using the same
+  JAX framework and full-state processing (`timed-sampler-comparison-v4`).
+- **Optimized Numba BW, reflected BW and BW + rotation versus SCS**, using optimized
   DCS production and the unchanged author SCS JAX transition
-  (`timed-numba-comparison-v3`). This comparison includes differences between
+  (`timed-numba-comparison-v4`). This comparison includes differences between
   the implementations and their output processing.
 
 Both offer 100D and 500D skewed Student-t targets with ν=3 and DCS β=2. Each can
@@ -33,10 +33,11 @@ Start a fresh run of **every method in the chosen comparison** for each target
 and VI setting you want to assess. Old results remain valid records of their
 saved protocols; replotting cannot turn them into the new comparison or
 measure the optimized backend or recover all-iteration coordinate estimates.
-Version 3 adds X₂ mean/left-tail and X₃ mean/right-tail measurements to the
-existing X₁ and radial quantities. Old saved traces cannot reconstruct these
-all-iteration estimates. The new coordinate measurements are part of the timing budget, so rerun every
-method together even for an existing target. Keep older radial results as
+Version 4 adds DCS-BW-rotate in both implementations. It retains the version-3
+X₂ mean/left-tail and X₃ mean/right-tail measurements and the existing X₁ and
+radial quantities. Earlier saved traces cannot reconstruct unsaved all-iteration
+estimates or the new sampler. Rerun every method together even for an existing
+target so timing conditions are comparable. Keep older results as
 historical records. Keep the same worker count and machine
 conditions across methods. For a second independent sampling check, choose
 a fresh seed batch; VI-on fits retain seed 42.
@@ -56,8 +57,8 @@ exact integers, and CSV/JSON retain full precision.
 
 | Launcher experiment | Current comparison | Outputs |
 |---|---|---|
-| Four samplers: DCS-RWM, DCS-BW, SCS and DCS-BW-reflect | Selected target and VI setting; equal time, JAX | `VsSCS`, radial estimates, added coordinate mean/tail, counts, runtime, bias/variance |
-| Optimized Numba DCS-BW and reflected BW versus SCS | Selected target and VI setting; equal time, mixed implementations | Same comparison figure families and exact-value tables |
+| Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and BW + rotation | Selected target and VI setting; equal time, JAX | `VsSCS`, radial estimates, added coordinate mean/tail, counts, runtime, bias/variance |
+| Optimized Numba BW, reflected BW and BW + rotation versus SCS | Selected target and VI setting; equal time, mixed implementations | Same comparison figure families and exact-value tables |
 | 50D t: infinite first moment, equal samples | 50 chains/method, 500,000 iterations/chain | `SuperInfiniteFirstTest`, tail/log-norm and quantiles |
 | 200D skew-t: DCS versus NUTS | Equal sampling time | `NUTS_PBW_vs` |
 | 200D skew-t: random-walk baselines | Equal sampling time | `VsRWM_NUTS` |
@@ -70,7 +71,7 @@ Both current comparisons use 2 chains of 0.05 seconds for Quick check, 20 chains
 settings, for every target and VI choice. With VI, both map families receive
 equal fresh-batch budgets. Without VI, both maps use R=1 with zero centre/deformation,
 and no fitting draws. Ordinary methods use acceptance-target 0.234 calibration;
-reflected BW uses ball-movement pilots within the same transition budget.
+reflected BW uses ball-movement pilots within the same transition budget. DCS-BW-rotate splits that budget between reflected steps and angular moves; both scales freeze, and each sampling iteration chooses one move with equal probability.
 All steps freeze before timed sampling. Numba DCS starts from the same JAX
 pilot state and selected step as its JAX counterpart.
 
@@ -83,7 +84,7 @@ The super-heavy-tail experiment retains equal iteration counts. Its mean norm
 does not exist at ν=0.5, so use its tail probability, finite mean log norm and
 marginal quantiles. These plots cannot be reconstructed by rescaling timed MSE.
 
-**All seven experiments + posterior table** runs the four-method JAX comparison
+**All seven experiments + posterior table** runs the five-method JAX comparison
 on the 100D skewed-t target and the other six experiments,
 and prepares independent logistic references. Its VI choice controls both maps
 in the comparison; the other experiments retain their existing map options.

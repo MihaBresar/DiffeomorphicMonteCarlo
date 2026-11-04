@@ -1,6 +1,9 @@
 # Laptop comparison results
 
-## Current coordinate checks, 4 November 2026
+These saved results predate the version-4 rotation mixture. They do not
+measure DCS-BW-rotate; all numerical values below retain their original scope.
+
+## Historical version-2 coordinate checks, 4 November 2026
 
 The recorded version-2 runs add **E[X₁]** and **P(X₁ > 3)** to the existing
 100D and 500D targets. No additional distribution was included. All eight

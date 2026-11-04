@@ -52,7 +52,7 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 
 1. Click **Set up environment** and wait for **Environment ready**. This installs
    the pinned packages inside this project and can take several minutes.
-2. Leave **Four samplers: DCS-RWM, DCS-BW, SCS and DCS-BW-reflect** and
+2. Leave **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and BW + rotation** and
    **Quick check** selected. Choose a **Target distribution** and whether to
    use **Variational map fitting — both DCS and SCS**. Choose **CPU workers**
    (start with 2–4), then click **Start run**. Quick-check graphs verify
@@ -68,10 +68,10 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 
 The two current comparison choices are:
 
-- **Four samplers: DCS-RWM, DCS-BW, SCS and DCS-BW-reflect** runs all four in
+- **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and BW + rotation** runs all five in
   the same JAX CPU framework, with full-state recording and common radial and three-coordinate
   processing.
-- **Optimized Numba DCS-BW and reflected BW versus SCS** runs the two ball-walk
+- **Optimized Numba BW, reflected BW and BW + rotation versus SCS** runs the three ball-walk
   methods in optimized Numba loops against the unchanged author SCS JAX
   transition. DCS reuses the same JAX step calibration, then caches densities
   and coordinate values and accumulates all eight estimates inside the sampling loop. This measures
@@ -83,8 +83,9 @@ The original radial plots remain. Six coordinate figures show means of X₁,
 X₂ and X₃ and the tails X₁ > 3, X₂ < −3 and X₃ > 3. X₂ is the mirrored
 skewed coordinate; X₃ has a symmetric Student-t marginal. Independent and
 analytic reference values, with their precision, are shown in the report.
-Start fresh runs of every method for these measurements; older results do
-not contain the all-iteration X₂/X₃ values.
+Start fresh runs of every method for the version-4 comparison. Earlier reports
+do not contain the rotation mixture, and pre-version-3 reports lack the
+all-iteration X₂/X₃ values.
 See [the current comparison protocol](COMPARISONS.md) for target definitions,
 thresholds, tuning and timing policies.
 
@@ -93,7 +94,10 @@ Use **With VI** to fit both map families with the same training resources.
 deformation for both families. In either case every method still receives
 separate proposal-step tuning: original methods target acceptance 0.234;
 reflected BW selects by squared movement in the ball. Sampling steps stay
-fixed. The reflected candidates and scores appear in `reflected_tuning.csv`;
+fixed. BW + rotation splits this same tuning budget between reflected steps and
+angles; each iteration then chooses one move with equal probability. Its angular
+candidates are in `angular_tuning.csv`. The reflected candidates and scores
+appear in `reflected_tuning.csv`;
 there is no special upper step bound of 2.
 
 Both current comparisons offer a seed-batch selector. **Original seeds (batch 0)** uses
@@ -125,7 +129,7 @@ reproduction or Full paper settings respectively; it does not multiply the
 chain count by the number of methods.
 
 The other original experiments remain in the Experiment menu. **All seven
-experiments + posterior table** includes the four-sampler JAX comparison on
+experiments + posterior table** includes the five-sampler JAX comparison on
 the 100D skewed-t target and the other six experiments. Its VI selector controls
 both maps in that comparison. Run the optimized Numba and 500D
 comparisons individually. The former three-method 100D and boundary choices

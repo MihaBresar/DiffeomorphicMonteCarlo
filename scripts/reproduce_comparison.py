@@ -12,8 +12,8 @@ from scripts import reproduce_scs_100d as runner
 from dcs_bench.comparison_targets import TARGET_IDS, comparison_target
 
 COMPARISONS = ('jax', 'numba')
-METHODS = {'jax': ['DCS-RWM', 'DCS-BW', 'SCS', 'DCS-BW-reflect'],
-           'numba': ['DCS-BW', 'SCS', 'DCS-BW-reflect']}
+METHODS = {'jax': ['DCS-RWM', 'DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate'],
+           'numba': ['DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate']}
 
 
 def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax',
@@ -27,6 +27,8 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
     reference_samples = supplied.pop('reference_samples', None)
     reference_seed = supplied.pop('reference_seed', None)
     config = runner.configuration(preset, workers, supplied)
+    if config['warmup'] < 6:
+        raise ValueError('The rotation comparison requires at least six warmup transitions')
     reference_samples = ({'quick': 50_000, 'reproduce': 1_000_000, 'paper': 5_000_000}[preset]
                          if reference_samples is None else reference_samples)
     reference_seed = 740317 if reference_seed is None else reference_seed
@@ -36,7 +38,7 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         raise ValueError('reference_seed must be an integer from 0 to 2**32-1')
     spec = selected['target']
     config.update(experiment='sampler-comparison' if comparison == 'jax' else 'sampler-comparison-numba',
-        protocol='timed-sampler-comparison-v3' if comparison == 'jax' else 'timed-numba-comparison-v3',
+        protocol='timed-sampler-comparison-v4' if comparison == 'jax' else 'timed-numba-comparison-v4',
         comparison=comparison, dcs_backend=comparison, target_id=target, target_title=selected['title'],
         target=spec, dimension=spec['dimension'], nu=spec.get('nu'), alpha=spec.get('alpha', {}),
         beta=selected['beta'],
@@ -46,14 +48,17 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         vi=vi, vi_enabled=vi == 'on', ball_map_policy='mobius' if vi == 'on' else 'vanilla',
         sphere_map_policy='vi' if vi == 'on' else 'vanilla',
         algorithms=list(METHODS[comparison]),
-        implementation_revision='shared-jax-three-coordinate-v3' if comparison == 'jax' else 'optimized-numba-three-coordinate-v3',
+        implementation_revision='shared-jax-rotation-v4' if comparison == 'jax' else 'optimized-numba-rotation-v4',
         step_policy='separate_method_specific_pretuning_then_frozen',
-        step_tuning_policies={'DCS-BW-reflect': 'ball_esjd_pilot_v1'},
+        step_tuning_policies={'DCS-BW-reflect': 'ball_esjd_pilot_v1',
+                             'DCS-BW-rotate': 'split_ball_angular_esjd_v1'},
+        initial_angular_scale=1., mixture_probability=.5,
         fitting_policy=('Shared fresh-batch reverse KL, Adam 0.01, gradient-norm cap 10; no coordinate/CDF clipping'
                         if vi == 'on' else 'No VI for either family: R=1, centre=0, deformation=0'),
         target_note=selected['reference_note'],
         tuning_note='Every method receives the same separate warmup-transition budget. Reflected BW selects '
-            'by ball-movement pilots; other methods use acceptance-target 0.234 dual averaging. All steps freeze '
+            'by ball-movement pilots; the rotation mixture splits this same budget between ball and angular '
+            'movement pilots. Original BW/RWM/SCS use acceptance-target 0.234 dual averaging. All steps freeze '
             'before sampling. VI off leaves both maps untuned but still calibrates every proposal step.')
     config['time_scope'] = ('Equal per-chain sampling time includes first-third burn-in, every transition and '
         'all-state radial and X1/X2/X3 estimates. Independent reference generation, VI, separate step calibration, compilation, synchronization waits and '

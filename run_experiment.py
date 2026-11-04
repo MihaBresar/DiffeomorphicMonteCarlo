@@ -84,7 +84,7 @@ def main(argv=None):
         summary_path = args.plot_only/'summary.json'
         if summary_path.exists():
             summary = json.loads(summary_path.read_text(encoding='utf-8'))
-            if summary.get('config', {}).get('protocol') in ('original-dcs-author-scs-v1', 'timed-dcs-author-scs-v2', 'timed-matched-dcs-scs-v3', 'timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2', 'timed-boundary-dcs-scs-v3', 'timed-sampler-comparison-v1', 'timed-numba-comparison-v1', 'timed-sampler-comparison-v2', 'timed-numba-comparison-v2', 'timed-sampler-comparison-v3', 'timed-numba-comparison-v3'):
+            if summary.get('config', {}).get('protocol') in ('original-dcs-author-scs-v1', 'timed-dcs-author-scs-v2', 'timed-matched-dcs-scs-v3', 'timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2', 'timed-boundary-dcs-scs-v3', 'timed-sampler-comparison-v1', 'timed-numba-comparison-v1', 'timed-sampler-comparison-v2', 'timed-numba-comparison-v2', 'timed-sampler-comparison-v3', 'timed-numba-comparison-v3', 'timed-sampler-comparison-v4', 'timed-numba-comparison-v4'):
                 from scripts.scs_100d_figures import render_report
                 render_report(args.plot_only, summary)
                 print(args.plot_only.resolve())

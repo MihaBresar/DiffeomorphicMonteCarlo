@@ -1,5 +1,22 @@
 # Changes
 
+## 2026-11-04 — reflected BW with fixed-radius rotations
+
+- Add DCS-BW-rotate to both current comparisons: a fixed 50/50 random mixture
+  of reflected BW and angular moves, implemented in JAX and optimized Numba.
+  Each iteration performs and counts exactly one selected move.
+- Rotate after the Möbius map so the angular proposal preserves physical
+  radius about the fitted centre and uses the physical-density Metropolis ratio.
+- Split the existing total warmup budget between reflected-step and
+  unit-direction-movement pilots; freeze both scales before sampling.
+  Retain separate first-third burn-in, eight functionals, targets and VI choices.
+- Record protocols `timed-sampler-comparison-v4` and
+  `timed-numba-comparison-v4`. Export angular candidates, frozen scales and
+  angles alongside existing BW tuning records. Preserve historical report
+  semantics and all figure families. Fresh timed comparisons rerun all methods.
+- No existing result is relabeled as evidence for the new sampler; speed and
+  MSE comparisons require measured runs.
+
 ## 2026-11-04 — mirrored and symmetric coordinate checks
 
 - Add E[X₂], P(X₂ < −3), E[X₃] and P(X₃ > 3) to both comparison modes,

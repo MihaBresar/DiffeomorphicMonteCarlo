@@ -17,8 +17,8 @@ class ComparisonSuiteTests(unittest.TestCase):
 
     def test_suite_configuration_selects_target_methods_beta_and_shared_resources(self):
         expected_methods = {
-            'jax': ['DCS-RWM', 'DCS-BW', 'SCS', 'DCS-BW-reflect'],
-            'numba': ['DCS-BW', 'SCS', 'DCS-BW-reflect'],
+            'jax': ['DCS-RWM', 'DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate'],
+            'numba': ['DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate'],
         }
         target_cases = (('skew-t-100d', 'skew_t', 100, 2.),
                         ('skew-t-500d', 'skew_t', 500, 2.))
@@ -34,7 +34,10 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertEqual(config['beta'], beta)
                         self.assertEqual(config['dcs_backend'], backend)
                         self.assertEqual(config['vi_enabled'], vi == 'on')
-                        self.assertEqual(config['step_tuning_policies'], {'DCS-BW-reflect': 'ball_esjd_pilot_v1'})
+                        self.assertEqual(config['step_tuning_policies'], {'DCS-BW-reflect': 'ball_esjd_pilot_v1',
+                                         'DCS-BW-rotate': 'split_ball_angular_esjd_v1'})
+                        self.assertEqual(config['mixture_probability'], .5)
+                        self.assertEqual(config['initial_angular_scale'], 1.)
                         self.assertNotIn('step_scale_ceilings', config)
                         self.assertEqual(config['runs'], 50)
                         self.assertEqual(config['warmup'], 1500)
@@ -47,7 +50,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertTrue(config['coordinate_metrics'])
                         self.assertEqual(config['coordinate_threshold'], 3.)
                         self.assertEqual(config['reference_samples'], 5_000_000)
-                        self.assertTrue(config['protocol'].endswith('-v3'))
+                        self.assertTrue(config['protocol'].endswith('-v4'))
 
     def test_vi_off_bypasses_fitting_for_both_map_families_without_skipping_warmup(self):
         for target_id in ('skew-t-100d', 'skew-t-500d'):
@@ -124,7 +127,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                     np.testing.assert_allclose(case['mse'], errors**2, rtol=1e-11, atol=1e-12)
                     self.assertEqual(case['total_iterations'], 900)
                     self.assertEqual(case['total_estimation_iterations'], 600)
-                self.assertEqual(len(summary['paired_mse_differences']), 24)
+                self.assertEqual(len(summary['paired_mse_differences']), 32)
                 self.assertEqual(summary['reference'], reference)
 
     def test_native_dispatch_reuses_same_jax_calibration_and_keeps_author_scs(self):
@@ -145,6 +148,34 @@ class ComparisonSuiteTests(unittest.TestCase):
                 else:
                     production.assert_called_once_with(mapping, config, 901001, calibration)
                     self.assertIs(result, native)
+
+    def test_rotation_dispatch_reuses_both_jax_calibrated_scales(self):
+        from dcs_bench import numba_rotation, numba_radial
+        mapping = {'dimension': 100}
+        calibration = SimpleNamespace(scale=.4, angular_scale=2., state=np.zeros(100))
+        native = object()
+        config = dict(suite.configuration('quick', comparison='numba'), algorithm='DCS-BW-rotate')
+        with patch.object(timed_radial, '_Matched', return_value=calibration) as calibrate, \
+                patch.object(numba_rotation, 'NumbaRotation', return_value=native) as production, \
+                patch.object(numba_radial, 'NumbaRadial') as legacy:
+            result = timed_radial._backend(mapping, config, 901001)
+            calibrate.assert_called_once_with(mapping, config, 901001)
+            production.assert_called_once_with(mapping, config, 901001, calibration)
+            legacy.assert_not_called()
+            self.assertIs(result, native)
+
+    def test_rotation_metadata_accounts_for_exact_shared_pilot_budget(self):
+        # Seven transitions: three BW trials, then angular trials of 2, 1, 1.
+        bw = np.array([[[.1, 1, .2, 1., 0], [.2, 1, .4, 1., 1], [.4, 1, .3, 1., 0]]])
+        angular = np.array([[[.5, 2, .5, 1., 0], [1., 1, 1., 1., 1], [2., 1, .2, 0., 0]]])
+        metadata = timed_radial._rotation_tuning_metadata((bw, angular), .2, 1., {'warmup': 7})
+        self.assertEqual(metadata['tuning_pilot_iterations'], 7)
+        self.assertEqual(metadata['bw_warmup_iterations'], 3)
+        self.assertEqual(metadata['angular_warmup_iterations'], 4)
+        self.assertEqual(sum(row['iterations'] for row in metadata['tuning_history']), 3)
+        self.assertEqual(sum(row['iterations'] for row in metadata['angular_tuning_history']), 4)
+        self.assertAlmostEqual(metadata['angular_angle'], np.pi/2)
+        self.assertEqual(metadata['mixture_probability'], .5)
 
 if __name__ == '__main__':
     unittest.main()

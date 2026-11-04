@@ -1,0 +1,308 @@
+{
+  "completed_utc": "2026-11-04T05:23:43.362157+00:00",
+  "protocol_version": 4,
+  "purpose": "Execution and mathematical consistency checks, not performance rankings",
+  "platform": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "python": "3.12.14",
+    "cpu": "Apple M4 Pro"
+  },
+  "automated_tests": {
+    "passed": 271,
+    "seconds": 80.327,
+    "status": "passed"
+  },
+  "quick_matrix": {
+    "configurations": 8,
+    "chains": 72,
+    "chains_per_method": 2,
+    "seed_batch": 1,
+    "sampling_seconds_per_chain": 0.05,
+    "warmup_per_chain": 100,
+    "status": "passed",
+    "workers": 2
+  },
+  "author_scs_unchanged": true,
+  "controls_unchanged": {
+    "dcs_bench/transforms.py": true,
+    "dcs_bench/ball_tuning.py": true,
+    "dcs_bench/ball_boundary.py": true,
+    "dcs_bench/numba_radial.py": true,
+    "dcs_bench/scs_paper.py": true,
+    "dcs_bench/targets.py": true,
+    "scripts/reproduce_scs_100d.py": true,
+    "timed_radial._dcs_components": true,
+    "timed_radial._programs": true,
+    "timed_radial._radial_batch": true
+  },
+  "checks": [
+    "VI-on/off physical-radius preservation and reverse-proposal correction",
+    "Independent physical-density oracle and stationary-distribution checks",
+    "One independent 50/50 component choice per production iteration",
+    "Identical JAX calibration for both backends, with two frozen scales",
+    "Exact shared warmup transition count and exact first-third production discard",
+    "Rejection repeats in all eight estimates and full-precision MSE recomputation",
+    "All ten existing figure families and separate angular tuning export",
+    "Historical report preservation and five-method/four-method visual inspection"
+  ],
+  "source_hashes": {
+    "dcs_bench/worker.py": "32362651f44247a61f3050c306f3f0ffdc7fd22732b016132c3740c00330ba8b",
+    "dcs_bench/transforms.py": "fb7161b32cd5430c7e899e9927a588cfddefb7511411360820f679bcab99efaa",
+    "dcs_bench/comparison_targets.py": "cf12efe21bd228f6c9b12865c2e2b82553a068acffab734ec56757a5e00ec011",
+    "dcs_bench/targets.py": "19d8dbabf4cdac998739c735fec8ee8946b79b7c8de2e25c095542f156bc9a63",
+    "dcs_bench/timed_radial.py": "4131f286852cd7fe26226f382c57b1cf37f8b44141e9897b0090787dfe38d2d6",
+    "dcs_bench/fast_dcs.py": "681682c907301ec3e6cfbbe042f08f99fae59cd958547ca62980eaeaa8b5a809",
+    "dcs_bench/references.py": "bcd55f6533641182aca380cbfec8192a8e50fd2e04f47d60dfa395438a2eea26",
+    "dcs_bench/ball_boundary.py": "a11dfad9e4c2d9276f95b95b64e08a05150da7d75ad2b9c02fa33b56c3ac9d38",
+    "dcs_bench/radial_reporting.py": "e0a80e7fa2c04c944cd9ce09caea73b580f1d927c2439d6432c2db91d5f3b4e5",
+    "dcs_bench/plotting.py": "42e1471bd4454e5d2cfafb6ae6c97d9d70dc1662ed61664b60da66a116640f06",
+    "dcs_bench/cpu.py": "b7193c8ee964e6859d6f80d18efeb9d28eae4633dc1158697f50da0eb08ccef4",
+    "dcs_bench/__init__.py": "824e883a0dfde9241e0b7742f2bc61aba10cd82a49576de89c96f6f4450cb8bd",
+    "dcs_bench/scs_paper.py": "8510470fd7db553d445631b5663bcd4c9dd17d2ef2faf410ed2a9585320ce631",
+    "dcs_bench/burnin.py": "ff229a5d693807313f4d3057b2396ce0918d9ba9f1f799dba975ff8c5286fc06",
+    "dcs_bench/display.py": "045f88f8af94062a74c55917b86704debb59d399d7b9a0370cc98beb0c114379",
+    "dcs_bench/draw_storage.py": "381bc13ace8d79e1362f845855f19fe4b2a260c136113442e11e3c15ccf5215f",
+    "dcs_bench/api.py": "825b330d2416a6562a7bb91b0ede7beb65294f62c1646674512ec74e730e56a2",
+    "dcs_bench/engine.py": "4cc8b610220dc6ac5bbedb2be68365fa46542a71ba83d193036a69a994deecd4",
+    "dcs_bench/ball_tuning.py": "ee601b723fbbf118a67a11690066cd714b2e7003ce2874d1d846f7873c6f1f4f",
+    "dcs_bench/compiled_sampling.py": "483dbebaddccd179119d307120d497a64d996964e0ab00e8dd464c88c6b5012f",
+    "dcs_bench/tuning.py": "82b5610d2734d7647f1e0ff667d9c40a1eb6ccb7b5d8c5c73e12d44dfd54b42c",
+    "dcs_bench/processing.py": "efaa8ff4ed0fa566fb07438dee1a38f909a9bfe364fce8bcf5b1a112e83d25a3",
+    "dcs_bench/numba_rotation.py": "0e26749de0482971e7cef2e3802969c1c4bff5a04f3c2061eed2a8deea7c05f5",
+    "dcs_bench/parallel.py": "4e8be301f69bdfd5a7ea19d2a3e84bd2998dc5c487523e01af16cce0bf85df8e",
+    "dcs_bench/simulation_error.py": "2bd364569a7ea02abba8a0099ba4b82d245daf728dee48dbfe1ed9b34ae3063c",
+    "dcs_bench/rotation.py": "1ef008d05461709eb8b82251ccac6462c117bbd9638db81a8394ad0b69ff8582",
+    "dcs_bench/samplers.py": "470c4c1415947a36d7733f863210d0b293fd4cc494863b99e0df09eba4aff219",
+    "dcs_bench/numba_radial.py": "71e1531b526c2e3bee569ef7c45dfb429505594118bd737c9bb117a635a7dc30",
+    "scripts/reproduce_comparison.py": "9b5c739f92d3381c6574ada7d48ab45ddd2c689db7be410b2e30f501fe7b7aab",
+    "scripts/reproduce_scs_100d.py": "fcf0f2778bf4d09bffd5dda1d678c4bc4dc2e5b8d8584789a8170ab62eb511f8",
+    "scripts/scs_100d_figures.py": "9b872e774f90ededbfe00ffcdef255469380160ad09a7a4e6abbc5ad9d713cd5"
+  },
+  "cases": [
+    {
+      "label": "jax-skew-t-100d-vi-on",
+      "chains": 10,
+      "status": "passed",
+      "summary_sha256": "426ca992534f7e3200674c4d64558ab1ca5608aae89694ef87d9625a13e1166b",
+      "rotation_parameters": [
+        {
+          "chain": 0,
+          "seed": 1901001,
+          "final_scale": 0.4000000000000002,
+          "angular_scale": 1.9999999999999996,
+          "angular_angle": 2.214297435588181,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        },
+        {
+          "chain": 1,
+          "seed": 1901002,
+          "final_scale": 0.20000000000000007,
+          "angular_scale": 7.999999999999998,
+          "angular_angle": 2.89288266449627,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        }
+      ]
+    },
+    {
+      "label": "jax-skew-t-100d-vi-off",
+      "chains": 10,
+      "status": "passed",
+      "summary_sha256": "352ece16f2d56517f11519341e5ac6f31ed7e1b61367e112cb65cc47e385a213",
+      "rotation_parameters": [
+        {
+          "chain": 0,
+          "seed": 1901001,
+          "final_scale": 0.20000000000000007,
+          "angular_scale": 2.0,
+          "angular_angle": 2.2142974355881813,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        },
+        {
+          "chain": 1,
+          "seed": 1901002,
+          "final_scale": 0.05000000000000001,
+          "angular_scale": 4.0,
+          "angular_angle": 2.651635327336065,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        }
+      ]
+    },
+    {
+      "label": "jax-skew-t-500d-vi-on",
+      "chains": 10,
+      "status": "passed",
+      "summary_sha256": "925c044898024bd3c222dd5df7c70aeda5924dea567251ed7a747719ebd9f02e",
+      "rotation_parameters": [
+        {
+          "chain": 0,
+          "seed": 1901001,
+          "final_scale": 0.10000000000000002,
+          "angular_scale": 2.0,
+          "angular_angle": 2.2142974355881813,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        },
+        {
+          "chain": 1,
+          "seed": 1901002,
+          "final_scale": 0.40000000000000013,
+          "angular_scale": 4.0,
+          "angular_angle": 2.651635327336065,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        }
+      ]
+    },
+    {
+      "label": "jax-skew-t-500d-vi-off",
+      "chains": 10,
+      "status": "passed",
+      "summary_sha256": "84120a9b3142efa2dd3d79169658894558bccb65a61fd5843bbf07868bc6d8f7",
+      "rotation_parameters": [
+        {
+          "chain": 0,
+          "seed": 1901001,
+          "final_scale": 0.10000000000000002,
+          "angular_scale": 0.9999999999999998,
+          "angular_angle": 1.5707963267948963,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        },
+        {
+          "chain": 1,
+          "seed": 1901002,
+          "final_scale": 0.10000000000000002,
+          "angular_scale": 1.0,
+          "angular_angle": 1.5707963267948966,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        }
+      ]
+    },
+    {
+      "label": "numba-skew-t-100d-vi-on",
+      "chains": 8,
+      "status": "passed",
+      "summary_sha256": "0ecace823e9fb1ab2b8cdcea8f59fe9502961c2e6a0eb5b56a3bcb903fcd37c1",
+      "rotation_parameters": [
+        {
+          "chain": 0,
+          "seed": 1901001,
+          "final_scale": 0.4000000000000002,
+          "angular_scale": 1.9999999999999996,
+          "angular_angle": 2.214297435588181,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        },
+        {
+          "chain": 1,
+          "seed": 1901002,
+          "final_scale": 0.20000000000000007,
+          "angular_scale": 7.999999999999998,
+          "angular_angle": 2.89288266449627,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        }
+      ]
+    },
+    {
+      "label": "numba-skew-t-100d-vi-off",
+      "chains": 8,
+      "status": "passed",
+      "summary_sha256": "8eceff88abec539e8bf16f537a9512fd7c0f8390385244c5a4db8cd5717ad9c2",
+      "rotation_parameters": [
+        {
+          "chain": 0,
+          "seed": 1901001,
+          "final_scale": 0.20000000000000007,
+          "angular_scale": 2.0,
+          "angular_angle": 2.2142974355881813,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        },
+        {
+          "chain": 1,
+          "seed": 1901002,
+          "final_scale": 0.05000000000000001,
+          "angular_scale": 4.0,
+          "angular_angle": 2.651635327336065,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        }
+      ]
+    },
+    {
+      "label": "numba-skew-t-500d-vi-on",
+      "chains": 8,
+      "status": "passed",
+      "summary_sha256": "cc60e158e585a51d3aa5b25e28f5012d8f249398f8b7bdb8bf0dc34bbbb4385b",
+      "rotation_parameters": [
+        {
+          "chain": 0,
+          "seed": 1901001,
+          "final_scale": 0.10000000000000002,
+          "angular_scale": 2.0,
+          "angular_angle": 2.2142974355881813,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        },
+        {
+          "chain": 1,
+          "seed": 1901002,
+          "final_scale": 0.40000000000000013,
+          "angular_scale": 4.0,
+          "angular_angle": 2.651635327336065,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        }
+      ]
+    },
+    {
+      "label": "numba-skew-t-500d-vi-off",
+      "chains": 8,
+      "status": "passed",
+      "summary_sha256": "fe2ba5f3c3f2625c15e4be4699508ce1b1aec4fd74d2a7ffd805d6129d94d68b",
+      "rotation_parameters": [
+        {
+          "chain": 0,
+          "seed": 1901001,
+          "final_scale": 0.10000000000000002,
+          "angular_scale": 0.9999999999999998,
+          "angular_angle": 1.5707963267948963,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        },
+        {
+          "chain": 1,
+          "seed": 1901002,
+          "final_scale": 0.10000000000000002,
+          "angular_scale": 1.0,
+          "angular_angle": 1.5707963267948966,
+          "mixture_probability": 0.5,
+          "bw_warmup_iterations": 50,
+          "angular_warmup_iterations": 50
+        }
+      ]
+    }
+  ]
+}

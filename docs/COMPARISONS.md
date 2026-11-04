@@ -6,8 +6,8 @@ saved reports and their command-line identifiers remain supported.
 
 | Identifier | Production implementations |
 |---|---|
-| `sampler-comparison` | DCS-RWM, DCS-BW, SCS, DCS-BW-reflect, all JAX |
-| `sampler-comparison-numba` | DCS-BW and DCS-BW-reflect in optimized Numba; author SCS in JAX |
+| `sampler-comparison` | DCS-RWM, DCS-BW, SCS, DCS-BW-reflect, DCS-BW-rotate, all JAX |
+| `sampler-comparison-numba` | DCS-BW, DCS-BW-reflect and DCS-BW-rotate in optimized Numba; author SCS in JAX |
 
 RWM here means **DCS-RWM in the transformed ball**, not an ordinary random walk
 on physical coordinates. Reflected BW folds a proposed displacement along its
@@ -95,6 +95,36 @@ All steps freeze before sampling. Candidate scores, selected steps and guard
 flags are saved; they must be inspected rather than treating equal resources
 as proof that every method is optimally tuned.
 
+**DCS-BW-rotate** chooses one reflected BW move or one angular move with
+probability 1/2 each. The choice is independent of the state and fixed before
+examining results. Only the chosen move is performed and counted as one
+iteration; this is not two transitions charged as one. Reflected BW changes
+radius as well as direction, while the angular component specifically changes
+direction. Rotation alone would not explore the whole target.
+
+For the angular move, let w be the ball coordinate **after** the Möbius map,
+r=||w||, and u=w/r. Draw a uniform tangent direction v orthogonal to u and
+propose w'=r[cos(θ)u+sin(θ)v], with θ=2 atan(a) and angular scale a>0.
+At r=0 the angular component stays at zero. This symmetric proposal on the
+fixed-radius sphere uses the physical-target Metropolis ratio π(x')/π(x).
+The radial map Jacobian is constant along the move. With VI, rotating after
+the Möbius map and applying its inverse avoids an omitted Möbius Jacobian:
+the preserved physical radius is ||x−μ|| about the fitted centre μ, which
+need not be ||x|| about zero. Each component preserves the same target,
+and their state-independent mixture does too.
+
+The mixture receives **the same total warmup-transition budget** as every
+other method: floor(warmup/2) for reflected BW pilots, and the remainder for
+angular pilots. Reflected BW scores squared ball movement as above. Angular
+pilots score squared movement of unit directions, including zeros after
+rejection, using the same rotating half/current/double search and initial
+angular scale a=1 (θ=π/2). The two scales are frozen before sampling;
+production MSE never selects either scale or the mixture probability.
+The fitted map is still shared with the other DCS methods. These pilots
+target local movement and need not optimize any measured MSE. Splitting the
+budget also means that each component receives fewer pilot transitions than
+a standalone reflected-BW chain.
+
 In particular, a target acceptance may be unreachable for a step-out proposal
 whose large-step distribution saturates. In the historical version-1 100D no-VI smaller run, SCS
 reached its numerical upper guard in 12 of 20 chains. This is a tuning
@@ -136,10 +166,16 @@ separate coordinate mean and tail-probability figures. They use two decimal
 places where appropriate and export exact integer counts and full-precision
 values. `reference_values.csv` includes reference values, MCSE and exact flags.
 
-Both current modes use protocol version 3 and report radial and three-coordinate
-quantities. Historical version-1 reports remain radial-only; version-2 reports
-retain their radial and X₁ quantities. They keep their recorded numbers, and
-replotting cannot reconstruct the new all-iteration X₂/X₃ estimates. These measurements do not establish an overall mixing
+Both current modes use protocol version 4 and report radial and three-coordinate
+quantities for the expanded method lists. The frozen angular scale, angle in
+radians/degrees, mixture probability and pilot split appear in the tables;
+`angular_tuning.csv` records every angular candidate and `reflected_tuning.csv`
+records BW candidates, including those for the mixture.
+Historical version-1 reports remain radial-only; version-2 reports
+retain their radial and X₁ quantities; version-3 reports have all eight
+quantities without DCS-BW-rotate. They keep their recorded numbers.
+Replotting cannot reconstruct new all-iteration measurements or a new sampler.
+Run every method together for a new timed comparison. These measurements do not establish an overall mixing
 advantage. MSE is the average squared error across independent chains; the fitted map is shared,
 so uncertainty is conditional on that fit. Empirical MSE error summaries are
 descriptive, not formal confidence intervals: the supplied t(3) targets
