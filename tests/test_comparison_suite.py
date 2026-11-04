@@ -17,8 +17,8 @@ class ComparisonSuiteTests(unittest.TestCase):
 
     def test_suite_configuration_selects_target_methods_beta_and_shared_resources(self):
         expected_methods = {
-            'jax': ['DCS-RWM', 'DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate'],
-            'numba': ['DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate'],
+            'jax': ['DCS-RWM', 'DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate', 'DCS-RWM-rotate'],
+            'numba': ['DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate', 'DCS-RWM-rotate'],
         }
         target_cases = (('skew-t-100d', 'skew_t', 100, 2.),
                         ('skew-t-500d', 'skew_t', 500, 2.))
@@ -35,7 +35,8 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertEqual(config['dcs_backend'], backend)
                         self.assertEqual(config['vi_enabled'], vi == 'on')
                         self.assertEqual(config['step_tuning_policies'], {'DCS-BW-reflect': 'ball_esjd_pilot_v1',
-                                         'DCS-BW-rotate': 'split_ball_angular_esjd_v1'})
+                                         'DCS-BW-rotate': 'split_ball_angular_esjd_v1',
+                                         'DCS-RWM-rotate': 'split_ball_angular_esjd_v1'})
                         self.assertEqual(config['mixture_probability'], .5)
                         self.assertEqual(config['initial_angular_scale'], 1.)
                         self.assertNotIn('step_scale_ceilings', config)
@@ -50,7 +51,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertTrue(config['coordinate_metrics'])
                         self.assertEqual(config['coordinate_threshold'], 3.)
                         self.assertEqual(config['reference_samples'], 5_000_000)
-                        self.assertTrue(config['protocol'].endswith('-v4'))
+                        self.assertTrue(config['protocol'].endswith('-v5'))
 
     def test_vi_off_bypasses_fitting_for_both_map_families_without_skipping_warmup(self):
         for target_id in ('skew-t-100d', 'skew-t-500d'):
@@ -127,7 +128,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                     np.testing.assert_allclose(case['mse'], errors**2, rtol=1e-11, atol=1e-12)
                     self.assertEqual(case['total_iterations'], 900)
                     self.assertEqual(case['total_estimation_iterations'], 600)
-                self.assertEqual(len(summary['paired_mse_differences']), 32)
+                self.assertEqual(len(summary['paired_mse_differences']), 40)
                 self.assertEqual(summary['reference'], reference)
 
     def test_native_dispatch_reuses_same_jax_calibration_and_keeps_author_scs(self):
@@ -176,6 +177,40 @@ class ComparisonSuiteTests(unittest.TestCase):
         self.assertEqual(sum(row['iterations'] for row in metadata['angular_tuning_history']), 4)
         self.assertAlmostEqual(metadata['angular_angle'], np.pi/2)
         self.assertEqual(metadata['mixture_probability'], .5)
+
+    def test_gaussian_rotation_dispatch_scale_units_and_shared_calibration(self):
+        from dcs_bench import numba_rwm_rotation, numba_rotation
+        config = dict(suite.configuration('quick', comparison='numba'), algorithm='DCS-RWM-rotate')
+        expected = .1 / np.sqrt(config['dimension'] + 2)
+        self.assertEqual(timed_radial.resolve_step_tuning(config), timed_radial.ROTATION_TUNING)
+        self.assertAlmostEqual(timed_radial._initial_proposal_scale(config), expected)
+        calibration = SimpleNamespace(scale=expected*4, angular_scale=2., state=np.zeros(100))
+        mapping, native = {'dimension': 100}, object()
+        with patch.object(timed_radial, '_Matched', return_value=calibration), \
+                patch.object(numba_rwm_rotation, 'NumbaRWMRotation', return_value=native) as production, \
+                patch.object(numba_rotation, 'NumbaRotation') as bw:
+            self.assertIs(timed_radial._backend(mapping, config, 1901001), native)
+            production.assert_called_once_with(mapping, config, 1901001, calibration)
+            bw.assert_not_called()
+        # A Gaussian-SD ceiling below the BW reference radius is admissible.
+        self.assertEqual(timed_radial.resolve_step_scale_ceiling(dict(config,
+            step_scale_ceilings={'DCS-RWM-rotate': .05})), .05)
+        with self.assertRaises(ValueError):
+            timed_radial.resolve_step_scale_ceiling(dict(config, step_scale_ceiling=expected/2))
+
+    def test_gaussian_rotation_metadata_preserves_units_and_exact_budget(self):
+        config = dict(suite.configuration('quick'), algorithm='DCS-RWM-rotate', warmup=7)
+        sigma = timed_radial._initial_proposal_scale(config)
+        reflection = np.array([[[sigma/2, 1, .2, 1., 0], [sigma, 1, .4, 1., 1], [sigma*2, 1, .3, 1., 0]]])
+        angular = np.array([[[.5, 2, .5, 1., 0], [1., 1, 1., 1., 1], [2., 1, .2, 0., 0]]])
+        info = timed_radial._rotation_tuning_metadata((reflection, angular), sigma, 1., config)
+        self.assertEqual(info['initial_scale_reference_bw_radius'], .1)
+        self.assertEqual(info['initial_gaussian_sigma'], sigma)
+        self.assertAlmostEqual(info['gaussian_equivalent_bw_radius'], .1)
+        self.assertEqual(info['scale_parameter'], 'Gaussian coordinate standard deviation')
+        self.assertEqual(info['tuning_pilot_iterations'], 7)
+        self.assertEqual(info['gaussian_warmup_iterations'], 3)
+        self.assertEqual(info['angular_warmup_iterations'], 4)
 
 if __name__ == '__main__':
     unittest.main()

@@ -18,9 +18,10 @@ METRICS = ('tail_probability', 'mean_norm')
 X1_METRICS = ('mean_x1', 'x1_tail_probability')
 X23_METRICS = ('mean_x2', 'x2_left_tail_probability', 'mean_x3', 'x3_tail_probability')
 ALIASES = (('tail_probability', 'tail'), ('mean_norm', 'norm'))
-METHODS = ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', 'SCS', 'DCS-BW-rotate')
+METHODS = ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', 'SCS', 'DCS-BW-rotate', 'DCS-RWM-rotate')
+ROTATION_METHODS = ('DCS-BW-rotate', 'DCS-RWM-rotate')
 COLORS = {'DCS-RWM': '#FF8C00', 'DCS-BW': '#9370db', 'DCS-BW-reflect': '#159a8c',
-          'SCS': '#ff1493', 'DCS-BW-rotate': '#2878b5'}
+          'SCS': '#ff1493', 'DCS-BW-rotate': '#2878b5', 'DCS-RWM-rotate': '#b69a27'}
 
 
 def _metrics(value, metric_names=METRICS):
@@ -83,6 +84,8 @@ def _table(rows):
 
 
 def _policy(name, timed=False, matched=False, ball_esjd=False):
+    if name == 'DCS-RWM-rotate':
+        return '50/50 reflected Gaussian RWM and fixed-radius rotation; Gaussian coordinate standard deviation and angular scale pretuned within one shared warmup budget, then frozen'
     if name == 'DCS-BW-rotate':
         return '50/50 reflected BW and fixed-radius rotation; both proposal scales pretuned within one shared warmup budget, then frozen'
     if ball_esjd and name == 'DCS-BW-reflect':
@@ -131,9 +134,10 @@ def render_report(root, summary):
     suite = config.get('protocol') in ('timed-sampler-comparison-v1', 'timed-numba-comparison-v1',
                                       'timed-sampler-comparison-v2', 'timed-numba-comparison-v2',
                                       'timed-sampler-comparison-v3', 'timed-numba-comparison-v3',
-                                      'timed-sampler-comparison-v4', 'timed-numba-comparison-v4')
+                                      'timed-sampler-comparison-v4', 'timed-numba-comparison-v4',
+                                      'timed-sampler-comparison-v5', 'timed-numba-comparison-v5')
     optimized = config.get('protocol') in ('timed-numba-comparison-v1', 'timed-numba-comparison-v2',
-                                          'timed-numba-comparison-v3', 'timed-numba-comparison-v4')
+                                          'timed-numba-comparison-v3', 'timed-numba-comparison-v4', 'timed-numba-comparison-v5')
     vi_mode = config.get('vi', 'on')
     boundary = config.get('protocol') in ('timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2', 'timed-boundary-dcs-scs-v3')
     restored_controls = config.get('protocol') == 'timed-boundary-dcs-scs-v2'
@@ -145,7 +149,8 @@ def render_report(root, summary):
     names = [name for name in (config.get('algorithms', METHODS) if suite else METHODS) if name in cases]
     if len(names) != len(cases) or len(set(names)) != len(names):
         raise ValueError('Configured methods must list every completed case exactly once')
-    has_rotation = 'DCS-BW-rotate' in names
+    has_rotation = any(name in names for name in ROTATION_METHODS)
+    has_rwm_rotation = 'DCS-RWM-rotate' in names
     counts = {name: _counts(cases[name], config, timed) for name in names}
     metric_names = tuple(summary.get('functionals', METRICS))
     if metric_names not in (METRICS, METRICS+X1_METRICS, METRICS+X1_METRICS+X23_METRICS):
@@ -184,6 +189,7 @@ def render_report(root, summary):
         target_title = config.get('target_title') or f'{dimension}D skewed Student-t, ν = {nu:g}'
         title = ('EXECUTION CHECK — ' if smoke else '') + target_title
         title += (' — optimized Numba DCS / author SCS' if optimized else
+                  ' — six samplers, JAX' if has_rwm_rotation else
                   ' — five samplers, JAX' if has_rotation else ' — four samplers, JAX')
         title += ' — VI '+str(vi_mode)
     elif boundary:
@@ -211,15 +217,18 @@ def render_report(root, summary):
         if has_rotation:
             tuning_note = ('VI '+str(vi_mode)+' for both maps. The rotation mixture splits its warmup between '
                            'BW and angular pilots; all sampling scales frozen.')
+        if has_rwm_rotation:
+            tuning_note = ('VI '+str(vi_mode)+' for both maps. Each rotation mixture splits its warmup between '
+                           'reflected-step and angular pilots; all sampling scales frozen.')
     x = np.arange(1, len(names)+1)
     colors = [COLORS[name] for name in names]
     figure_names = []
 
     def save(fig, name):
         if len(names) > 4:
-            # Widen only the new five-method plots; historical figure bytes and
+            # Widen expanded plots; historical five-method figure bytes and
             # layouts are preserved when their supplied values are unchanged.
-            fig.set_size_inches(fig.get_figwidth()*1.2, fig.get_figheight())
+            fig.set_size_inches(fig.get_figwidth()*(1.2 if len(names) == 5 else 1.44), fig.get_figheight())
             for ax in fig.axes:
                 if len(ax.get_xticklabels()) == len(names):
                     for tick in ax.get_xticklabels():
@@ -484,7 +493,7 @@ def render_report(root, summary):
         if suite:
             row.update(target=target_title, dimension=dimension, vi=vi_mode, dcs_beta=config.get('beta'),
                        execution_backend='Numba' if optimized and name != 'SCS' else 'JAX')
-        if name == 'DCS-BW-rotate':
+        if name in ROTATION_METHODS:
             records = case.get('records', [])
             row.update(mixture_probability=config.get('mixture_probability', .5),
                        angular_scales=[r.get('angular_scale') for r in records],
@@ -493,6 +502,10 @@ def render_report(root, summary):
                                                if r.get('angular_angle') is not None else None for r in records],
                        bw_warmup_iterations=[r.get('bw_warmup_iterations') for r in records],
                        angular_warmup_iterations=[r.get('angular_warmup_iterations') for r in records])
+        if name == 'DCS-RWM-rotate':
+            row.update(scale_parameter='Gaussian coordinate standard deviation',
+                       gaussian_equivalent_bw_radii=[r.get('gaussian_equivalent_bw_radius') for r in records],
+                       initial_scale_reference_bw_radii=[r.get('initial_scale_reference_bw_radius') for r in records])
         for metric, key in enumerate(metric_names):
             row[key+'_truth'] = truth[metric]
             if reference:
@@ -514,7 +527,7 @@ def render_report(root, summary):
             history = row.pop('tuning_history', None)
             angular_history = row.pop('angular_tuning_history', None)
             row.update(method=name, production_step_policy=_policy(name, timed, matched, ball_esjd))
-            if ball_esjd and name in ('DCS-BW-reflect', 'DCS-BW-rotate'):
+            if ball_esjd and name in ('DCS-BW-reflect', *ROTATION_METHODS):
                 for pilot in history or []:
                     tuning_rows.append(dict(method=name, chain=row['chain'], seed=row.get('seed'),
                         **{key: pilot.get(key) for key in ('round', 'candidate', 'scale', 'iterations',
@@ -524,7 +537,15 @@ def render_report(root, summary):
                     'frozen_step': row.get('frozen_scale', row.get('final_scale')),
                     'selected_ball_esjd': row.get('tuning_selected_esjd'),
                     'search_status': row.get('tuning_search_status')})
-            if name == 'DCS-BW-rotate':
+                if has_rwm_rotation:
+                    parameter = ('Gaussian coordinate standard deviation' if name == 'DCS-RWM-rotate' else 'Uniform-ball proposal radius')
+                    tuning_summaries[-1].update(scale_parameter=parameter,
+                        gaussian_equivalent_bw_radius=row.get('gaussian_equivalent_bw_radius'),
+                        initial_scale_reference_bw_radius=row.get('initial_scale_reference_bw_radius'))
+                    for pilot_row in tuning_rows:
+                        if pilot_row['method'] == name and pilot_row['chain'] == row['chain']:
+                            pilot_row['scale_parameter'] = parameter
+            if name in ROTATION_METHODS:
                 for pilot in angular_history or []:
                     angular_tuning_rows.append(dict(method=name, chain=row['chain'], seed=row.get('seed'),
                         **{key: pilot.get(key) for key in ('round', 'candidate', 'scale', 'iterations',
@@ -664,7 +685,8 @@ def render_report(root, summary):
                     'tail-probability and mean-norm estimation, not a reproduction of the SCS publication figures or '
                     'a general mixing guarantee. The unmodified author SCS transition is retained.')
         if optimized:
-            optimized_methods = ('DCS-BW, reflected BW and DCS-BW-rotate' if has_rotation else
+            optimized_methods = ('DCS-BW, reflected BW, DCS-BW-rotate and DCS-RWM-rotate' if has_rwm_rotation else
+                                 'DCS-BW, reflected BW and DCS-BW-rotate' if has_rotation else
                                  'DCS-BW and reflected BW')
             notes.append('Implementation comparison: '+optimized_methods+' use optimized Numba loops with cached '
                          'current density and radius, fused radial accumulation and no full physical-state recording. '
@@ -693,6 +715,13 @@ def render_report(root, summary):
                          'mixture probability is fixed at 0.5 before examining results. Full angular candidates '
                          'are in angular_tuning.csv. Equal pilot resources do not guarantee optimal tuning or '
                          'an MSE advantage for any method.')
+        if has_rwm_rotation:
+            notes.append('DCS-RWM-rotate selects reflected isotropic Gaussian RWM or the same angular proposal with '
+                         'equal probability. Its Gaussian step sigma is a coordinate standard deviation, not a BW radius. '
+                         'Its initial sigma is the configured reference BW radius divided by sqrt(d+2), matching initial '
+                         'expected squared increment length. Subsequent Gaussian and angular scales are pretuned within '
+                         'the same total pilot budget, then frozen. The equivalent BW radius sigma*sqrt(d+2) is recorded '
+                         'only to compare proposal units; it is not a second tuned parameter.')
         if len(metric_names) > 2:
             notes[3] = ('Every post-burn-in iteration contributes to mean norm, radial tail probability, mean first '
                         'coordinate and first-coordinate tail probability, including repeated states after rejection. '
@@ -776,9 +805,10 @@ def render_report(root, summary):
     if setup_rows:
         page += '<h2>Map fitting excluded from production time</h2>'+_table(setup_rows)
     if tuning_summaries:
-        page += '<details><summary>Reflected BW pilot tuning and frozen steps</summary><p>The score is the mean squared jump in ball coordinates, including zero movement after rejection. It is not an MSE estimate. Full pilot candidates are available in <a href="reflected_tuning.csv">reflected_tuning.csv</a> and the saved summary.</p>'+_table(tuning_summaries)+'</details>'
+        reflected_heading = 'Reflected-step pilot tuning and frozen steps' if has_rwm_rotation else 'Reflected BW pilot tuning and frozen steps'
+        page += '<details><summary>'+reflected_heading+'</summary><p>The score is the mean squared jump in ball coordinates, including zero movement after rejection. It is not an MSE estimate. Full pilot candidates are available in <a href="reflected_tuning.csv">reflected_tuning.csv</a> and the saved summary.</p>'+_table(tuning_summaries)+'</details>'
     if angular_tuning_summaries:
-        page += '<details><summary>Rotation pilot tuning and frozen angles</summary><p>The score is the mean squared jump of unit directions, including zero movement after rejection. The angle is 2 atan(angular scale). Reflected BW and angular pilots share the existing warmup budget; both scales are frozen before sampling. Full candidates are available in <a href="angular_tuning.csv">angular_tuning.csv</a>.</p>'+_table(angular_tuning_summaries)+'</details>'
+        page += '<details><summary>Rotation pilot tuning and frozen angles</summary><p>The score is the mean squared jump of unit directions, including zero movement after rejection. The angle is 2 atan(angular scale). Reflected-step and angular pilots share the existing warmup budget; both scales are frozen before sampling. Full candidates are available in <a href="angular_tuning.csv">angular_tuning.csv</a>.</p>'+_table(angular_tuning_summaries)+'</details>'
     page += '<h2>Every chain</h2>'+_table(chain_rows)
     page += '<h2>Full map parameters</h2>'+_table(parameter_rows)
     if prefix_rows:

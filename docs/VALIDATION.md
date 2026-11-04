@@ -1,5 +1,51 @@
 # Validation of the corrected implementation
 
+## Reflected Gaussian RWM with rotations (4 November 2026)
+
+Version 5 adds **DCS-RWM-rotate** to the existing comparisons: six methods
+in JAX and five in the optimized Numba/author-SCS comparison. One reflected
+Gaussian move or one fixed-radius angular move is selected with probability
+1/2 per iteration. Both scales are pretuned within the same total budget and
+frozen before sampling. Gaussian coordinate standard deviation starts at
+`0.1/sqrt(d+2)`; it is distinct from the BW proposal radius. Reports preserve
+all eight estimates, the ten figure families and every earlier control.
+
+All **286 automated tests** passed locally in **85.779 seconds**.
+The complete eight-setting matrix passed for both Quick check (**88 chains**)
+and Smaller reproduction (**880 chains**), covering 100D/500D skewed t(3),
+VI on/off and both implementations. Tests cover reflected Gaussian symmetry,
+physical-density corrections, stationarity checks, component selection,
+pilot accounting, exact first-third discard and all-state MSE recomputation.
+Matching JAX and Numba settings used identical maps, references, paired chain
+seeds, final proposal scales and angular scales/angles for all common methods.
+The prior transition controls and pinned author SCS sources remain unchanged.
+
+| Local preset | Chains/method | Requested seconds/chain | Separate tuning transitions | Simultaneous workers | VI updates × draws/update | Independent reference draws |
+|---|---:|---:|---:|---:|---:|---:|
+| Quick check | 2 | 0.05 | 100 | 2 | 20 × 128 | 50,000 |
+| Smaller reproduction | 20 | 2.00 | 1000 | 4 | 400 × 500 | 1,000,000 |
+
+These local runs used sampling seed batch **1**, fit seed **42**, independent
+reference seed **740317**, float64 CPU computation and the Apple M4 Pro laptop.
+VI off used zero fitting draws for both maps. Each mixture split its tuning
+transitions equally between its reflected and angular components. Sampling
+time includes the first-third production discard and every repeated state;
+fitting, reference preparation, compilation, tuning and reports are excluded.
+The 300-transition clock checks can exceed the requested time, particularly
+in Quick check; actual measured times and counts remain in each report.
+
+See the [version-5 validation record](../validation/rwm_rotation_checks.json)
+for source hashes, actual scales/angles, settings and backend matching checks.
+Quick checks establish execution only. The Smaller results are exploratory,
+conditional on one fitted map and one seed batch: they do not establish
+universal dominance or publication-scale rankings. Heavy-tailed mean/norm
+errors make descriptive MSE uncertainty fragile, and independent reference
+error remains separate. The optimized comparison includes framework and
+output-processing differences. Fresh full-paper runs and independent seed
+batches are needed for stronger performance conclusions. Windows/Linux
+checks for this revision run separately in GitHub Actions; no remote pass is
+claimed here.
+
 ## Reflected-BW/rotation mixture (4 November 2026)
 
 Version 4 adds **DCS-BW-rotate** in both JAX and optimized Numba. Each

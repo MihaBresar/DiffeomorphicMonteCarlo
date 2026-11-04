@@ -24,6 +24,8 @@ ACCEPTANCE_TUNING = 'indicator_dual_averaging_0234'
 BALL_TUNING = 'ball_esjd_pilot_v1'
 ROTATION_TUNING = 'split_ball_angular_esjd_v1'
 ROTATION_METHOD = 'DCS-BW-rotate'
+RWM_ROTATION_METHOD = 'DCS-RWM-rotate'
+ROTATION_METHODS = (ROTATION_METHOD, RWM_ROTATION_METHOD)
 BALL_STEP_POLICY = ('Discarded-pilot squared jump distance in ball coordinates; '
                     'up to eight rotating h/2, h, 2h triplet rounds within the existing warmup budget, then frozen')
 ROTATION_STEP_POLICY = ('Split the existing discarded warmup budget between reflected-BW ball movement '
@@ -38,16 +40,16 @@ def resolve_step_tuning(config):
     if not isinstance(policies, dict):
         raise ValueError('step_tuning_policies must map methods to tuning policy identifiers')
     for method, policy in policies.items():
-        if method not in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, 'SCS'):
+        if method not in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, RWM_ROTATION_METHOD, 'SCS'):
             raise ValueError(f'Unknown tuning method: {method}')
         if policy not in (ACCEPTANCE_TUNING, BALL_TUNING, ROTATION_TUNING):
             raise ValueError(f'Unknown step tuning policy: {policy}')
         if policy == BALL_TUNING and method != 'DCS-BW-reflect':
             raise ValueError('Ball ESJD calibration is defined for reflected BW only')
-        if (policy == ROTATION_TUNING) != (method == ROTATION_METHOD):
-            raise ValueError('DCS-BW-rotate requires split ball/angular calibration')
+        if (policy == ROTATION_TUNING) != (method in ROTATION_METHODS):
+            raise ValueError('Rotation mixtures require split reflected-step/angular calibration')
     selected = policies.get(config['algorithm'],
-                            ROTATION_TUNING if config['algorithm'] == ROTATION_METHOD else ACCEPTANCE_TUNING)
+                            ROTATION_TUNING if config['algorithm'] in ROTATION_METHODS else ACCEPTANCE_TUNING)
     if selected == BALL_TUNING and config['warmup'] < 3:
         raise ValueError('Ball ESJD calibration requires at least three warmup transitions')
     if selected == ROTATION_TUNING:
@@ -58,8 +60,17 @@ def resolve_step_tuning(config):
             raise ValueError('initial_angular_scale must be positive and finite')
         probability = config.get('mixture_probability', .5)
         if isinstance(probability, bool) or not isinstance(probability, Real) or probability != .5:
-            raise ValueError('DCS-BW-rotate uses a fixed mixture_probability of 0.5')
+            raise ValueError('Rotation mixtures use a fixed mixture_probability of 0.5')
     return selected
+
+
+def _initial_proposal_scale(config):
+    """Keep BW-radius initialization and convert only the Gaussian mixture."""
+    radius = float(config.get('initial_scale', .1))
+    if config['algorithm'] == RWM_ROTATION_METHOD:
+        from .rwm_rotation import initial_sigma
+        return initial_sigma(int(scs_paper.target_spec(config)['dimension']), radius)
+    return radius
 
 
 def resolve_step_scale_ceiling(config):
@@ -76,16 +87,18 @@ def resolve_step_scale_ceiling(config):
     limits = config.get('step_scale_ceilings', {})
     if not isinstance(limits, dict):
         raise ValueError('step_scale_ceilings must map method names to finite numeric limits')
-    methods = ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, 'SCS')
+    methods = ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, RWM_ROTATION_METHOD, 'SCS')
     for name, value in limits.items():
         if name not in methods:
             raise ValueError(f'Unknown step-scale ceiling method: {name}')
+        minimum = (_initial_proposal_scale(dict(config, algorithm=name))
+                   if name == RWM_ROTATION_METHOD else initial_scale)
         if isinstance(value, bool) or not isinstance(value, Real) or \
-                not np.isfinite(value) or value < initial_scale:
+                not np.isfinite(value) or value < minimum:
             raise ValueError(f'step_scale_ceilings[{name!r}] must be finite and at least initial_scale')
     shared = config.get('step_scale_ceiling')
     if shared is not None and (isinstance(shared, bool) or not isinstance(shared, Real) or
-            not np.isfinite(shared) or shared < initial_scale):
+            not np.isfinite(shared) or shared < _initial_proposal_scale(config)):
         raise ValueError('step_scale_ceiling must be finite and at least initial_scale')
     selected = limits.get(config['algorithm'], shared)
     return None if selected is None else float(selected)
@@ -180,6 +193,9 @@ def _components(mapping, spec, algorithm):
     core = scs_paper._author()  # Also enables the same float64 policy for DCS.
     import jax.numpy as jnp
     target = Target(spec)
+    if algorithm == RWM_ROTATION_METHOD:
+        from .rwm_rotation import build_components
+        return build_components(mapping, spec)
     if algorithm == ROTATION_METHOD:
         from .rotation import build_components
         parts = build_components(mapping, target, _dcs_components(mapping, target, 'DCS-BW-reflect'))
@@ -293,6 +309,32 @@ def _rotation_programs(mapping_json, spec_json, warmup, thin, threshold, initial
     return burn_program, batch_program, initial, time.perf_counter()-started
 
 
+@lru_cache(maxsize=8)
+def _rwm_rotation_programs(mapping_json, spec_json, warmup, thin, threshold, initial_scale,
+                       initial_angular_scale, scale_ceiling=None, coordinate_threshold=None):
+    """Compile the Gaussian mixture separately, preserving the BW program cache."""
+    import jax
+    import jax.numpy as jnp
+    from .rotation import calibrate
+    from .rwm_rotation import build_parts
+    mapping, spec = json.loads(mapping_json), json.loads(spec_json)
+    parts = build_parts(mapping, spec)
+    initial = parts['initial']
+    if not np.isfinite(float(parts['density'](initial))) or not np.all(np.isfinite(np.asarray(parts['projection'](initial)))):
+        raise ValueError('Nonfinite initial density or physical point')
+    burn = lambda state, key: calibrate(parts, state, key, warmup, initial_scale,
+                                        initial_angular_scale, scale_ceiling)
+    batch = lambda state, key, scales: _radial_batch(parts['block'], parts['projection'],
+        state, key, scales, thin, threshold, coordinate_threshold)
+    device = jax.local_devices(backend='cpu')[0]
+    initial, key, scales = jax.device_put((initial, jax.random.key(0),
+        jnp.asarray([initial_scale, initial_angular_scale])), device)
+    started = time.perf_counter()
+    burn_program = jax.jit(burn).lower(initial, key).compile()
+    batch_program = jax.jit(batch).lower(initial, key, scales).compile()
+    return burn_program, batch_program, initial, time.perf_counter()-started
+
+
 class _Matched:
     """Common JAX driver, calibration, recording and clocks for DCS and SCS."""
     def __init__(self, mapping, config, seed):
@@ -304,7 +346,7 @@ class _Matched:
             raise ValueError('Map and target dimensions differ')
         scale_ceiling = resolve_step_scale_ceiling(config)
         self.tuning_policy = resolve_step_tuning(config)
-        self.initial_scale = float(config.get('initial_scale', .1))
+        self.initial_scale = _initial_proposal_scale(config)
         arguments = (
             json.dumps(mapping, sort_keys=True), json.dumps(spec, sort_keys=True),
             config['algorithm'], config['warmup'], config['thin'],
@@ -315,12 +357,14 @@ class _Matched:
         extra = ({'coordinate_threshold': float(config['coordinate_threshold'])}
                  if config.get('coordinate_metrics', False) else {})
         if self.tuning_policy == ROTATION_TUNING:
-            previous = _rotation_programs.cache_info().misses
-            burn, self.program, initial, compile_seconds = _rotation_programs(
+            compiler = (_rwm_rotation_programs if config['algorithm'] == RWM_ROTATION_METHOD
+                        else _rotation_programs)
+            previous = compiler.cache_info().misses
+            burn, self.program, initial, compile_seconds = compiler(
                 arguments[0], arguments[1], config['warmup'], config['thin'],
                 float(config.get('threshold', 50.)), self.initial_scale,
                 float(config.get('initial_angular_scale', 1.)), scale_ceiling, **extra)
-            cache_missed = _rotation_programs.cache_info().misses > previous
+            cache_missed = compiler.cache_info().misses > previous
         else:
             previous = _programs.cache_info().misses
             burn, self.program, initial, compile_seconds = _programs(*arguments, **extra)
@@ -335,7 +379,7 @@ class _Matched:
         if self.tuning_policy == ROTATION_TUNING:
             self.state, scales, accepts, histories = calibrated
             if not np.all(np.isfinite(np.asarray(self.state))) or not np.all(np.isfinite(np.asarray(scales))):
-                raise FloatingPointError('Nonfinite reflected-BW/angular calibration')
+                raise FloatingPointError('Nonfinite reflected-step/angular calibration')
             self.scale, self.angular_scale = map(float, scales)
             self._scale = scales
             self.tuning_metadata = _rotation_tuning_metadata(histories, self.scale, self.angular_scale, config)
@@ -364,6 +408,9 @@ class _Matched:
 def _backend(mapping, config, seed):
     calibration = _Matched(mapping, config, seed)
     if config.get('dcs_backend', 'jax') == 'numba' and config['algorithm'] != 'SCS':
+        if config['algorithm'] == RWM_ROTATION_METHOD:
+            from .numba_rwm_rotation import NumbaRWMRotation
+            return NumbaRWMRotation(mapping, config, seed, calibration)
         if config['algorithm'] == ROTATION_METHOD:
             from .numba_rotation import NumbaRotation
             return NumbaRotation(mapping, config, seed, calibration)
@@ -425,11 +472,22 @@ def _rotation_tuning_metadata(histories, scale, angular_scale, config):
         angular_radius_policy='Preserve distance from the fixed map centre mu by rotating after Mobius',
         angular_acceptance_policy='Physical target-density ratio; radial Jacobian cancels on the fixed-radius sphere',
         iteration_policy='One independently selected reflected-BW or angular update per recorded iteration')
+    if config.get('algorithm') == RWM_ROTATION_METHOD:
+        dimension = int(scs_paper.target_spec(config)['dimension'])
+        sigma = _initial_proposal_scale(config)
+        bw.update(scale_parameter='Gaussian coordinate standard deviation',
+            initial_scale_reference_bw_radius=float(config.get('initial_scale', .1)),
+            initial_gaussian_sigma=sigma,
+            gaussian_equivalent_bw_radius=float(scale*np.sqrt(dimension+2.)),
+            reflected_warmup_iterations=bw_count, gaussian_warmup_iterations=bw_count,
+            first_component='reflected_gaussian_rwm',
+            tuning_note=bw['tuning_note'].replace('Reflected-BW', 'Reflected Gaussian-RWM'),
+            iteration_policy='One independently selected reflected-Gaussian-RWM or angular update per recorded iteration')
     return bw
 
 
 def _validate(config):
-    if config['algorithm'] not in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, 'SCS'):
+    if config['algorithm'] not in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, RWM_ROTATION_METHOD, 'SCS'):
         raise ValueError('Unknown timed comparison method')
     if not np.isfinite(config['time_budget']) or config['time_budget'] <= 0:
         raise ValueError('time_budget must be positive and finite')
@@ -441,7 +499,7 @@ def _validate(config):
     if config.get('dcs_backend', 'jax') not in ('jax', 'numba'):
         raise ValueError('dcs_backend must be jax or numba')
     if config.get('dcs_backend') == 'numba' and config['algorithm'] == 'DCS-RWM':
-        raise ValueError('The optimized Numba comparison contains BW and reflected BW, not DCS-RWM')
+        raise ValueError('Plain DCS-RWM is not part of the optimized Numba comparison')
     if not isinstance(config.get('coordinate_metrics', False), bool):
         raise ValueError('coordinate_metrics must be a boolean')
     if config.get('coordinate_metrics', False):
@@ -540,21 +598,24 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         'batch_size': BATCH_SIZE, 'prefix_stride': PREFIX_STRIDE, 'batches': batches,
         'compile_seconds': backend.compile_seconds, 'warmup_seconds': backend.warmup_seconds,
         'warmup_iterations': config['warmup'], 'warmup_acceptance': backend.warmup_acceptance,
-        'initial_scale': float(config.get('initial_scale', .1)), 'scale': float(backend.scale), 'final_scale': float(backend.scale),
+        'initial_scale': _initial_proposal_scale(config), 'scale': float(backend.scale), 'final_scale': float(backend.scale),
         'frozen_scale': float(backend.scale), 'adaptation_during_sampling': False,
-        'step_policy': (ROTATION_STEP_POLICY if tuning_policy == ROTATION_TUNING else
+        'step_policy': (ROTATION_STEP_POLICY.replace('reflected-BW', 'reflected-Gaussian-RWM')
+                        if config['algorithm'] == RWM_ROTATION_METHOD else
+                        ROTATION_STEP_POLICY if tuning_policy == ROTATION_TUNING else
                         BALL_STEP_POLICY if tuning_policy == BALL_TUNING else STEP_POLICY),
         'tuning_policy': tuning_policy,
         'target_acceptance': None if tuning_policy in (BALL_TUNING, ROTATION_TUNING) else .234,
         'common_cpu_backend': 'mixed: optimized Numba DCS, author JAX SCS' if config.get('dcs_backend') == 'numba' else 'JAX',
         'backend': 'Numba' if native else 'JAX',
         'implementation_revision': config.get('implementation_revision', IMPLEMENTATION_REVISION),
-        'boundary_policy': ('chord_reflection_or_fixed_radius_rotation' if config['algorithm'] == ROTATION_METHOD else
+        'boundary_policy': ('chord_reflection_or_fixed_radius_rotation' if config['algorithm'] in ROTATION_METHODS else
                             'reflect_along_proposal_chord' if config['algorithm'] == 'DCS-BW-reflect'
                             else 'author_cap_stepout' if config['algorithm'] == 'SCS' else 'direct_rejection'),
         'step_scale_ceiling': recorded_ceiling,
         'scale_ceiling_reached': bool(backend.scale >= recorded_ceiling*(1-1e-10)),
-        'proposal_generator': ('50/50_reflected_uniform_ball_or_tangent_rotation' if config['algorithm'] == ROTATION_METHOD else
+        'proposal_generator': ('50/50_reflected_isotropic_gaussian_or_tangent_rotation' if config['algorithm'] == RWM_ROTATION_METHOD else
+                               '50/50_reflected_uniform_ball_or_tangent_rotation' if config['algorithm'] == ROTATION_METHOD else
                                'normal_d_plus_2_projection' if config['algorithm'] in ('DCS-BW', 'DCS-BW-reflect')
                                else 'author_tangent_normal' if config['algorithm'] == 'SCS'
                                else 'isotropic_normal'),

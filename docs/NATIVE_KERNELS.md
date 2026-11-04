@@ -3,7 +3,7 @@
 All seven launcher experiments use compiled loops for their canonical sampling
 methods. `compiled_sampling.py` covers DCS-RWM, DCS-BW, DCS-HnR, ordinary Gaussian
 and stable random walks, and SCS. It supports the skew-t, logistic, Eight Schools
-(centered and noncentered), and GARCH densities. The current `sampler-comparison` runs DCS-RWM/BW/reflect/rotate and author SCS in a shared compiled JAX scan framework. The separate `sampler-comparison-numba` runs optimized native BW/reflect/rotate against unchanged author JAX SCS; both targets and both VI settings are available. The native loops accumulate radial and first-three-coordinate quantities, caching unchanged values after rejection. See [the exact comparison scope](COMPARISONS.md).
+(centered and noncentered), and GARCH densities. The current `sampler-comparison` runs DCS-RWM/BW/reflect/BW-rotate/RWM-rotate and author SCS in a shared compiled JAX scan framework. The separate `sampler-comparison-numba` runs optimized native BW/reflect/BW-rotate/RWM-rotate against unchanged author JAX SCS; both targets and both VI settings are available. The native loops accumulate radial and first-three-coordinate quantities, caching unchanged values after rejection. See [the exact comparison scope](COMPARISONS.md).
 NumPyro/BlackJAX NUTS retain their compiled implementations.
 
 Each worker compiles before the sampling start barrier. Warmup is separate;
@@ -32,6 +32,15 @@ always use compiled paths for the methods listed above.
 Native production starts at the identical JAX-calibrated state and frozen step used in the shared-framework mode. PCG64 production streams are independent of the calibration stream, so parity means matching proposal and target laws, not identical seeded trajectories. Controlled-increment tests compare Metropolis decisions, density/Jacobian formulas, reflected chords and all-state cumulative statistics, including d=500.
 
 `numba_rotation.py` adds DCS-BW-rotate: a fixed 50/50 mixture of one reflected BW move or one angular move per iteration. It uses the same JAX pilot calibration and both frozen scales as the JAX mixture. Its fused loop records the same eight all-iteration quantities and burn-in prefix sums as native BW/reflect. Angular proposals preserve physical radius about the fitted centre by rotating after the Möbius map; only the chosen mixture component runs. The separate pilot phases share one warmup-transition budget. This implementation does not by itself establish a speed or MSE advantage over SCS; the throughput measurements below concern the earlier BW/reflect kernels only.
+
+`numba_rwm_rotation.py` adds DCS-RWM-rotate with reflected Gaussian increments
+and the same angular component. It receives the shared JAX-calibrated state,
+Gaussian coordinate standard deviation and angular scale. The Gaussian scale
+starts at the reference BW radius divided by `sqrt(d+2)`; the two mixtures do
+not equate their numerical step parameters. Both use one selected update per
+iteration, fused statistics, cached rejected-state values and separate
+production random streams. Existing throughput records below do not measure
+this added method.
 
 A local macOS ARM64 throughput check used 900,000 transitions per case, three rotated repeats, and the same saved 100D map and method-specific calibrated start/step. Median paired JAX/Numba time ratios were **10.73× for BW** and **10.27× for reflected BW**. Median rates were 161,765 versus 1,734,092 iterations/s for BW, and 129,286 versus 1,334,991 for reflected BW. Compilation and calibration were excluded. These measurements compare DCS implementations, not DCS against SCS, and do not establish MSE improvements or promised Ryzen speedups. The complete map, configuration and measurements are in [the validation record](../validation/radial_numba_throughput.json). Reproduce them using `python scripts/benchmark_radial_numba.py` while no other CPU-heavy jobs run. Source hashes identify the measured revision; the subsequently corrected RNG-description string does not alter sampling.
 

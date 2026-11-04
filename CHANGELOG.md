@@ -1,5 +1,19 @@
 # Changes
 
+## 2026-11-04 — reflected Gaussian RWM with rotations
+
+- Add DCS-RWM-rotate to both current comparisons, preserving every existing
+  method: six methods in JAX and five in the optimized comparison.
+- Use reflected Gaussian increments and the existing corrected angular move,
+  selecting exactly one component with equal probability per iteration.
+  Pretune both scales within the same total warmup-transition budget and
+  retain separate first-third production burn-in.
+- Match initial expected squared increment length with Gaussian coordinate
+  scale `0.1/sqrt(d+2)`. Record Gaussian scale units and equivalent BW radius.
+- Record version-5 protocols, preserve historical reports, and include the
+  new method in every existing radial and X₁/X₂/X₃ MSE/count/time figure.
+  Fresh comparisons rerun all methods; old results do not acquire this method.
+
 ## 2026-11-04 — reflected BW with fixed-radius rotations
 
 - Add DCS-BW-rotate to both current comparisons: a fixed 50/50 random mixture
