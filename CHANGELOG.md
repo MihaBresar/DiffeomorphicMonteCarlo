@@ -1,5 +1,20 @@
 # Changes
 
+## 2026-11-04 — radial comparisons, ESS and native billiards
+
+- Use the same five active methods in JAX and optimized Numba comparisons:
+  DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard. Keep reflected BW
+  with its existing ball-movement pilot and preserve historical reports.
+- Add optimized native RWM and invariant-chord billiards with the shared JAX
+  pilot, effective map, frozen step, and independent native production stream.
+- Remove coordinate statistics from new comparisons. Retain analytic radial
+  references, original MSE/count/time figures, and add functional ESS and ESS/s.
+- Compute comparison ESS from unthinned post-burn-in scalar histories,
+  including rejections. Bound concurrent FFT memory, separate diagnostic time,
+  and preserve unavailable reasons instead of inventing counts for constant traces.
+- Record both comparison protocols as version 7. New results require fresh
+  runs; historical thinned files cannot reconstruct unthinned ESS.
+
 ## 2026-11-04 — optimized JAX billiards
 
 - Add **DCS-Billiard** as the seventh JAX comparison method, alongside SCS,

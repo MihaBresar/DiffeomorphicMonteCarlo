@@ -38,9 +38,12 @@ jobs:
       - run: python run_experiment.py --plot-only results/ci-billiard-no-vi
       - run: python run_experiment.py sampler-comparison-numba --target skew-t-100d --vi off --preset quick --runs 3 --seed-batch 1 --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-boundary-scs
       - run: python run_experiment.py --plot-only results/ci-boundary-scs
+      - run: python run_experiment.py sampler-comparison-numba --target skew-t-100d --vi on --preset quick --runs 3 --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-numba-vi
+      - run: python run_experiment.py --plot-only results/ci-numba-vi
       - run: python run_experiment.py sampler-comparison --target skew-t-500d --vi on --preset quick --runs 1 --workers 1 --output-dir results/ci-500d-jax
       - run: python run_experiment.py sampler-comparison --target skew-t-500d --vi off --preset quick --runs 1 --workers 1 --output-dir results/ci-500d-billiard-no-vi
       - run: python run_experiment.py sampler-comparison-numba --target skew-t-500d --vi off --preset quick --runs 1 --workers 1 --output-dir results/ci-500d-numba
+      - run: python run_experiment.py sampler-comparison-numba --target skew-t-500d --vi on --preset quick --runs 1 --workers 1 --output-dir results/ci-500d-numba-vi
       - run: python prepare_reference.py --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-reference
       - run: python run_experiment.py skew-t-200d-nuts --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci
       - run: python run_experiment.py --plot-only results/ci
@@ -70,9 +73,11 @@ jobs:
             results/ci-single-scs
             results/ci-billiard-no-vi
             results/ci-boundary-scs
+            results/ci-numba-vi
             results/ci-500d-jax
             results/ci-500d-billiard-no-vi
             results/ci-500d-numba
+            results/ci-500d-numba-vi
             results/ci-baselines
             results/ci-eight-schools
             results/ci-processing*.json

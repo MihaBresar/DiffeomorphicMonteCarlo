@@ -193,13 +193,10 @@ class TimedBilliardTests(unittest.TestCase):
         self.assertEqual(len(record['mean_all_iterations']), 8)
         self.assertTrue(np.all(np.isfinite(traces)))
 
-    def test_rejects_native_backend_and_alternative_pilot(self):
+    def test_rejects_unknown_backend_and_alternative_pilot(self):
         config = self.config()
-        native = {**config, 'dcs_backend': 'numba'}
-        with self.assertRaisesRegex(ValueError, 'JAX'):
-            timed._validate(native)
-        with self.assertRaisesRegex(ValueError, 'JAX'):
-            timed._backend(BallMap(5).parameters(), native, 1)
+        with self.assertRaisesRegex(ValueError, 'jax or numba'):
+            timed._validate({**config, 'dcs_backend': 'unknown'})
         with self.assertRaisesRegex(ValueError, 'pilot'):
             timed.resolve_step_tuning({**config,
                 'step_tuning_policies': {timed.BILLIARD_METHOD: timed.ACCEPTANCE_TUNING}})

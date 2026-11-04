@@ -7,10 +7,10 @@ results. Both fixed-time and fixed-iteration designs remain in the repository.
 The two current sampler-comparison reports identify their selected target,
 **VI on/off for both map families**, and JAX or optimized Numba execution.
 Both support 100D and 500D skewed Student-t targets with ν=3 and DCS β=2.
-See [the current comparison protocol](COMPARISONS.md). The JAX report includes
-DCS-RWM, DCS-BW, SCS, DCS-BW-reflect, DCS-BW-rotate, DCS-RWM-rotate and DCS-Billiard; the optimized report includes four DCS
-methods and unchanged author SCS. Their figures describe the selected run;
-they do not imply a general sampler ranking.
+See [the current comparison protocol](COMPARISONS.md). Both current reports
+include DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard. The Numba option runs the four
+DCS methods natively and keeps author SCS in JAX. Their figures describe the
+selected run; they do not imply a general sampler ranking.
 
 In the other experiments, DCS labels identify the selected map as **Möbius VI** or **vanilla**. Vanilla
 means R=1, centre=0 and Möbius=0, with the experiment's β unchanged. Exact-value
@@ -25,43 +25,36 @@ keep their identity maps. Old fixed-R=√d results retain their historical label
 | `SuperInfiniteFirstTest` | Linear MSE bars for tail probability, mean log norm, then average runtime at equal iterations |
 | `QQ-regresssion` | Two-by-two marginal Q–Q plots for β₁, with ν=4 and ν=6 |
 
-Current reports identify `timed-sampler-comparison-v6` or
-`timed-numba-comparison-v5`. They retain `VsSCS`, `scs_100d_estimates`,
-`scs_100d_runtime`, and `scs_100d_bias_variance`; the historical filenames stay
-the same for 500D, while plot titles identify the actual target. Added
-`coordinate_mean` and `coordinate_tail_probability` figures show per-chain
-estimates and MSE for E[X₁] and P(X₁ > c). Additional
-`coordinate_x2_mean`, `coordinate_x2_left_tail_probability`,
-`coordinate_x3_mean` and `coordinate_x3_tail_probability` figures show
-E[X₂], P(X₂ < −c), E[X₃] and P(X₃ > c). The threshold is 3 for both targets.
-X₂ uses mirrored X₁ references with the same MCSE; X₃ references are analytic.
-Reference lines are explicitly labeled independent estimates where applicable,
-with MCSE shown. Historical version-1 reports remain radial-only and version-2
-reports retain X₁ only. Version-3 reports retain all eight measurements without
-the rotation mixtures; version-4 reports include BW rotation only. Replotting cannot reconstruct unsaved statistics or a new method.
-Every method receives equal sampling time and separate proposal calibration;
-the first third of timed iterations is discarded. Reflected BW uses
-ball-movement pilots, while the original methods target acceptance 0.234.
-Both rotation mixtures split their warmup between reflected steps and unit-direction
-movement pilots, then use fixed 50/50 mixtures. Both scales remain frozen
-during sampling. RWM rotation reports its Gaussian coordinate standard deviation
-and equivalent BW radius separately; these are different scale units. JAX version 6
-adds DCS-Billiard, whose frozen step comes from a reflected-BW pilot in its
-post-Möbius coordinates. Tables disclose its effective zero-deformation map
-and retained jointly fitted centre/scale. Without VI, both families use
-unit scale and zero centre/deformation, with no fitting draws.
+Current reports identify `timed-sampler-comparison-v7` or
+`timed-numba-comparison-v7`. They retain `VsSCS`, `scs_100d_estimates`,
+`scs_100d_runtime` and `scs_100d_bias_variance`, and add `scs_100d_ess` for
+mean functional ESS per chain and ESS/s. The filenames remain the same in
+500D; titles identify the target. New comparisons report only radial-tail
+probability and mean norm, with analytic references. Coordinate plots are no
+longer generated. CSV/JSON preserve exact counts and full precision.
+
+All methods have equal production-time and pilot budgets. RWM/BW/SCS use
+acceptance-target 0.234 calibration; reflected BW uses ball-movement pilots
+without a geometric step ceiling of 2, and billiards use those pilots in
+post-Möbius coordinates. Every step freezes before production and the first
+third is discarded. Effective maps and pilot histories are recorded.
+Functional ESS uses unthinned post-burn-in scalar histories, including
+rejections. Any unavailable chain makes that method aggregate unavailable.
+See [ESS definitions and limits](ESS.md). Archived versions retain their
+recorded coordinate measurements and method lists; replotting cannot invent
+unrecorded methods or recover unthinned ESS from a thinned history.
 
 Replotting earlier three-method or boundary summaries preserves their recorded
 target, tuning policy and design. It does not relabel them as the new suite.
 Legacy CLI identifiers and report regeneration remain supported, although the
 old comparisons are no longer launcher choices. The All seven sequence now
-uses the seven-method JAX comparison on 100D skewed t with the chosen VI policy;
+uses the five-method JAX comparison on 100D skewed t with the chosen VI policy;
 the other six experiments retain their existing map options.
 
 The compact **200D random-walk baselines** report keeps just `VsRWM_NUTS`
 (two MSE panels), `VsRWM_NUTS_ergodic_averages` (tail and norm estimates), and
 `VsRWM_NUTS_sample_counts` (generated samples, retained samples and runtime).
-It does not compute marginal quantiles, directional checks or ESS/R-hat.
+It also reports functional ESS; it does not compute marginal quantiles, directional checks or R-hat.
 Its HTML/CSV tables also include the average estimate across chains.
 
 The other generic skew-t experiments also save the original four-coordinate marginal Q–Q
@@ -98,8 +91,8 @@ Where enabled in the generic experiments, directional checks and newer
 logarithmic MSE plots with bootstrap intervals are in `figures/supplementary`.
 The launcher puts them in a collapsed **Supplementary diagnostics** section.
 The compact 200D baseline report skips these outputs. The two new comparison
-suites report radial and coordinate estimates and MSE with descriptive between-chain error
-summaries; they do not add individual-chain convergence diagnostics.
+suites report radial estimates, MSE and functional ESS with descriptive between-chain error
+summaries. Coordinate statistics are omitted.
 
 ## Exact numerical values
 
@@ -127,8 +120,8 @@ The new comparison suites also save `tuned_parameters.csv`, `setup_times.csv`
 and `reflected_tuning.csv`, recording map parameters, excluded setup costs and
 every reflected-BW pilot candidate. Version-4 reports additionally save
 `angular_tuning.csv`, angular scales and angles in radians/degrees, and the
-shared warmup split for both rotation mixtures, with Gaussian scale units explicit. Version-3 and later reports save
-`reference_values.csv` with all eight reference values, MCSE and exact flags.
+historical warmup splits for rotation mixtures where those methods were recorded. Version-3 and later coordinate reports save
+`reference_values.csv` with the recorded reference values, MCSE and exact flags. Current version-7 runs contain the two analytic radial references.
 Version-2 reports retain their four reference values. With VI off, fitting costs and training
 counts are zero; proposal calibration still runs.
 

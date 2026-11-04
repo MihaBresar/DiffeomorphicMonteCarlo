@@ -1,5 +1,32 @@
 # Validation of the corrected implementation
 
+## Five-method comparisons, native billiards and ESS (4 November 2026)
+
+Both active comparison modes now use DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard.
+Version 7 reports only the original radial-tail probability and mean norm,
+with ESS and ESS/s added. Numba implements ordinary RWM and the same optimized
+billiard proposal; its frozen JAX calibration is unchanged. Author SCS remains
+the pinned JAX implementation. See [the protocol](COMPARISONS.md).
+
+All **312 automated tests**, **eight comparison configurations
+(80 Quick chains)** and **all six other public experiments
+(34 Quick chains, plus independent logistic references)**
+passed locally. Comparison checks verify identical JAX/Numba maps, calibrated
+states, frozen scales and pilot histories; analytic references, two functionals,
+unthinned ESS provenance, invalid-trace reasons, original plots and saved-report
+regeneration without resampling or ESS recomputation. Other reports verify ESS
+against the actual retained-draw stride used in their estimates.
+
+Native proposals were checked against JAX with common increments and uniforms,
+including grazing/diameter cases and calibrated-scale extremes. ESS checks cover
+ArviZ parity, autocorrelation/anticorrelation, repeated states, constant/short
+traces, paper thinning=50, temporary-file cleanup and cached compact summaries.
+Quick results validate execution, not sampler rankings. The capture cost changes
+timed throughput, so rerun all methods together for new paper results.
+
+[Validation record](../validation/radial_ess_checks.json) and
+[ESS definitions](ESS.md). Linux/Windows checks run separately in GitHub Actions.
+
 ## Optimized JAX billiard addition (4 November 2026)
 
 Protocol v6 adds `DCS-Billiard` to the JAX comparison, preserving the previous

@@ -15,11 +15,21 @@ from scripts import reproduce_scs_100d as runner
 
 class ComparisonSuiteTests(unittest.TestCase):
 
+    def test_reflected_bw_retains_existing_pilot_defaults(self):
+        from scripts import reproduce_boundary_100d as boundary
+        previous = boundary.configuration('paper')
+        for backend in ('jax', 'numba'):
+            config = suite.configuration('paper', comparison=backend)
+            method_config = dict(config, algorithm='DCS-BW-reflect')
+            self.assertEqual(timed_radial.resolve_step_tuning(method_config),
+                             'ball_esjd_pilot_v1')
+            for key in ('initial_scale', 'warmup', 'seed', 'burnin_fraction'):
+                self.assertEqual(config[key], previous[key])
+            self.assertNotIn('step_scale_ceilings', config)
+
     def test_suite_configuration_selects_target_methods_beta_and_shared_resources(self):
-        expected_methods = {
-            'jax': ['DCS-RWM', 'DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate', 'DCS-RWM-rotate', 'DCS-Billiard'],
-            'numba': ['DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate', 'DCS-RWM-rotate'],
-        }
+        expected_methods = {backend: ['DCS-RWM', 'DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-Billiard']
+                            for backend in ('jax', 'numba')}
         target_cases = (('skew-t-100d', 'skew_t', 100, 2.),
                         ('skew-t-500d', 'skew_t', 500, 2.))
         for backend, methods in expected_methods.items():
@@ -34,14 +44,9 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertEqual(config['beta'], beta)
                         self.assertEqual(config['dcs_backend'], backend)
                         self.assertEqual(config['vi_enabled'], vi == 'on')
-                        expected_policies = {'DCS-BW-reflect': 'ball_esjd_pilot_v1',
-                                         'DCS-BW-rotate': 'split_ball_angular_esjd_v1',
-                                         'DCS-RWM-rotate': 'split_ball_angular_esjd_v1'}
-                        if backend == 'jax':
-                            expected_policies['DCS-Billiard'] = 'ball_esjd_pilot_v1'
-                        self.assertEqual(config['step_tuning_policies'], expected_policies)
-                        self.assertEqual(config['mixture_probability'], .5)
-                        self.assertEqual(config['initial_angular_scale'], 1.)
+                        self.assertEqual(config['step_tuning_policies'], {'DCS-BW-reflect': 'ball_esjd_pilot_v1', 'DCS-Billiard': 'ball_esjd_pilot_v1'})
+                        self.assertNotIn('mixture_probability', config)
+                        self.assertNotIn('initial_angular_scale', config)
                         self.assertNotIn('step_scale_ceilings', config)
                         self.assertEqual(config['runs'], 50)
                         self.assertEqual(config['warmup'], 1500)
@@ -51,10 +56,11 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertEqual(config['optimizer_samples'], 2000)
                         self.assertEqual(config['target']['nu'], 3.)
                         self.assertEqual(config['target']['alpha'], {'0': 100., '1': -100.})
-                        self.assertTrue(config['coordinate_metrics'])
-                        self.assertEqual(config['coordinate_threshold'], 3.)
+                        self.assertFalse(config['coordinate_metrics'])
+                        self.assertNotIn('coordinate_threshold', config)
+                        self.assertTrue(config['ess_enabled'])
                         self.assertEqual(config['reference_samples'], 5_000_000)
-                        self.assertTrue(config['protocol'].endswith('-v6' if backend == 'jax' else '-v5'))
+                        self.assertTrue(config['protocol'].endswith('-v7'))
 
     def test_vi_off_bypasses_fitting_for_both_map_families_without_skipping_warmup(self):
         for target_id in ('skew-t-100d', 'skew-t-500d'):
@@ -107,13 +113,9 @@ class ComparisonSuiteTests(unittest.TestCase):
             mean_norm = np.exp(.5*np.log(3.)+special.gammaln((dimension+1)/2)+special.gammaln(1.)
                                -special.gammaln(dimension/2)-special.gammaln(1.5))
             truth = np.array([stats.f.sf(config['threshold']**2/dimension, dimension, 3), mean_norm])
-            reference = dict(functionals=['tail_probability', 'mean_norm', 'mean_x1', 'x1_tail_probability',
-                                         'mean_x2', 'x2_left_tail_probability', 'mean_x3', 'x3_tail_probability'],
-                             truth=[*truth, .7, .03, -.7, .03, 0., stats.t.sf(3., 3.)],
-                             reference_mcse=[0., 0., 1e-5, 1e-5, 1e-5, 1e-5, 0., 0.],
-                             exact=[True, True, False, False, False, False, True, True])
-            truth = np.asarray(reference['truth'])
-            errors = np.array([.005, 1., .1, .002, .2, .004, .05, .003])
+            reference = dict(functionals=['tail_probability', 'mean_norm'], truth=truth.tolist(),
+                             reference_mcse=[0., 0.], exact=[True, True], source='Analytic Student-t radial law')
+            errors = np.array([.005, 1.])
             records = {}
             for method in config['algorithms']:
                 records[method] = []
@@ -131,7 +133,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                     np.testing.assert_allclose(case['mse'], errors**2, rtol=1e-11, atol=1e-12)
                     self.assertEqual(case['total_iterations'], 900)
                     self.assertEqual(case['total_estimation_iterations'], 600)
-                self.assertEqual(len(summary['paired_mse_differences']), 48)
+                self.assertEqual(len(summary['paired_mse_differences']), 8)
                 self.assertEqual(summary['reference'], reference)
 
     def test_native_dispatch_reuses_same_jax_calibration_and_keeps_author_scs(self):

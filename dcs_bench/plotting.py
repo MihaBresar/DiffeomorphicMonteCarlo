@@ -14,6 +14,7 @@ from .processing import process_chains
 from .radial_reporting import compact_radial_report, process_radial_chains
 from .cpu import cpu_info
 from .display import number, cell, figure_ticks
+from .functional_ess import aggregate_functional_ess
 
 COLORS = ['#9370DB', '#FF8C00', '#228B22', '#FF1493', '#4682B4']
 METHOD_COLORS = {'DCS-BW': '#9370DB', 'DCS-RWM': '#FF8C00', 'DCS-HnR': '#9370DB',
@@ -226,7 +227,7 @@ def skew_qq_figure(target, ref, data, config, folder, quick):
 
 def export_paper_values(output, config, all_summary):
     """Full-precision CSV values and a table with readable numerical labels."""
-    rows, count_rows = [], []
+    rows, count_rows, ess_rows = [], [], []
     for s, scenario in enumerate(all_summary):
         ref = scenario['reference']
         for a, summary in scenario['algorithms'].items():
@@ -251,13 +252,30 @@ def export_paper_values(output, config, all_summary):
                     mse_bootstrap_95_high=summary['mse_bootstrap_95_interval'][1][k]))
                 if compact_radial_report(config):
                     rows[-1]['estimate'] = float(np.mean(np.asarray(summary['chain_functional_estimates'])[:, k]))
+                ess = summary.get('functional_ess', {}).get(functional)
+                if ess is not None:
+                    ess_rows.append(dict(scenario=s, algorithm=a, functional=functional,
+                        **{key: json.dumps(value) if isinstance(value, (list, dict)) else value
+                           for key, value in ess.items()}))
+                    rows[-1].update(functional_ess_mean=ess['mean_ess'],
+                        functional_ess_median=ess['median_ess'], functional_ess_sum=ess['total_ess'],
+                        functional_ess_per_sampling_second=ess['ess_per_sampling_second'],
+                        functional_ess_valid_chains=ess['valid_chains'], functional_ess_chains=ess['chains'],
+                        functional_ess_draw_strides=json.dumps(ess['draw_strides']),
+                        functional_ess_unavailable_reasons='; '.join(ess['unavailable_reasons']))
     write_csv(output/'paper_values.csv', rows)
     write_csv(output/'sample_counts.csv', count_rows)
+    if ess_rows:
+        write_csv(output/'functional_ess.csv', ess_rows)
     # Display formatting is separate from the full-precision CSV exports.
     columns = ['scenario', 'algorithm', 'functional', 'mse', 'reference', 'mean_iterations',
                'mean_retained_samples', 'total_iterations', 'total_retained_samples', 'mean_production_seconds']
     if compact_radial_report(config):
         columns.insert(3, 'estimate')
+    if any('functional_ess_mean' in row for row in rows):
+        columns += ['functional_ess_mean', 'functional_ess_per_sampling_second',
+                    'functional_ess_valid_chains', 'functional_ess_chains',
+                    'functional_ess_draw_strides', 'functional_ess_unavailable_reasons']
     if any('total_burnin_iterations' in row for row in rows):
         columns += ['total_burnin_iterations', 'total_estimation_iterations', 'mean_burnin_iterations', 'mean_estimation_iterations']
     burn_note = ('Separate step tuning precedes sampling. Recorded sampling burn-in is included in generated counts and excluded from estimation counts. Retained samples follow tuning, sampling burn-in and thinning. '
@@ -275,8 +293,14 @@ def export_paper_values(output, config, all_summary):
             +burn_note+'These are finite numerical estimates, '
             'displayed with two decimals, using scientific notation for small values. CSV and JSON retain full precision.</p>'
             +('<p>Estimates are averages of independent-chain estimates. This report contains only the norm moment, '
-              'tail probability, MSE, sample counts and timing. No ESS, R-hat, coordinate quantiles or directional diagnostics are computed.</p>'
+              'tail probability, MSE, sample counts and timing, plus functional ESS when recorded. No R-hat, coordinate quantiles or directional diagnostics are computed.</p>'
               if compact_radial_report(config) else '')+
+            ('<p>Functional ESS is raw-mean split-chain autocorrelation ESS for the same retained draws used by each estimate. '
+             'The actual thinning stride is shown and is never multiplied into ESS. Tail-probability ESS uses its binary indicator; '
+             'it is not rank-normalized bulk ESS or quantile tail ESS. ESS per second divides the sum of per-chain ESS by '
+             'full production seconds, including sampling burn-in and excluding setup/diagnostic work. This sum is not the ESS '
+             'of a pooled estimator or a convergence guarantee. Any unavailable chain makes the all-chain aggregate unavailable.</p>'
+             if any('functional_ess_mean' in row for row in rows) else '')+
             '<p><a href="paper_values.csv">Download all values (CSV)</a> · '
             '<a href="sample_counts.csv">Sample counts and exact mean fractions (CSV)</a></p>'
             '<div class="scroll"><table><thead><tr>'+''.join('<th>'+c.replace('_', ' ')+'</th>' for c in columns)+
@@ -313,7 +337,8 @@ def rebuild(output):
         for algorithm in config['algorithms']:
             paths = [directory/'chains'/f'{algorithm}-{i:03d}.npz' for i in range(config['runs'])]
             arguments = dict(expected=manifest['fingerprint'], label=f'Scenario {s}, {algorithm}',
-                             progress=lambda message: print(message, flush=True))
+                             progress=lambda message: print(message, flush=True),
+                             ess_enabled=True)
             if radial_only:
                 processed = process_radial_chains(paths, target, config['threshold'], **arguments)
             else:
@@ -331,6 +356,7 @@ def rebuild(output):
             totals = [r['sampling_seconds']+r.get('warmup_seconds', r.get('warmup_seconds_including_compilation', 0.))
                       +r.get('production_compile_and_pilot_seconds', 0.)+setup_seconds/config['runs'] for r in records]
             algo_summary = dict(errors, chain_functional_estimates=estimates.tolist(),
+                functional_ess=aggregate_functional_ess(records, ref['functional_names']),
                 chain_quantiles=quantiles.tolist(), cross_chain_diagnostics=diagnostics,
                 result_processing=processed['processing'],
                 diagnostic_draws_per_chain=length, independent_chain_diagnostics=indiv,
@@ -365,6 +391,12 @@ def rebuild(output):
                         estimate=est[k], reference=ref['functional_truth'][k], squared_error=(est[k]-ref['functional_truth'][k])**2,
                         sampling_seconds=record['sampling_seconds'], seconds_including_setup=totals[i],
                         iterations=record['iterations'], retained_draws=record['retained_draws']))
+                    ess_entry = record.get('functional_ess', {}).get(name, {})
+                    csv_rows[-1].update(functional_ess=ess_entry.get('ess'),
+                        functional_ess_per_sampling_second=ess_entry.get('ess_per_sampling_second'),
+                        functional_ess_draw_stride=ess_entry.get('draw_stride'),
+                        functional_ess_draws=ess_entry.get('draws'),
+                        functional_ess_unavailable_reason=ess_entry.get('unavailable_reason'))
                     if not radial_only:
                         diag = indiv[i]
                         ess = diag['ess_bulk'][name]
@@ -391,7 +423,7 @@ def rebuild(output):
         tables_and_figures_seconds=perf_counter()-started-diagnostic_seconds,
         total_seconds=perf_counter()-started,
         sampling_clock_includes_result_processing=False,
-        diagnostics_computed=not radial_only,
+        diagnostics_computed=True, functional_ess_computed=True,
         diagnostic_subsampling=False))
     print(f'Result processing finished in {perf_counter()-started:.2f} seconds.', flush=True)
     return rendered

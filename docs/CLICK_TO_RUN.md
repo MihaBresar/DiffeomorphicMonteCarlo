@@ -52,7 +52,7 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 
 1. Click **Set up environment** and wait for **Environment ready**. This installs
    the pinned packages inside this project and can take several minutes.
-2. Leave **Seven samplers: SCS, reflected BW, DCS-Billiard and DCS controls** and
+2. Leave **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)** and
    **Quick check** selected. Choose a **Target distribution** and whether to
    use **Variational map fitting — both DCS and SCS**. Choose **CPU workers**
    (start with 2–4), then click **Start run**. Quick-check graphs verify
@@ -66,112 +66,37 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
    open `paper_values.html` to read estimates, MSE, sample counts and timing
    values. The page uses two decimals; its CSV downloads retain full precision.
 
-The two current comparison choices are:
+The two current comparisons contain the same five methods: DCS-RWM, DCS-BW,
+SCS, DCS-BW-reflect and DCS-Billiard. The JAX option runs all five in the same framework;
+the Numba option uses optimized native DCS loops against the unchanged author
+SCS JAX transition. Both offer 100D/500D and VI on/off. Rotation mixtures
+are no longer active choices.
 
-- **Seven samplers: SCS, reflected BW, DCS-Billiard and DCS controls** runs all seven in
-  the same JAX CPU framework, with full-state recording and common radial and three-coordinate
-  processing.
-- **Five samplers: optimized Numba DCS versus SCS** runs four DCS methods in optimized Numba loops against the unchanged author SCS JAX
-  transition. DCS reuses the same JAX step calibration, then caches densities
-  and coordinate values and accumulates all eight estimates inside the sampling loop. This measures
-  the selected implementations, including their different processing costs.
+Full paper settings use 50 chains per method, 20.00 seconds per chain and
+1,500 separate pilot transitions. Both modes report mean norm, radial-tail
+probability, MSE, exact counts, time, functional ESS and ESS per second.
+Coordinate measurements and their long reference simulation are omitted;
+radial references are analytic. The original radial figures remain, with a new
+ESS figure and `functional_ess.csv`. Displayed numbers use two decimals.
 
-Each choice offers **100D skewed Student-t, ν=3** and **500D skewed Student-t,
-ν=3**. Both use DCS β=2.
-The original radial plots remain. Six coordinate figures show means of X₁,
-X₂ and X₃ and the tails X₁ > 3, X₂ < −3 and X₃ > 3. X₂ is the mirrored
-skewed coordinate; X₃ has a symmetric Student-t marginal. Independent and
-analytic reference values, with their precision, are shown in the report.
-Start fresh runs of every method for the version-6 JAX comparison, which adds
-optimized DCS-Billiard. Numba remains version 5 and has no billiard method.
-Earlier reports retain their recorded method lists; pre-version-3 reports
-lack the all-iteration X₂/X₃ values.
-See [the current comparison protocol](COMPARISONS.md) for target definitions,
-thresholds, tuning and timing policies.
+VI off keeps unit scale, zero centre and zero deformation, while still tuning
+proposal steps. VI on fits both map families. Billiards retain the fitted
+centre/R/β and use zero production deformation, as explained in
+[the construction](BILLIARD.md). RWM/BW/SCS tune toward acceptance 0.234;
+reflected BW uses ball-movement pilots with no geometric step ceiling of 2;
+billiards use these pilots in their active post-Möbius coordinates. All
+steps then freeze. The first third of production is discarded in every case.
 
-Use **With VI** to fit both map families with the same training resources.
-**Without VI** uses unit scale, zero centre and zero
-deformation for both families. In either case every method still receives
-separate proposal-step tuning: original methods target acceptance 0.234;
-reflected BW selects by squared movement in the ball. Sampling steps stay
-fixed. DCS-Billiard (JAX only) keeps the jointly fitted centre and scale when VI
-is enabled, with zero production deformation because it moves after Möbius.
-Its reflected-BW pilot uses those same coordinates and the same total warmup
-budget. This is not an additional fit with deformation constrained to zero.
-Each rotation mixture splits this same tuning budget between reflected
-steps and angles; each iteration then chooses one move with equal probability.
-Gaussian RWM starts at coordinate scale `0.1/sqrt(d+2)` before tuning; the
-reports distinguish its scale units from BW’s radius. Angular candidates for
-both mixtures are in `angular_tuning.csv`. The reflected candidates and scores
-appear in `reflected_tuning.csv`;
-there is no special upper step bound of 2.
+ESS is computed after sampling from unthinned scalar histories, including
+rejections. The log reports this stage. FFT work is limited to one chain at a
+time to keep memory bounded; diagnostic time is separate. Temporary unthinned
+histories are discarded after diagnostics. An unavailable ESS has a reason;
+it is not replaced by the iteration count. See [ESS interpretation](ESS.md).
 
-Both current comparisons offer a seed-batch selector. **Original seeds (batch 0)** uses
-sampling seed 901001; **Fresh batch 1–5** use new sampling and warmup streams
-while keeping map-fitting seed 42 fixed when VI is on. Choose a different batch to check
-whether an observed MSE ordering persists. Repeating the same batch reuses
-its streams, but timing can change how many iterations finish and where
-first-third burn-in ends, so counts and estimates can still differ. These
-batches assess sampling variability conditional on the selected maps, not
-variability from fitting new maps. Keep target, VI choice, run size and worker
-count the same when comparing methods. Each method runs for the same
-production sampling time:
-
-| Run size | Chains per method | Sampling seconds per chain |
-| --- | ---: | ---: |
-| Quick check | 2 | 0.05 |
-| Smaller reproduction | 20 | 2.00 |
-| Full paper settings | 50 | 20.00 |
-
-The figures report generated iteration counts, mean-norm and tail-probability
-estimates, MSE, and the observed bias/variance decomposition across chains.
-The exact-value exports also include inexpensive empirical MSE uncertainty
-summaries from the per-chain errors. Treat these as descriptive; they are not
-formal 95% confidence intervals, and the heavy tail of the norm statistic
-makes rare large errors especially important.
-Methods run separately with the same worker setting. Selecting
-32 workers allows 2, 20 or 32 simultaneous chains in Quick check, Smaller
-reproduction or Full paper settings respectively; it does not multiply the
-chain count by the number of methods.
-
-The other original experiments remain in the Experiment menu. **All seven
-experiments + posterior table** includes the seven-sampler JAX comparison on
-the 100D skewed-t target and the other six experiments. Its VI selector controls
-both maps in that comparison. Run the optimized Numba and 500D
-comparisons individually. The former three-method 100D and boundary choices
-have been removed from the launcher; their command-line scripts and saved-report
-regeneration remain available for historical compatibility.
-
-For large posterior runs, the log distinguishes sampling, saving and
-convergence diagnostics. A chain can finish sampling before its file and
-report are ready. These stages now use bounded memory and report their
-progress; see [result processing](RESULT_PROCESSING.md).
-
-For the other experiments, the **DCS map for the other experiments** selector offers **Möbius map**, which
-fits R, centre and Möbius parameters by VI, and **Vanilla map**, which uses
-untuned R=1, centre=0 and Möbius=0. Both keep the experiment's β and the same
-proposal-scale warmup. The identity maps in Eight Schools and GARCH are
-unchanged. To compare map choices, start a fresh run with each choice and keep
-the experiment, run size and worker count the same.
-
-The **50D t: infinite first moment, equal samples** experiment uses 500,000
-production iterations per chain in Full paper settings. Its mean norm is
-infinite, so it reports tail probability, the finite mean log norm and marginal
-quantiles.
-
-Worker limits depend on the number of available chains. The other experiments
-use at most two production workers for a quick check, eight for a smaller
-reproduction, and 20 or 50 for full paper settings. Logistic reference
-preparation uses at most four. Hardware capacity and the selected worker count
-also apply. The launcher displays the production limit for the selection.
-
-Full paper runs can take many hours and several gigabytes. Keep the computer
-plugged in, awake, and available for the benchmark. Independent chains can run on
-several CPU cores; methods are compared using the same worker setting. More
-workers need more memory. Linux/Windows workers are pinned to detected cores;
-macOS assigns cores through its scheduler. See [parallel execution](PARALLEL.md).
-GPU acceleration is not part of this reproduction configuration. Timing-based
-graphs will differ across machines and worker settings.
+Use a fresh seed batch to check repeatability conditional on the fitted maps.
+The same batch reuses random streams, but time stopping can change counts.
+Run each target/VI combination separately and rerun all five methods together.
+New version-7 runs do not change historical saved reports.
 
 ## Stop or finish
 

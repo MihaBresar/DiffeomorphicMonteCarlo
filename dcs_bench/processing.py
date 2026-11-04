@@ -122,7 +122,7 @@ def _independent_diagnostics(chains, names, executor, *,
     return result
 
 
-def _summarize_chain(path, target, threshold, q_levels, names, expected, store, executor):
+def _summarize_chain(path, target, threshold, q_levels, names, expected, store, executor, ess_enabled=False):
     from .engine import read_chain
 
     started = perf_counter()
@@ -135,6 +135,14 @@ def _summarize_chain(path, target, threshold, q_levels, names, expected, store, 
     estimate = values.mean(axis=0)
     quantiles = np.quantile(draws[:, :4], q_levels, axis=0)
     summary_seconds = perf_counter()-started
+    if ess_enabled:
+        from .functional_ess import functional_ess, DEFINITION
+        tick = perf_counter()
+        record = dict(record, functional_ess=functional_ess(values, names, record.get('sampling_seconds'),
+            draw_stride=record.get('thin', 1), target=target.spec),
+            functional_ess_definition=DEFINITION,
+            functional_ess_series_policy='Every retained post-burn-in draw used by the reported estimate; actual sampler thinning stride is recorded, never multiplied into ESS')
+        record['functional_ess_seconds'] = perf_counter()-tick
     started = perf_counter()
     individual = _independent_diagnostics(values[None, ...], names, executor)
     coordinate_ess = None
@@ -153,7 +161,7 @@ def _summarize_chain(path, target, threshold, q_levels, names, expected, store, 
 
 
 def process_chains(paths, target, threshold, q_levels, functional_names, *,
-                   expected=None, temporary_parent=None, label='', progress=print, diagnostic_workers=1):
+                   expected=None, temporary_parent=None, label='', progress=print, diagnostic_workers=1, ess_enabled=False):
     """Summarize complete saved chains without keeping every chain in RAM.
 
     ``progress`` accepts one text argument; pass ``None`` to suppress messages.
@@ -183,7 +191,7 @@ def process_chains(paths, target, threshold, q_levels, functional_names, *,
             if progress is not None:
                 progress(f'{prefix}processing saved chain {index+1}/{len(paths)} '
                          '(loading, exact estimates and individual diagnostics)')
-            part = _summarize_chain(path, target, threshold, q_levels, names, expected, store, executor)
+            part = _summarize_chain(path, target, threshold, q_levels, names, expected, store, executor, ess_enabled)
             estimates.append(part['estimate'])
             quantiles.append(part['quantiles'])
             records.append(part['record'])
@@ -211,6 +219,8 @@ def process_chains(paths, target, threshold, q_levels, functional_names, *,
         cross_seconds = perf_counter()-cross_started
     processing = dict(
         strategy='One saved chain at a time; disk-staged full traces; one cross-chain functional at a time',
+        functional_ess_computed=ess_enabled,
+        functional_ess_seconds=sum(r.get('functional_ess_seconds', 0.) for r in records),
         diagnostic_subsampling=False,
         diagnostic_prefix_policy='Only cross-chain diagnostics use the shortest retained chain length',
         chains=len(paths), functionals=len(names), retained_draws=sum(store.lengths),

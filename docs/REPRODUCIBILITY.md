@@ -1,6 +1,24 @@
 # Reproducibility and timing policy
 
-The [current selectable-target comparisons](COMPARISONS.md) record protocols `timed-sampler-comparison-v6` (seven methods in JAX) and `timed-numba-comparison-v5` (four optimized Numba DCS methods versus author JAX SCS). Both have two targets and VI on/off for both map families. Ordinary DCS-RWM/BW and SCS use acceptance-target 0.234 pretuning; reflected BW uses ball-movement pilots within the same warmup budget. DCS-BW-rotate and DCS-RWM-rotate each divide that budget between reflected-step and angular pilots, freeze both scales and independently choose one component per iteration with probability 1/2. The latter uses Gaussian increments and starts its coordinate standard deviation at 0.1/sqrt(d+2), matching BW’s initial expected squared increment length; final scales are tuned independently and their units are reported. Rotations preserve radius about the fitted centre and use the physical-density Metropolis ratio. JAX-only DCS-Billiard adds invariant specular chord traversals to the uniform-ball proposal. It works after Möbius, retaining the jointly fitted centre, scale and β with zero active deformation. Its separate pilot is reflected BW in those same coordinates; it does not retune on production errors. Both the fitted and effective maps are recorded. See [the construction](BILLIARD.md). All production steps freeze, and the first third of actual sampling iterations is discarded. The Numba mode changes framework and output-processing costs explicitly; the JAX mode shares those costs. SCS calls the unmodified author transition. The two original radial measurements are supplemented by the means of X₁, X₂ and X₃ and the tails X₁ > 3, X₂ < −3 and X₃ > 3. All eight are accumulated inside the same sampling clocks. Independent X₁ references record MCSE; X₂ uses their exact symmetry relations and shared MCSE, while X₃ has analytic t(3) references. Historical version-1 reports retain radial-only values, version-2 reports retain radial/X₁ values and version-3 reports retain eight quantities without rotation; version-4 reports include BW rotation but not RWM rotation.
+The [current selectable-target comparisons](COMPARISONS.md) record protocols
+`timed-sampler-comparison-v7` and `timed-numba-comparison-v7`. Both include
+DCS-RWM, DCS-BW, author SCS, DCS-BW-reflect and DCS-Billiard, 100D/500D targets, and VI on/off.
+The same JAX pilot initializes each DCS method in either implementation mode;
+Numba production uses an independent PCG64 stream and fused native summaries.
+SCS calls the unmodified author transition. Billiards retain the jointly fitted
+centre/R/β with zero production deformation after Möbius; this is not a refit.
+See [the construction](BILLIARD.md). Reflected BW keeps its shared ball map
+and ball-movement pilot with no geometric step ceiling of 2. All steps freeze and one-third of actual
+production iterations is discarded.
+
+Only mean norm and radial-tail probability are measured in the comparisons.
+Their references are analytic. Functional ESS uses unthinned scalar histories
+including rejections, captured inside each sampling clock; ESS computation is
+outside the clock and serialized to bound workspace memory. ESS/s uses summed
+per-chain ESS divided by summed full production seconds. It is a descriptive
+rate, not the ESS of a concatenated unequal-length pooled chain. Unavailable
+chains remain visible. See [the diagnostic definition](ESS.md). Historical
+coordinate/rotation reports preserve their recorded scope.
 
 All new runs use CPU policy **`pjrt-single-compute-thread-v1`**, setting
 `PJRT_NPROC=1` before JAX backend creation for both DCS and SCS. Earlier
@@ -11,8 +29,8 @@ tuning rules. Runtime helper threads can remain. Manifests record the policy
 and complete thread settings; generic chain records do too. **Rerun the whole
 method comparison for corrected timed results**, since changed throughput also
 changes retained counts and MSE. Do not combine old and new timing cohorts.
-The CPU correction itself preserved version-5 sampling rules; JAX version 6
-subsequently adds DCS-Billiard, while Numba remains version 5. Source hashes
+The CPU correction itself preserved version-5 sampling rules. Version 7 now
+simplifies both suites and adds native billiards and functional ESS. Source hashes
 and the runtime policy distinguish the CPU correction. See [parallel execution](PARALLEL.md).
 
 The policies below describe the six other main experiments.
@@ -52,13 +70,15 @@ Posterior DCS receives the mean **production** time of the fixed-count NUTS runs
 
 The mean estimator is formed within each chain first. MSE is the mean of those chains' squared errors, and RMSE its square root. Posterior table RMSE additionally averages squared errors over physical coordinates before taking the square root. The coordinate-wise values are also saved because parameters have different units. PosteriorDB and logistic references have finite Monte Carlo uncertainty and are not labelled exact. Approximate MSE bootstrap intervals describe variability across the available runs; they do not establish reliable heavy-tail asymptotics, especially for unbounded functions without fourth moments.
 
-The 200D random-walk baseline experiment reports only the two radial estimates,
-their MSEs, sample counts and timing. It uses analytic radial reference values
-and skips individual/cross-chain diagnostics, coordinate quantiles and
-directional checks. Workers cache means over all retained draws after burn-in;
-reporting reads these small records. This does not change production timing,
-sample selection, the sampler or tuning. The diagnostic rules below apply to
-the other generic experiments.
+The 200D random-walk baseline experiment reports the two radial estimates,
+their MSEs, sample counts, timing, functional ESS and ESS per second. It uses
+analytic radial references and skips R-hat, coordinate quantiles and directional
+checks. Workers cache estimates and functional ESS from the retained draws
+after burn-in; reporting reads these small records. ESS calculation follows
+production and has its own recorded cost. Historical records without cached
+ESS require one pass over the saved chain. This does not change sample
+selection, the sampler or tuning. See [the ESS definitions](ESS.md); the broader
+diagnostic rules below apply to the other generic experiments.
 
 Multichain diagnostics use a common prefix of length equal to the shortest chain and record that length. Estimator means and per-chain diagnostics use all retained draws. Reporting streams one chain at a time and stages functional values on disk; cross-chain diagnostics process one functional at a time. This changes memory use, not the diagnostic definitions or sample selection. A constant functional within a chain yields unavailable MCSE/ESS rather than a reassuring zero. Rank R-hat is not computed from a single chain.
 

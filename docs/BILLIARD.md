@@ -1,29 +1,31 @@
-# Optimized JAX billiard sampler
+# Optimized billiard sampler
 
-`DCS-Billiard` is the seventh method in `sampler-comparison`, available for
-100D and 500D skewed Student-t(3), with or without VI. The existing methods
-remain in the comparison. This is an experimental geometric proposal, not a
-claim of universal dominance. It is not included in the Numba comparison.
+`DCS-Billiard` is available in both current five-method comparisons alongside
+DCS-RWM, DCS-BW, DCS-BW-reflect and author SCS. Choose JAX for a common-framework comparison,
+or optimized Numba DCS versus the author JAX SCS implementation. Both offer
+100D and 500D skewed Student-t(3), with and without VI. This is an experimental
+geometric proposal, not a claim of universal dominance.
 
 ## Running the full comparison
 
-On Windows, extract the latest repository ZIP and open **Start.bat**. After
-environment setup and a successful Quick check, choose:
+Extract the latest repository ZIP and open **Start.bat** on Windows. Choose:
 
-1. **Seven samplers: SCS, reflected BW, DCS-Billiard and DCS controls**.
+1. **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)** or **Five samplers: optimized Numba DCS versus SCS**.
 2. **100D** or **500D** under Target distribution.
 3. **With VI** or **Without VI**.
-4. **Full paper settings**, a sampling seed batch, and the desired CPU workers.
+4. **Full paper settings**, a sampling seed batch, and CPU workers.
 5. **Start run**.
 
-Repeat for each desired target/VI combination. Full paper settings use
-50 chains per method, 20.00 seconds of production per chain, and a separate
-1,500-transition pilot per chain. All methods discard the first third of
-their generated production iterations. The reports include mean norm,
-radial-tail probability, means and tails of X₁/X₂/X₃, MSE, generated/retained
-counts and timings. Use a fresh sampling batch to check sampling variability
-conditional on the fitted maps. All setup costs and actual production times
-are recorded separately. See [the complete protocol](COMPARISONS.md).
+Full settings use 50 chains per method, 20.00 production seconds per chain,
+and 1,500 separate pilot transitions. The first third of production is discarded.
+Reports show mean norm, radial-tail probability, MSE, sample counts, timing,
+functional ESS and ESS per second. They omit coordinate statistics. See
+[the comparison protocol](COMPARISONS.md) and [ESS definitions](ESS.md).
+
+Both implementations use the same JAX pilot state and frozen step. Numba
+production uses an independent PCG64 stream and fused density/radius summaries;
+it is not a bitwise replay of JAX. Its endpoint follows the same invariant-chord
+rule below, without fast-math approximations. The author SCS code stays in JAX.
 
 ## Active coordinates and VI
 

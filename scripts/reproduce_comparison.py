@@ -12,8 +12,8 @@ from scripts import reproduce_scs_100d as runner
 from dcs_bench.comparison_targets import TARGET_IDS, comparison_target
 
 COMPARISONS = ('jax', 'numba')
-METHODS = {'jax': ['DCS-RWM', 'DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate', 'DCS-RWM-rotate', 'DCS-Billiard'],
-           'numba': ['DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate', 'DCS-RWM-rotate']}
+METHODS = {backend: ['DCS-RWM', 'DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-Billiard']
+           for backend in COMPARISONS}
 
 
 def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax',
@@ -27,8 +27,8 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
     reference_samples = supplied.pop('reference_samples', None)
     reference_seed = supplied.pop('reference_seed', None)
     config = runner.configuration(preset, workers, supplied)
-    if config['warmup'] < 6:
-        raise ValueError('The rotation comparison requires at least six warmup transitions')
+    if config['warmup'] < 3:
+        raise ValueError('The billiard comparison requires at least three warmup transitions')
     reference_samples = ({'quick': 50_000, 'reproduce': 1_000_000, 'paper': 5_000_000}[preset]
                          if reference_samples is None else reference_samples)
     reference_seed = 740317 if reference_seed is None else reference_seed
@@ -38,43 +38,37 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         raise ValueError('reference_seed must be an integer from 0 to 2**32-1')
     spec = selected['target']
     config.update(experiment='sampler-comparison' if comparison == 'jax' else 'sampler-comparison-numba',
-        protocol='timed-sampler-comparison-v6' if comparison == 'jax' else 'timed-numba-comparison-v5',
+        protocol='timed-sampler-comparison-v7' if comparison == 'jax' else 'timed-numba-comparison-v7',
         comparison=comparison, dcs_backend=comparison, target_id=target, target_title=selected['title'],
         target=spec, dimension=spec['dimension'], nu=spec.get('nu'), alpha=spec.get('alpha', {}),
         beta=selected['beta'],
         threshold=selected['threshold'], threshold_policy=selected['threshold_policy'],
-        coordinate_metrics=True, coordinate_threshold=selected['coordinate_threshold'],
+        coordinate_metrics=False, ess_enabled=True,
         reference_samples=reference_samples, reference_seed=reference_seed, reference_batch_size=8192,
         vi=vi, vi_enabled=vi == 'on', ball_map_policy='mobius' if vi == 'on' else 'vanilla',
         sphere_map_policy='vi' if vi == 'on' else 'vanilla',
         algorithms=list(METHODS[comparison]),
-        implementation_revision='shared-jax-billiard-v6' if comparison == 'jax' else 'optimized-numba-rotation-v5',
+        implementation_revision='shared-jax-radial-ess-v7' if comparison == 'jax' else 'optimized-numba-radial-ess-v7',
         step_policy='separate_method_specific_pretuning_then_frozen',
-        step_tuning_policies={'DCS-BW-reflect': 'ball_esjd_pilot_v1',
-                             'DCS-BW-rotate': 'split_ball_angular_esjd_v1',
-                             'DCS-RWM-rotate': 'split_ball_angular_esjd_v1'},
-        initial_angular_scale=1., mixture_probability=.5,
+        step_tuning_policies={'DCS-BW-reflect': 'ball_esjd_pilot_v1', 'DCS-Billiard': 'ball_esjd_pilot_v1'},
         fitting_policy=('Shared fresh-batch reverse KL, Adam 0.01, gradient-norm cap 10; no coordinate/CDF clipping'
                         if vi == 'on' else 'No VI for either family: R=1, centre=0, deformation=0'),
         target_note=selected['reference_note'],
-        tuning_note='Every method receives the same separate warmup-transition budget. Reflected BW selects '
-            'by ball-movement pilots; the rotation mixture splits this same budget between ball and angular '
-            'movement pilots; Gaussian RWM starts with the RMS-matched scale initial_scale/sqrt(d+2). Original BW/RWM/SCS use acceptance-target 0.234 dual averaging. All steps freeze '
-            'before sampling. VI off leaves both maps untuned but still calibrates every proposal step.')
-    if comparison == 'jax':
-        config['step_tuning_policies']['DCS-Billiard'] = 'ball_esjd_pilot_v1'
-        config['billiard_map_policy'] = 'post_mobius_retained_joint_fit_centre_scale_beta_delta_zero'
-        config['tuning_note'] += (' DCS-Billiard uses the same reflected-BW pilot rule in post-Mobius '
-            'coordinates, retaining the jointly fitted centre, R and beta with effective delta=0. '
-            'The pilot kernel is reflected BW; production alone uses the optimized billiard endpoint. '
-            'It receives the same total pilot transition budget and introduces no additional tuned angle.')
+        tuning_note='Every method receives the same separate warmup-transition budget. DCS-RWM, '
+            'DCS-BW and SCS use acceptance-target 0.234 dual averaging. Reflected BW uses '
+            'ball-movement pilots in the shared ball map, without a geometric step ceiling of 2. DCS-Billiard uses '
+            'reflected-BW pilots in post-Mobius coordinates, retaining the jointly fitted '
+            'centre, R and beta with effective delta=0. The pilot state and selected step initialize '
+            'billiard production. All steps freeze before sampling; VI off still calibrates proposal steps.')
+    config['billiard_map_policy'] = 'post_mobius_retained_joint_fit_centre_scale_beta_delta_zero'
     config['time_scope'] = ('Equal per-chain sampling time includes first-third burn-in, every transition and '
-        'all-state radial and X1/X2/X3 estimates. Independent reference generation, VI, separate step calibration, compilation, synchronization waits and '
+        'all-state radial estimates and unthinned scalar capture for ESS. VI, separate step calibration, compilation, synchronization waits, ESS computation and '
         'file/report generation are excluded and recorded separately. ' +
         ('All methods use JAX full-state scans.' if comparison == 'jax' else
          'DCS uses optimized Numba density/radius caching and fused summaries; SCS uses the unmodified author '
          'JAX transition and full-state processing. This is an implementation-efficiency comparison, '
          'not a common-framework comparison. JAX pretuning is shared with the other comparison.'))
+    config['reference_policy'] = 'Analytic Student-t radial references; no coordinate-reference simulation'
     return config
 
 

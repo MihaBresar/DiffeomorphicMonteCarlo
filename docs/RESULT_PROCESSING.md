@@ -1,5 +1,14 @@
 # Saving and processing large runs
 
+Current version-7 comparisons add functional ESS for the radial-tail indicator
+and norm. They capture unthinned scalar histories into temporary files inside
+the sampling clock, then compute ESS after the wave finishes. A shared lock
+limits FFT work to one chain at a time, and diagnostic time is recorded
+separately. The temporary histories are discarded after ESS; only small
+configured-thinning traces and diagnostic records are saved. Current generic
+and compact baseline reports also include functional ESS, explicitly on their
+actual retained-draw basis. See [ESS definitions](ESS.md).
+
 Sampling, saving, convergence diagnostics and figure rendering are separate
 stages. The launcher prints when each chain finishes sampling, how many retained
 draws it is saving, and the saving duration. Reporting prints its chain and
@@ -19,28 +28,19 @@ also records total invocation wall time.
 ## Compact 200D random-walk report
 
 The `skew-t-200d-baselines` experiment uses `reporting: radial` in all presets.
-It reports only mean norm, tail probability, their MSEs across independent
-chains, generated/retained sample counts and timing. Workers calculate these
-two estimates once in bounded blocks after the recorded one-third burn-in,
-outside the production clock, and include them in the saved chain metadata.
-The report reads that metadata without reopening the large draw arrays.
-Every retained draw contributes; estimates are not truncated to a common
-chain length. The report includes the average of the chain estimates, with
-MSE calculated from the individual chain errors rather than the pooled mean.
+Workers calculate mean norm and radial-tail probability in bounded blocks
+from all retained post-burn-in states, then cache these estimates and their
+functional ESS in `radial_summary`. The compact report reads cached metadata
+without reopening large draw arrays. It shows estimates, MSE, counts, timing,
+ESS and ESS/s. References are analytic. It omits coordinate quantiles,
+directional checks, cross-chain diagnostics, MCSE and R-hat; the original
+radial plots remain.
 
-Both reference values follow directly from the Student-t radial law, which
-sign skewing preserves. No million-draw IID reference is needed. There are
-no individual/cross-chain ESS, MCSE or R-hat calculations, coordinate quantile
-sorts, directional checks or temporary functional traces for this experiment.
-The original radial boxplots, MSE bars and sample-count/runtime figures remain.
-Other experiments keep their existing reporting. NUTS's built-in counters and
-sampling operations are unchanged.
-
-Older 200D baseline checkpoints can also be summarized without diagnostics:
-if their small cached estimates are absent or incompatible, the processor
-reads one physical chain at a time and calculates just the two radial means.
-A saved completed summary can regenerate the compact figures without loading
-chains. Existing generated figures are not deleted when an old run is replotted.
+For older checkpoints missing ESS, report processing reads one saved physical
+chain at a time, constructs scalar norms in bounded blocks and computes scalar
+ESS. The checkpoint is never rewritten. The actual retained draw stride and
+diagnostic cost are recorded. A completed summary regenerates figures without
+repeating diagnostics. See [ESS definitions](ESS.md).
 
 ## Why Eight Schools exposed the bottleneck
 

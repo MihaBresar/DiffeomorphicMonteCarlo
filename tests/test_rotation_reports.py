@@ -98,10 +98,11 @@ class RotationReportTests(unittest.TestCase):
 
     def test_launcher_explains_both_implementations_and_frozen_split_tuning(self):
         page = (Path(__file__).resolve().parents[1]/'launcher/index.html').read_text(encoding='utf-8')
-        for text in ('Seven samplers:', 'Five samplers: optimized Numba DCS versus SCS',
-                     'splits the same tuning budget', 'All sampling steps are frozen'):
+        for text in ('Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)', 'Five samplers: optimized Numba DCS versus SCS',
+                     'functional ESS', 'All sampling steps are frozen'):
             self.assertIn(text, page)
-        self.assertNotIn('Four samplers:', page)
+        self.assertNotIn('DCS-BW-rotate', page)
+        self.assertNotIn('DCS-RWM-rotate', page)
 
 
 if __name__ == '__main__':

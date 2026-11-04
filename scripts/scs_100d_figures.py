@@ -79,7 +79,7 @@ def _table(rows):
     if not rows:
         return '<p>No values available.</p>'
     fields = list(dict.fromkeys(key for row in rows for key in row))
-    header = ''.join('<th>'+html.escape(key.replace('_', ' '))+'</th>' for key in fields)
+    header = ''.join('<th>'+html.escape('sum of per-chain ESS' if key == 'total_ess' else key.replace('_', ' '))+'</th>' for key in fields)
     body = ''.join('<tr>'+''.join('<td>'+html.escape(cell(row.get(key), key))+'</td>' for key in fields)+'</tr>' for row in rows)
     return '<div class="table-wrap"><table><thead><tr>'+header+'</tr></thead><tbody>'+body+'</tbody></table></div>'
 
@@ -139,9 +139,10 @@ def render_report(root, summary):
                                       'timed-sampler-comparison-v3', 'timed-numba-comparison-v3',
                                       'timed-sampler-comparison-v4', 'timed-numba-comparison-v4',
                                       'timed-sampler-comparison-v5', 'timed-numba-comparison-v5',
-                                      'timed-sampler-comparison-v6')
+                                      'timed-sampler-comparison-v6', 'timed-sampler-comparison-v7', 'timed-numba-comparison-v7')
     optimized = config.get('protocol') in ('timed-numba-comparison-v1', 'timed-numba-comparison-v2',
-                                          'timed-numba-comparison-v3', 'timed-numba-comparison-v4', 'timed-numba-comparison-v5')
+                                          'timed-numba-comparison-v3', 'timed-numba-comparison-v4', 'timed-numba-comparison-v5', 'timed-numba-comparison-v7')
+    radial_ess = config.get('protocol') in ('timed-sampler-comparison-v7', 'timed-numba-comparison-v7')
     vi_mode = config.get('vi', 'on')
     boundary = config.get('protocol') in ('timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2', 'timed-boundary-dcs-scs-v3')
     restored_controls = config.get('protocol') == 'timed-boundary-dcs-scs-v2'
@@ -195,7 +196,9 @@ def render_report(root, summary):
     if suite:
         target_title = config.get('target_title') or f'{dimension}D skewed Student-t, ν = {nu:g}'
         title = ('EXECUTION CHECK — ' if smoke else '') + target_title
-        title += (' — optimized Numba DCS / author SCS' if optimized else
+        title += (' — five samplers, optimized Numba DCS / author SCS' if optimized and radial_ess else
+                  ' — optimized Numba DCS / author SCS' if optimized else
+                  ' — five samplers, JAX' if radial_ess else
                   ' — seven samplers, JAX' if has_billiard else
                   ' — six samplers, JAX' if has_rwm_rotation else
                   ' — five samplers, JAX' if has_rotation else ' — four samplers, JAX')
@@ -381,6 +384,46 @@ def render_report(root, summary):
     fig.tight_layout(rect=(0, .12, 1, .88))
     save(fig, 'scs_100d_bias_variance')
 
+    ess_rows = []
+    if radial_ess:
+        for name in names:
+            diagnostics = cases[name].get('functional_ess')
+            if not isinstance(diagnostics, dict) or any(key not in diagnostics for key in METRICS):
+                raise ValueError('Current radial reports require recorded functional ESS for every method')
+            for key in METRICS:
+                detail = diagnostics[key]
+                ess_rows.append(dict(method=name, functional=key, **detail,
+                    diagnostic_seconds=cases[name].get('functional_ess_seconds')))
+        fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+        for metric, label in enumerate(metric_labels):
+            for row_index, (field, ylabel) in enumerate((('mean_ess', 'Mean functional ESS per chain'),
+                    ('ess_per_sampling_second', 'Functional ESS per sampling second'))):
+                ax = axes[row_index, metric]
+                values = [cases[name]['functional_ess'][METRICS[metric]].get(field) for name in names]
+                finite = [float(value) for value in values if value is not None]
+                ymax = max(finite, default=1.)
+                for position, value, color, name in zip(x, values, colors, names):
+                    detail = cases[name]['functional_ess'][METRICS[metric]]
+                    if value is None:
+                        ax.text(position, ymax*.03, 'Unavailable\n'+str(detail['valid_chains'])+'/'+
+                                str(detail['chains'])+' valid chains', ha='center', va='bottom', fontsize=8)
+                    else:
+                        ax.bar(position, value, color=color, width=.58)
+                        ax.text(position, value+ymax*.025, number(value), ha='center', va='bottom', fontsize=9)
+                ax.set_xticks(x, names)
+                ax.set_xlim(x[0]-.5, x[-1]+.5)
+                ax.set_title(label)
+                ax.set_ylabel(ylabel)
+                ax.set_ylim(0., max(1., ymax*1.25))
+                ax.grid(axis='y', alpha=.2)
+                ax.set_axisbelow(True)
+        fig.suptitle(title+' — functional ESS and ESS per second', fontsize=14)
+        fig.text(.5, .045, 'Unthinned post-burn-in functions, including repeated states. ESS/s uses full production time.\n'
+                 'Any unavailable chain makes its aggregate unavailable; ESS is not a convergence guarantee.',
+                 ha='center', fontsize=9)
+        fig.tight_layout(rect=(0, .11, 1, .94))
+        save(fig, 'scs_100d_ess')
+
     # These figures supplement the original radial figure family. They measure
     # prespecified physical coordinates, not rotations chosen after sampling.
     if len(metric_names) > 2:
@@ -529,6 +572,13 @@ def render_report(root, summary):
         for metric, key in enumerate(metric_names):
             row[key+'_mse_empirical_mcse'] = variability['mse_empirical_mcse'][metric]
             row[key+'_largest_chain_error_share'] = variability['largest_chain_squared_error_share'][metric]
+        if radial_ess:
+            for key in METRICS:
+                detail = case['functional_ess'][key]
+                for field in ('total_ess', 'mean_ess', 'median_ess', 'ess_per_sampling_second',
+                              'valid_chains', 'chains', 'unavailable_reasons', 'draw_strides'):
+                    row[key+'_'+field] = detail.get(field)
+            row['functional_ess_seconds'] = case.get('functional_ess_seconds')
         case_rows.append(row)
         records = case.get('records', [])
         if records and len(records) != case['chains']:
@@ -634,6 +684,8 @@ def render_report(root, summary):
     csvs = {'scs_100d_values.csv': case_rows, 'paper_values.csv': case_rows,
             'sample_counts.csv': count_rows, 'scs_100d_chains.csv': chain_rows,
             'tuned_parameters.csv': parameter_rows}
+    if ess_rows:
+        csvs['functional_ess.csv'] = ess_rows
     if effective_rows:
         csvs['effective_maps.csv'] = effective_rows
     if paired_rows:
@@ -715,6 +767,12 @@ def render_report(root, summary):
                     'Saved trace thinning does not change those estimates. Counts and full-precision errors are exported.')
         notes[5] = ('Map fitting, compilation and step calibration are reported separately and excluded from production timing. '
                     'All DCS methods share one ball map; SCS uses the recorded sphere map.')
+        if radial_ess:
+            notes[1] = (acceptance_methods+' use separate acceptance-target 0.234 calibration. '
+                        'DCS-Billiard spends the same warmup-transition budget on reflected-BW ball-movement '
+                        'pilots in post-Mobius coordinates. All steps are frozen before production; '
+                        'the first-third timed burn-in is additional. Reflected BW uses the same ball-movement '
+                        'pilot rule in the shared fitted ball map, without a geometric step ceiling of 2.')
         if has_billiard:
             notes[2] = ('VI is enabled for both map families with equal optimizer and fresh-draw budgets. '
                         'DCS-Billiard retains the jointly fitted centre, R and beta but runs after Mobius, '
@@ -729,7 +787,7 @@ def render_report(root, summary):
             notes.append('DCS-Billiard uses specular billiard reflections with invariant extra complete chords, '
                          'computed directly without a bounce loop. It uses the same uniform-ball increment law '
                          'and one Metropolis test. Invalid numerical endpoints are rejected. The original BW, '
-                         'reflected BW and SCS controls are unchanged.')
+                         'RWM and SCS controls are unchanged.')
             notes.append('Billiard step calibration runs reflected BW in its own post-Mobius coordinates from '
                          'the common physical start, using the same total warmup-transition budget. The resulting '
                          'state and selected step initialize billiard production; production does not retune. '
@@ -742,7 +800,8 @@ def render_report(root, summary):
                     'tail-probability and mean-norm estimation, not a reproduction of the SCS publication figures or '
                     'a general mixing guarantee. The unmodified author SCS transition is retained.')
         if optimized:
-            optimized_methods = ('DCS-BW, reflected BW, DCS-BW-rotate and DCS-RWM-rotate' if has_rwm_rotation else
+            optimized_methods = ('DCS-RWM, DCS-BW, reflected BW and DCS-Billiard' if radial_ess else
+                                 'DCS-BW, reflected BW, DCS-BW-rotate and DCS-RWM-rotate' if has_rwm_rotation else
                                  'DCS-BW, reflected BW and DCS-BW-rotate' if has_rotation else
                                  'DCS-BW and reflected BW')
             notes.append('Implementation comparison: '+optimized_methods+' use optimized Numba loops with cached '
@@ -755,7 +814,8 @@ def render_report(root, summary):
             notes.append('Common-framework comparison: every method uses JAX CPU scans with full-state recording and '
                          'the same 300-transition timing batches and radial reduction. Outside-ball rejections can skip '
                          'density evaluation in ordinary BW/RWM; this is part of their specified transition cost.')
-        notes.append('Reflected BW keeps the reversible chord-fold proposal and its Metropolis correction. Its '
+        if 'DCS-BW-reflect' in names:
+            notes.append('Reflected BW keeps the reversible chord-fold proposal and its Metropolis correction. Its '
                      'ball-movement pilot search uses up to eight rotating h/2, h, 2h rounds with no special bound of 2. '
                      'A finite noisy local search does not certify an optimal step or optimal radial MSE. '
                      'Every trial is recorded in reflected_tuning.csv; a final-round edge winner is reported explicitly.')
@@ -816,6 +876,18 @@ def render_report(root, summary):
                              'shared. Finite-chain estimates need not obey the symmetry. X₃ has an ordinary '
                              'univariate Student-t marginal, so its mean zero and tail reference are analytic '
                              'and marked exact. These relations do not assert independence of coordinates.')
+    if radial_ess:
+        notes.append('Functional ESS is computed for the unthinned post-burn-in radial-tail indicator and norm, '
+                     'including repeated states after rejection. It uses raw mean ESS with split-chain '
+                     'autocorrelations and Geyer positive/monotone sequence truncation; it is distinct from '
+                     'rank-normalized bulk ESS and quantile-tail ESS. Saved trace thinning does not alter this diagnostic.')
+        notes.append('ESS per sampling second divides summed chain ESS by summed full production time, '
+                     'including discarded sampling burn-in. The sum is descriptive, not pooled-estimator ESS. Calibration, compilation and ESS computation are excluded; '
+                     'diagnostic computation time is shown separately. A method aggregate is unavailable if any chain '
+                     'has unavailable ESS, with reasons and valid-chain counts shown. Constant traces do not receive '
+                     'an artificial ESS equal to the sample count. ESS alone does not establish convergence or low bias.')
+        notes.append('This current comparison reports only radial-tail probability and mean norm. '
+                     'Coordinate and marginal statistics are not generated; archived reports retain their recorded measurements.')
     notes.append('Empirical MSE MCSE is the sample standard deviation of chain squared errors divided by the square root of the number of chains. Largest-chain error share measures how much one chain contributes to total squared error. Paired differences align methods by saved seed; negative differences favor the named method over SCS. These are descriptive, conditional on the fitted maps, not formal confidence intervals or convergence diagnostics. Heavy-tailed norm errors can make variance-based uncertainty unreliable; fresh seed batches are needed to assess repeatability.')
     notes += [summary[key] for key in ('target_note', 'mse_note', 'time_scope') if isinstance(summary.get(key), str)]
     warning = '<p class="warning">Quick execution check only — do not interpret sampler rankings.</p>' if smoke else ''
@@ -857,6 +929,8 @@ def render_report(root, summary):
     if reference_rows:
         page += '<h2>Reference values and precision</h2><p>Estimated references are independent of every sampler. MCSE describes reference simulation error; it is separate from between-chain variation.</p>'+_table(reference_rows)
     page += '<h2>Counts, errors and runtime</h2>'+_table(case_rows)
+    if ess_rows:
+        page += '<h2>Functional ESS and ESS per second</h2><p>These are diagnostics of the radial functions used in the estimates, not coordinate ESS. All post-burn-in iterations enter the diagnostic, including rejection repeats. An unavailable chain makes its method aggregate unavailable; reasons and valid counts are retained. ESS/s uses total production seconds, including burn-in; diagnostic computation time is separate.</p>'+_table(ess_rows)
     if paired_rows:
         page += '<h2>Paired MSE differences from SCS</h2><p>Negative differences favor the named method. Empirical MCSE is descriptive; it is not a confidence interval.</p>'+_table(paired_rows)
     if setup_rows:

@@ -8,9 +8,12 @@ separate step calibration are untimed; all production steps are frozen.
 """
 from functools import lru_cache
 from copy import deepcopy
+from contextlib import ExitStack, nullcontext
 import hashlib
 import json
 from numbers import Real
+from pathlib import Path
+import tempfile
 import time
 
 import numpy as np
@@ -371,8 +374,6 @@ class _Matched:
     """Common JAX driver, calibration, recording and clocks for DCS and SCS."""
     def __init__(self, mapping, config, seed):
         if config['algorithm'] == BILLIARD_METHOD:
-            if config.get('dcs_backend', 'jax') != 'jax':
-                raise ValueError('DCS-Billiard is available in the shared JAX comparison only')
             mapping = effective_mapping(mapping, config['algorithm'])
         scs_paper._author()
         import jax
@@ -430,6 +431,7 @@ class _Matched:
         if self.tuning_policy != ROTATION_TUNING:
             self.scale = float(scale)
             self._scale = scale
+        self.tuning_metadata['calibrated_state_sha256'] = hashlib.sha256(np.asarray(self.state).tobytes()).hexdigest()
         self.warmup_acceptance = float(accepts) / config['warmup'] if config['warmup'] else None
         self.implementation = ('Original author JAX SCS transition' if config['algorithm'] == 'SCS'
             else 'DCS JAX transition') + '; separate calibration, full-state scans and radial recording'
@@ -457,6 +459,12 @@ class _Matched:
 def _backend(mapping, config, seed):
     calibration = _Matched(mapping, config, seed)
     if config.get('dcs_backend', 'jax') == 'numba' and config['algorithm'] != 'SCS':
+        if config['algorithm'] == BILLIARD_METHOD:
+            from .numba_billiard import NumbaBilliard
+            return NumbaBilliard(mapping, config, seed, calibration)
+        if config['algorithm'] == 'DCS-RWM':
+            from .numba_rwm import NumbaRWM
+            return NumbaRWM(mapping, config, seed, calibration)
         if config['algorithm'] == RWM_ROTATION_METHOD:
             from .numba_rwm_rotation import NumbaRWMRotation
             return NumbaRWMRotation(mapping, config, seed, calibration)
@@ -547,10 +555,8 @@ def _validate(config):
         raise ValueError('Require nonnegative warmup and thin to be a positive divisor of 100')
     if config.get('dcs_backend', 'jax') not in ('jax', 'numba'):
         raise ValueError('dcs_backend must be jax or numba')
-    if config.get('dcs_backend') == 'numba' and config['algorithm'] == 'DCS-RWM':
-        raise ValueError('Plain DCS-RWM is not part of the optimized Numba comparison')
-    if config.get('dcs_backend') == 'numba' and config['algorithm'] == BILLIARD_METHOD:
-        raise ValueError('DCS-Billiard is available in the shared JAX comparison only')
+    if not isinstance(config.get('ess_enabled', False), bool):
+        raise ValueError('ess_enabled must be a boolean')
     if not isinstance(config.get('coordinate_metrics', False), bool):
         raise ValueError('coordinate_metrics must be a boolean')
     if config.get('coordinate_metrics', False):
@@ -580,7 +586,17 @@ def _postburn(prefixes, norms, thin, threshold, coordinate_threshold=None):
     return traces, iterations, burn, count, totals, sums
 
 
-def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=None):
+def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=None, diagnostic_lock=None):
+    """Run with temporary scalar storage whose handles close before Windows cleanup."""
+    with ExitStack() as resources:
+        directory = (resources.enter_context(tempfile.TemporaryDirectory(prefix='dcs-ess-'))
+                     if config.get('ess_enabled', False) else None)
+        return _run_timed(mapping_dict, config, seed, before_sampling, after_sampling,
+            diagnostic_lock, resources, Path(directory)/'norms.bin' if directory else None)
+
+
+def _run_timed(mapping_dict, config, seed, before_sampling, after_sampling,
+               diagnostic_lock, resources, ess_path):
     """Return post-burn radial traces and exact post-burn iteration summaries.
 
     ``time_budget`` is measured only after separate warmup/step calibration.
@@ -592,7 +608,17 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
     tuning_policy = resolve_step_tuning(config)
     scale_ceiling = resolve_step_scale_ceiling(config)
     recorded_ceiling = float(np.exp(15.) if scale_ceiling is None else scale_ceiling)
-    backend = _backend(mapping_dict, config, int(seed))
+    ess_enabled = bool(config.get('ess_enabled', False))
+    ess_setup_seconds = 0.
+    if ess_enabled:
+        from .functional_ess import prepare_ess
+        setup_started = time.perf_counter()
+        prepare_ess()
+        ess_setup_seconds = time.perf_counter()-setup_started
+    # Every iteration contributes to the point estimate, hence its ESS also
+    # needs every iteration. Saved trace thinning remains a separate choice.
+    backend_config = dict(config, thin=1) if ess_enabled else config
+    backend = _backend(mapping_dict, backend_config, int(seed))
     native = config.get('dcs_backend') == 'numba' and config['algorithm'] != 'SCS'
     thin, threshold = config['thin'], float(config.get('threshold', 50.))
     coordinate_threshold = float(config['coordinate_threshold']) if config.get('coordinate_metrics', False) else None
@@ -605,7 +631,8 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         return (count, 4) if coordinate_threshold is not None else (count,)
     capacity, batches = 1024, 0
     prefix_buffer = np.empty((capacity * 3, prefix_width), dtype=float)
-    norm_buffer = np.empty(trace_shape(capacity * BATCH_SIZE // thin), dtype=float)
+    norm_buffer = None if ess_enabled else np.empty(trace_shape(capacity * BATCH_SIZE // thin), dtype=float)
+    norm_output = resources.enter_context(ess_path.open('wb', buffering=1024*1024)) if ess_enabled else None
     totals = np.zeros(prefix_width, dtype=float)
     if before_sampling is not None:
         before_sampling()
@@ -617,22 +644,37 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
             larger = np.empty((capacity * 3, prefix_width), dtype=float)
             larger[:batches * 3] = prefix_buffer
             prefix_buffer = larger
-            larger = np.empty(trace_shape(capacity * BATCH_SIZE // thin), dtype=float)
-            larger[:batches * BATCH_SIZE // thin] = norm_buffer
-            norm_buffer = larger
+            if not ess_enabled:
+                larger = np.empty(trace_shape(capacity * BATCH_SIZE // thin), dtype=float)
+                larger[:batches * BATCH_SIZE // thin] = norm_buffer
+                norm_buffer = larger
         prefix_buffer[batches * 3:(batches + 1) * 3] = prefixes + totals
         totals = prefix_buffer[(batches + 1) * 3 - 1].copy()
-        start = batches * BATCH_SIZE // thin
-        norm_buffer[start:start + BATCH_SIZE // thin] = norms
+        if ess_enabled:
+            norm_output.write(np.ascontiguousarray(norms, dtype=np.float64).tobytes())
+        else:
+            start = batches * BATCH_SIZE // thin
+            norm_buffer[start:start + BATCH_SIZE // thin] = norms
         batches += 1
         elapsed = time.perf_counter() - started
         if elapsed >= config['time_budget']:
             break
+    if ess_enabled:
+        # Capture and the final buffered write are charged identically to every
+        # method. The diagnostic FFT itself starts after the sampling barrier.
+        norm_output.flush()
+        elapsed = time.perf_counter() - started
     cpu_seconds = time.process_time() - cpu_started
     if after_sampling is not None:
         after_sampling()
     prefixes = prefix_buffer[:batches * 3]
-    norms = norm_buffer[:batches * BATCH_SIZE // thin]
+    if ess_enabled:
+        norm_output.close()
+        full_norms = np.memmap(ess_path, mode='r', dtype=np.float64, shape=trace_shape(batches*BATCH_SIZE))
+        resources.callback(full_norms._mmap.close)
+        norms = full_norms[thin-1::thin]
+    else:
+        norms = norm_buffer[:batches * BATCH_SIZE // thin]
     if not np.all(np.isfinite(prefixes)) or not np.all(np.isfinite(norms)):
         raise FloatingPointError('Nonfinite timed radial summaries')
     traces, iterations, burn, count, totals, sums = _postburn(
@@ -682,7 +724,7 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         'burn_fraction': '1/3 of actual timed iterations after separate warmup',
         'estimator': 'all post-burn timed iterations, including rejection repeats; thinning affects saved traces only',
         'implementation': backend.implementation,
-        'history_storage_bytes': int(prefix_buffer.nbytes + norm_buffer.nbytes),
+        'history_storage_bytes': int(prefix_buffer.nbytes + (0 if ess_enabled else norm_buffer.nbytes)),
         'target_skew_cdf': 'normal' if config.get('target', {}).get('kind', 'skew_t') == 'skew_t' else None,
         'checkpoints': [],
     }
@@ -696,6 +738,22 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
             all_timed_x3_sum=float(totals[7]), all_timed_x3_tail_count=int(totals[8]))
         record['common_statistic_policy'] += '; x1/x2/x3 means and right/left/right tails use every same post-MH state'
     record.update(getattr(backend, 'tuning_metadata', {}))
+    if ess_enabled:
+        from .functional_ess import radial_ess, DEFINITION
+        print(f'{config["algorithm"]}, seed {seed}: sampling complete; calculating ESS', flush=True)
+        wait_started = time.perf_counter()
+        with diagnostic_lock if diagnostic_lock is not None else nullcontext():
+            wait_seconds = time.perf_counter()-wait_started
+            radii = full_norms[burn:] if coordinate_threshold is None else full_norms[burn:, 0]
+            values, diagnostic_seconds = radial_ess(radii, threshold, elapsed,
+                draw_stride=1, nu=float(scs_paper.target_spec(config).get('nu', 3.)))
+        record.update(functional_ess=values, functional_ess_seconds=diagnostic_seconds,
+            functional_ess_setup_seconds=ess_setup_seconds,
+            functional_ess_wait_seconds=wait_seconds, functional_ess_definition=DEFINITION,
+            functional_ess_series_policy='All post-burn-in iterations, including rejection repeats; stride 1. Saved traces may be thinned separately. Scalar capture and flush are inside sampling time; serialized FFT diagnostics are outside.',
+            functional_ess_capture_bytes=int(full_norms.nbytes),
+            functional_ess_draw_stride=1, functional_ess_saved_trace_stride=thin,
+            functional_ess_serialized=diagnostic_lock is not None)
     if native:
         record['rng_note'] = 'Shared JAX calibration; independent domain-separated NumPy PCG64 production stream. Different backends preserve proposal laws, not bitwise production trajectories.'
         record['calibration_backend'] = 'JAX, identical to the shared-framework comparison'

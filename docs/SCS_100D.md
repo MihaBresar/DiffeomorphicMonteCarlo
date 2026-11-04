@@ -1,12 +1,15 @@
 # Historical three-method 100D skewed-t comparison
 
+Current version-7 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
+in both JAX and optimized Numba modes, with VI on/off and 100D/500D targets.
+New reports contain only radial estimates/MSE/counts/time plus functional ESS
+and ESS/s. See [the current protocol](COMPARISONS.md); historical sections
+below retain their stated original scope.
+
 **This page preserves an earlier protocol.** It is no longer a launcher
-choice. The current [configurable comparisons](COMPARISONS.md) are the
-seven-method JAX suite (DCS-RWM, DCS-BW, SCS, DCS-BW-reflect, DCS-BW-rotate, DCS-RWM-rotate and DCS-Billiard) and the
-optimized Numba BW/reflected-BW/BW-rotate/RWM-rotate comparison with unchanged author SCS. Both
-offer 100D and 500D skewed t targets, each with
-VI on or off for both map families. All seven now uses the seven-method JAX
-suite on 100D skewed t with its selected VI policy.
+choice. The [current comparisons](COMPARISONS.md) contain RWM, BW, reflected BW, billiards
+and SCS, with JAX or optimized Numba DCS execution. Both offer 100D/500D and
+VI on/off. All seven experiments uses the five-method JAX suite on 100D.
 
 The historical `skew-t-100d-fixed` CLI identifier and
 `scripts/reproduce_scs_100d.py` remain available. Existing reports can still

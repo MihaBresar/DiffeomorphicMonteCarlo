@@ -159,9 +159,11 @@ def chain_job(job):
         algorithm = job['algorithm']
         from dcs_bench.timed_radial import run_timed
         print(f'{algorithm}, chain {job["chain"]+1} starting', flush=True)
+        diagnostics = ({'diagnostic_lock': job.get('diagnostic_lock')}
+                       if job['config'].get('ess_enabled', False) else {})
         traces, record = run_timed(job['mapping'], {**job['config'], 'algorithm': algorithm}, job['seed'],
                                    before_sampling=lambda: barrier.wait(timeout=900),
-                                   after_sampling=lambda: barrier.wait(timeout=900))
+                                   after_sampling=lambda: barrier.wait(timeout=900), **diagnostics)
         # File compression by an earlier finisher must not compete with peers
         # whose production clocks are still running.
         barrier.wait(timeout=900)
@@ -216,6 +218,7 @@ def run_chains(root, config, maps):
     context = multiprocessing.get_context('spawn')
     records = {name: [] for name in methods}
     with context.Manager() as manager:
+        diagnostic_lock = manager.BoundedSemaphore(1) if config.get('ess_enabled', False) else None
         pool, pool_width = None, 0
         try:
             for wave, start in enumerate(range(0, config['runs'], count)):
@@ -240,6 +243,9 @@ def run_chains(root, config, maps):
                         wave=wave, wave_size=len(chains), wave_cpu_ids=wave_cpus[wave], barrier=barrier, config=config,
                         mapping=maps['sphere' if algorithm == 'SCS' else 'ball'],
                         output=str(root/'chains'/algorithm/f'{chain:03d}.npz')) for chain in chains]
+                    if diagnostic_lock is not None:
+                        for job in jobs:
+                            job['diagnostic_lock'] = diagnostic_lock
                     print(f'Wave {wave+1}, {algorithm}: {len(chains)} concurrent chains', flush=True)
                     futures, completed, errors = [], [], []
                     try:
@@ -329,6 +335,10 @@ def summarize(config, maps, fitting, records, reference=None):
             mean_estimation_iterations=float(np.mean([r['estimation_iterations'] for r in rows])),
             mean_acceptance=float(np.mean([r['acceptance'] for r in rows])),
             final_scales=[r['final_scale'] for r in rows], records=rows)
+        if config.get('ess_enabled', False):
+            from dcs_bench.functional_ess import aggregate_functional_ess
+            cases[name]['functional_ess'] = aggregate_functional_ess(rows, functionals)
+            cases[name]['functional_ess_seconds'] = float(sum(r.get('functional_ess_seconds', 0.) for r in rows))
         cases[name].update(mse_variability(means, truth))
         cases[name]['reference_error_material'] = (reference_mcse > .1*np.sqrt(mse)).tolist()
     return dict(config=config, truth=truth.tolist(), functionals=functionals, reference=reference,

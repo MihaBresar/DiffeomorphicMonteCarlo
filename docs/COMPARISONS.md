@@ -1,254 +1,133 @@
 # Current sampler comparisons
 
-The launcher offers two fresh-run comparisons with the same target selector and
-VI on/off switch. Historical SCS/boundary choices are no longer visible, but
-saved reports and their command-line identifiers remain supported.
+Both launcher comparisons use the same five methods: **DCS-RWM, DCS-BW,
+author SCS, DCS-BW-reflect and DCS-Billiard**. The two rotation mixtures are
+removed from new comparison runs. Their saved reports remain readable.
 
 | Identifier | Production implementations |
 |---|---|
-| `sampler-comparison` | DCS-RWM, DCS-BW, SCS, DCS-BW-reflect, DCS-BW-rotate, DCS-RWM-rotate, DCS-Billiard, all JAX |
-| `sampler-comparison-numba` | DCS-BW, DCS-BW-reflect, DCS-BW-rotate and DCS-RWM-rotate in optimized Numba; author SCS in JAX |
+| `sampler-comparison` | All five methods in JAX |
+| `sampler-comparison-numba` | DCS-RWM, DCS-BW, DCS-BW-reflect and DCS-Billiard in optimized Numba; unchanged author SCS in JAX |
 
-RWM here means **DCS-RWM in the transformed ball**, not an ordinary random walk
-on physical coordinates. Reflected BW folds a proposed displacement along its
-chord through the ball; it is not the spherical SCS step-out proposal. See the
-[reflection argument](BOUNDARY_100D.md).
-**DCS-Billiard** instead turns by specular reflection and adds invariant full
-chord traversals. It calculates the endpoint directly, without a bounce loop.
-This experimental sampler is available only in the JAX comparison; all
-previous controls remain. See [its construction and proof](BILLIARD.md).
+Both modes use protocol version 7. RWM means DCS-RWM in transformed ball
+coordinates. Its isotropic Gaussian proposal rejects exterior endpoints;
+ordinary BW uses a uniform-ball increment and also rejects exterior endpoints.
+Reflected BW folds exterior endpoints along the proposal chord before its
+Metropolis test, using the shared ball map.
+Billiards use the [invariant specular construction](BILLIARD.md).
 
-## Targets and references
+## Targets, measurements and references
 
-| Selector | Density and map | Radial threshold | Radial tail reference | Mean-norm reference |
+| Selector | Target and map | Radial threshold | Tail reference | Mean-norm reference |
 |---|---|---:|---:|---:|
 | `skew-t-100d` | Normal-CDF-skewed t, d=100, ν=3, α=(100,−100,0,…), DCS β=2 | 50.00 | 0.0107346153 | 13.7852602890 |
 | `skew-t-500d` | Same skew and ν, d=500, DCS β=2 | 50√5 ≈ 111.80 | 0.0106799328 | 30.8864890662 |
 
-Thresholds are fixed before sampling, independent of method, VI and pilot
-outcomes. JSON/CSV retain full precision. Skewing the t target by its sign
-leaves the radial law unchanged for both targets: ||X||²/d has the F(d,ν) law.
+New runs report only **radial-tail probability and mean norm**, their MSEs,
+iteration counts and production time, plus functional ESS and ESS per second.
+The X₁/X₂/X₃ means and coordinate tails are no longer computed or plotted.
+The target and common physical all-ones starting point are unchanged.
 
-Both targets also report **E[X₁], E[X₂], E[X₃]**, **P(X₁ > 3)**,
-**P(X₂ < −3)** and **P(X₃ > 3)**. X₂ has the same marginal law as −X₁,
-so the left tail is the natural mirrored comparison. X₃ has an ordinary
-symmetric univariate t(3) marginal. These prespecified measurements test both
-the skewed coordinates and an unskewed coordinate; radial measurements alone
-cannot do that. The coordinate threshold is fixed before sampling.
-The existing target distributions and physical initial points (all ones) are
-unchanged. The usual third-moment skewness coefficient is not defined at ν=3
-and is not reported.
-
-Independent references use symmetric Student-t draws, integrate the sign
-selection exactly conditional on each draw, and apply fixed known-mean control
-variates for the first-coordinate expectations. These variance reductions
-do not use competing sampler output, fit results or adaptive choices. Reference estimates and their Monte Carlo
-standard errors are saved separately from sampling errors. Reference budgets
-are 50,000 draws for Quick check, 1,000,000 for Smaller reproduction and
-5,000,000 for Full paper settings, using a fixed seed independent of fitting
-and sampler streams. The report distinguishes analytic values from estimated
-references and flags reference MCSE above one tenth of observed sampler RMSE.
-An estimated reference is not relabeled an exact truth; its precision must be
-considered when interpreting small MSE differences.
-
-The X₂ mean reference is the negative of the X₁ reference; its left-tail
-reference equals the X₁ right-tail reference. Their MCSE values are shared,
-and these estimated references are not independent of each other. X₃ has
-analytic mean zero and tail probability `scipy.stats.t.sf(3, 3)`
-(approximately 0.02883444), with zero reference MCSE. To see these symmetries,
-the transformation (x₁,x₂) ↦ (−x₂,−x₁) preserves the target; when integrating
-out x₁,x₂ for the X₃ marginal, exchanging them pairs Φ(a) with Φ(−a).
-This does not imply independent coordinates or identical finite-run MSE for
-X₁ and X₂: initialization, fitted maps and sampled trajectories can differ.
+Both reference values are analytic: skewing this t target by sign leaves its
+radial law unchanged, and ‖X‖²/d follows F(d,ν). No coordinate-reference
+simulation is performed. Thresholds are fixed before sampling, independent
+of method, VI and pilot outcomes. CSV/JSON retain full precision.
 
 ## What is matched
 
-- Same physical target, eight functionals, independent references and physical
-  initialization (all coordinates equal to one).
-- Same requested per-chain sampling time, number of independent chains,
-  warmup-transition budget, 300-transition clock checks and exact first-third
-  burn-in. Repeated states after rejection enter every estimate.
-- Same fitting budget and optimizer settings when VI is enabled: fresh
-  independent base draws, reverse-KL objective, Adam learning rate 0.01,
-  gradient-norm cap 10 and fit seed 42. Initial map scales are one. No target,
-  CDF or physical-coordinate clipping is used.
-- Same ordered CPU subset and simultaneous-chain count per wave across
-  methods, including partial waves. Method order rotates between waves.
-  macOS scheduling is explicitly OS-managed; Linux/Windows pinning is recorded.
-- The same JAX calibration code, seed, final state and frozen step for a DCS
-  method in either implementation mode. Production in Numba uses a separate,
-  domain-separated NumPy PCG64 stream, so cross-backend trajectories are not
-  bitwise copies.
+- Same physical target, two radial functionals, analytic references and start.
+- Same per-chain production-time budget, number of chains, total pilot
+  transition budget, 300-transition clock batches and first-third burn-in.
+- Repeated states after rejection contribute to estimates and ESS.
+- Equal map-fitting optimizer and fresh-draw budgets with VI enabled:
+  reverse KL, Adam 0.01, gradient-norm cap 10, seed 42 and initial unit scale.
+  The target, CDF and physical coordinates are not clipped.
+- Same ordered CPU allocation and simultaneous chains per wave, including
+  partial waves. Method order rotates across waves. Runtime helper threads
+  may exist; all JAX compute pools use the common `PJRT_NPROC=1` policy.
+- Each DCS method has the same JAX pilot, final pilot state and frozen step in
+  either execution mode. Numba production has an independent PCG64 stream;
+  cross-backend trajectories are not bitwise copies.
 
-VI **off** skips fitting for both the ball and spherical maps: scale R=1,
-centre zero and Möbius/observer deformation zero. DCS β remains 2;
-SCS latitude stays 1.1. Step pretuning still runs. VI **on** fits both map
-families, with one shared ball fit for all DCS methods. DCS-Billiard retains
-that fit's centre, scale and β but proposes after the Möbius transformation:
-its effective production deformation is zero. This is not a new fit constrained
-to zero deformation, nor does it retain the full Möbius-preconditioned kernel.
-Both the original fitted map and each method's effective map are recorded.
-VI losses omit
-different base-normalizing constants and are not
-comparable normalized KL values across map families.
+VI **off** uses R=1, centre zero and deformation zero for both map families.
+DCS β stays 2; SCS latitude stays 1.1. Proposal steps are still pretuned.
+VI **on** fits ball and sphere families once each. Billiards retain the joint
+ball fit's centre/R/β but run in post-Möbius coordinates, with effective δ=0.
+This is not a new VI fit with δ constrained to zero. RWM/BW/reflected BW retain the original
+fitted ball map. `method_maps.json`, `effective_maps.csv`, summary and manifest
+record the distinction. Base-normalizing constants differ, so reported VI
+losses are not comparable normalized KL values across families.
 
-## Method-specific choices
+## Separate proposal calibration
 
-The current CPU execution policy is **`pjrt-single-compute-thread-v1`** for
-every method. It sets `PJRT_NPROC=1` before the pinned JAX backend starts,
-in addition to the existing numerical-library limits. The earlier Eigen-only
-flags allowed some compiled kernels to consume multiple CPU cores per worker;
-the affected method changed with dimension in the laptop audit. This distorted
-wall-time throughput comparisons, especially without OS CPU pinning. Runtime
-helper threads may still exist. The new policy and actual thread settings are
-saved in the manifest. **Rerun all methods together** for corrected timed
-counts, MSE and speed figures; do not combine older timings with new ones.
-That CPU correction preserved targets, proposal laws and tuning rules. The
-current JAX protocol is version 6 because DCS-Billiard has since been added;
-Numba remains version 5. See [CPU allocation and evidence](PARALLEL.md#cpu-allocation-and-timing).
+Ordinary DCS-RWM, DCS-BW and SCS use observed-acceptance dual averaging toward
+0.234. Reflected BW retains its ball-movement pilot: up to eight rounds of
+rotating h/2, h and 2h trials, selecting by observed squared movement in the
+shared ball map with rejected moves scoring zero. It has no geometric step
+ceiling of 2. Billiards spend the same total pilot budget on reflected-BW movement
+in their active post-Möbius coordinates: rotating h/2, h and 2h trials, scoring
+squared ball displacement including zero after rejection. The final pilot
+state and selected scale initialize billiard production. No production MSE
+selects the scale, and no extra angle is tuned. Every step freezes before
+sampling. `reflected_tuning.csv` records both methods' pilots separately;
+the saved effective maps identify their distinct VI-on coordinates.
 
-DCS-RWM, ordinary DCS-BW and SCS tune their proposal steps toward acceptance
-0.234 using the same observed-acceptance dual-averaging rule. Reflected BW
-uses ball squared-displacement pilots within the same number of warmup
-transitions: rotating h/2, h and 2h windows, including zero movement on
-rejection. Its step has no special ceiling of 2. Both rules retain broad
-finite-precision scale guards; neither guarantees optimal radial efficiency.
-All steps freeze before sampling. Candidate scores, selected steps and guard
-flags are saved; they must be inspected rather than treating equal resources
-as proof that every method is optimally tuned.
+All rules retain broad numerical guards. A guard hit or equal pilot budget
+does not establish optimal tuning. Gaussian RWM's scale is a coordinate
+standard deviation; BW/billiard scale is a proposal-ball radius.
 
-**DCS-Billiard** receives a fresh reflected-BW pilot in its own post-Möbius
-coordinates, beginning at the common physical all-ones point. It uses the same
-number of warmup transitions and the same ball-movement pilot rule, then
-freezes the selected scale and final pilot state for billiard production.
-The pilot does not run the billiard kernel or select on production MSE. With
-VI off, these pilot coordinates equal ordinary reflected BW's coordinates;
-with VI on, their effective maps differ. Equal pilot resources do not imply
-that this inherited calibration optimizes billiard efficiency.
+## ESS and timing
 
-Each production step uses one uniform-ball increment, computes its specular
-billiard endpoint with the prescribed invariant extra chords, and applies one
-Metropolis test using the target density and radial map Jacobian in the active
-coordinates. The same full-state scan, projection and eight-functional
-recording as the other JAX methods remain inside the production clock.
-The optimized implementation omits the outgoing velocity needed only by the
-phase-flow proof, while retaining finite/interior endpoint checks. It changes
-neither the mathematical endpoint nor the random-number budget.
+[Functional ESS](ESS.md) is computed separately for the radial-tail indicator
+and norm using the unthinned post-burn-in scalar history. It describes the
+actual functions used in the mean estimators, not rank-normalized coordinate
+bulk/tail ESS. Thinning saved traces does not alter comparison ESS.
 
-At a fixed scale, the extra full chords preserve the proposed ball radius.
-Accepted radial kernels coincide with chord-reflected BW only for a radial
-transformed target in those same coordinates. This does not guarantee the
-same radial MSE for a skew target, a translated physical norm, different pilot
-scales or an equal-time experiment. Full-paper comparisons should include all
-methods, VI settings, recorded errors and tuning outcomes without assuming a
-ranking in advance.
+Scalar diagnostic capture occurs inside every production clock. Histories
+are temporary and are discarded after diagnostics. ESS computation begins
+after all chains in a wave stop sampling; only one chain's FFT workspace is
+active at a time to bound memory. Computation and waiting are outside the
+production clock and diagnostic time is recorded separately. Constant,
+nonfinite or insufficient traces produce unavailable ESS with a reason.
+A method total, mean and ESS/s are unavailable if any chain is unavailable;
+valid-chain counts are shown, and incomplete subsets are not advertised as
+complete totals. ESS/s divides total ESS by total production seconds,
+including discarded sampling burn-in.
 
-**DCS-BW-rotate** chooses one reflected BW move or one angular move with
-probability 1/2 each. The choice is independent of the state and fixed before
-examining results. Only the chosen move is performed and counted as one
-iteration; this is not two transitions charged as one. Reflected BW changes
-radius as well as direction, while the angular component specifically changes
-direction. Rotation alone would not explore the whole target.
+JAX uses full-state scans, physical projection and the same scalar recording
+for every method. Native DCS caches current density/radius and fuses scalar
+accumulation; SCS retains author JAX scans. Thus the Numba mode compares these
+implementations, including their different framework/output costs, rather
+than isolating geometric transition cost. The author SCS source is unchanged.
 
-**DCS-RWM-rotate** uses the same 50/50 construction, replacing the reflected
-uniform-ball increment by an isotropic Gaussian increment `sigma * N(0,I)`.
-Reflection remains reversible for ball volume because the signed displacement
-law on each chord is symmetric. Its reflected branch therefore uses the usual
-transformed-target Metropolis ratio; its angular branch is unchanged.
+## Budgets and outputs
 
-The Gaussian scale `sigma` is a **coordinate standard deviation**, while BW's
-`h` is a **proposal-ball radius**. To match initial expected squared increment
-length, Gaussian tuning starts at `sigma = h / sqrt(d+2)` with reference `h=0.1`.
-Both scales are then tuned independently under the same total warmup budget;
-this conversion does not force their final scales to agree. Reports record
-sigma, the reference initial BW radius, and the equivalent final BW radius
-`sigma * sqrt(d+2)` so the different units are visible. No extra Gaussian
-reflection-only method replaces the existing ordinary DCS-RWM control.
-
-For the angular move, let w be the ball coordinate **after** the Möbius map,
-r=||w||, and u=w/r. Draw a uniform tangent direction v orthogonal to u and
-propose w'=r[cos(θ)u+sin(θ)v], with θ=2 atan(a) and angular scale a>0.
-At r=0 the angular component stays at zero. This symmetric proposal on the
-fixed-radius sphere uses the physical-target Metropolis ratio π(x')/π(x).
-The radial map Jacobian is constant along the move. With VI, rotating after
-the Möbius map and applying its inverse avoids an omitted Möbius Jacobian:
-the preserved physical radius is ||x−μ|| about the fitted centre μ, which
-need not be ||x|| about zero. Each component preserves the same target,
-and their state-independent mixture does too.
-
-Each mixture receives **the same total warmup-transition budget** as every
-other method: floor(warmup/2) for its reflected-step pilots, and the remainder for
-angular pilots. Both reflected components score squared ball movement as above, with their own proposal-scale units. Angular
-pilots score squared movement of unit directions, including zeros after
-rejection, using the same rotating half/current/double search and initial
-angular scale a=1 (θ=π/2). The two scales are frozen before sampling;
-production MSE never selects either scale or the mixture probability.
-The fitted map is still shared with the other DCS methods. These pilots
-target local movement and need not optimize any measured MSE. Splitting the
-budget also means that each component receives fewer pilot transitions than
-a standalone reflected-BW chain.
-
-In particular, a target acceptance may be unreachable for a step-out proposal
-whose large-step distribution saturates. In the historical version-1 100D no-VI smaller run, SCS
-reached its numerical upper guard in 12 of 20 chains. This is a tuning
-limitation to disclose; neither the guard flag nor equal warmup budgets
-establishes optimal tuning.
-
-The JAX comparison uses equivalent full-state scans, physical projection and
-eight-functional reduction for all methods. The Numba comparison deliberately
-changes this implementation work: DCS caches current density, radius and first three
-coordinates, skips recomputing
-unchanged rejected-state values and fuses all-iteration accumulation without
-returning every full state. SCS retains the unmodified author transition and
-JAX full-state processing. Thus the second comparison measures these concrete
-implementations; its timing does not isolate a purely geometric algorithm
-advantage. The pinned SCS source remains byte-for-byte unchanged.
-
-## Budgets, clocks and outputs
-
-| Preset | Chains per method | Seconds per chain | Separate warmup | VI updates × draws/update |
+| Preset | Chains/method | Seconds/chain | Separate pilot | VI updates × draws/update |
 |---|---:|---:|---:|---:|
 | Quick check | 2 | 0.05 | 100 | 20 × 128 |
 | Smaller reproduction | 20 | 2 | 1,000 | 400 × 500 |
 | Full paper settings | 50 | 20 | 1,500 | 1,500 × 2,000 |
 
-VI off uses zero fitting updates regardless of preset. Independent reference
-preparation, compilation, fitting, warmup, synchronization waits and file/report
-generation are outside the
-sampling clock and recorded separately. Native DCS setup includes the shared
-JAX calibration/scan compilation plus Numba compilation. Actual sampling
-seconds and overshoot are saved; short runs can exceed the requested budget
-by a larger relative amount. All 300 states in each completed block count.
+VI off uses no fitting updates. Compilation, fitting, pilots, synchronization,
+ESS computation and final file/report generation are outside production time.
+The first third of the actual generated iterations is discarded exactly.
+All states in each completed 300-step block count; elapsed time and overshoot
+are recorded. Saved trace thinning changes neither radial estimates nor ESS.
 
-The first third of the actual timed iterations is discarded. Prefix sums at
-100-step boundaries implement this exactly; thinning affects only saved
-traces, not estimates or MSE. All eight functionals, including the six
-coordinate quantities, are accumulated inside every sampling clock. Reports
-retain the original radial boxplots, MSE and count/time figure families and add
-separate coordinate mean and tail-probability figures. They use two decimal
-places where appropriate and export exact integer counts and full-precision
-values. `reference_values.csv` includes reference values, MCSE and exact flags.
+Reports retain `VsSCS`, `scs_100d_estimates`, `scs_100d_runtime` and
+`scs_100d_bias_variance`, and add `scs_100d_ess`. Numbers use two displayed
+decimals, exact integer counts, and full-precision CSV/JSON exports.
+`functional_ess.csv` records ESS totals/means/medians, ESS/s, valid counts,
+strides and unavailable reasons. The per-chain records retain diagnostics and
+costs, without saving the large unthinned temporary scalar histories.
 
-JAX uses protocol version 6 and Numba uses version 5; both report radial and
-three-coordinate quantities for their recorded method lists. The frozen angular scale, angle in
-radians/degrees, mixture probability and pilot split appear in the tables;
-`angular_tuning.csv` records every angular candidate and `reflected_tuning.csv`
-records reflected-step candidates for BW, both mixtures and the JAX billiard
-pilot, including their scale units and active proposal coordinates.
-Historical version-1 reports remain radial-only; version-2 reports
-retain their radial and X₁ quantities; version-3 reports have all eight
-quantities without DCS-BW-rotate. Version-4 reports include BW rotation but not
-DCS-RWM-rotate; version-5 reports contain both mixtures but no billiard method.
-They keep their recorded numbers.
-Replotting cannot reconstruct new all-iteration measurements or a new sampler.
-Run every method together for a new timed comparison. These measurements do not establish an overall mixing
-advantage. MSE is the average squared error across independent chains; the fitted map is shared,
-so uncertainty is conditional on that fit. Empirical MSE error summaries are
-descriptive, not formal confidence intervals: the supplied t(3) targets
-have infinite fourth radial moment, making rare large errors
-particularly important for norm and coordinate-mean errors. MSE against an
-estimated reference also carries reference uncertainty. Smaller reproduction
-results are exploratory; use longer runs and fresh seed batches before publication claims.
+Historical protocols retain their original method lists and measurements;
+replotting cannot reconstruct an unsaved sampler or unthinned ESS. Run all
+methods together to compare new counts, MSE and ESS. ESS alone is not evidence
+of convergence or absence of bias. MSE variability is conditional on fixed
+fitted maps; the t(3) norm has no fourth moment, so rare errors can make
+empirical MSE uncertainty unstable. Use longer runs and fresh seed batches
+before drawing publication conclusions.
 
 See [click-to-run instructions](CLICK_TO_RUN.md), [rerun commands](RERUN.md)
-and [native implementation checks](NATIVE_KERNELS.md).
+and [the billiard proposal](BILLIARD.md).

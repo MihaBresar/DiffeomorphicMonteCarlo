@@ -1,12 +1,15 @@
 # Historical boundary relocation comparison
 
-**This page preserves the earlier separate boundary experiment.** It is no
-longer a launcher choice. Use the current [configurable comparisons](COMPARISONS.md):
-seven samplers in JAX (DCS-RWM, DCS-BW, SCS, DCS-BW-reflect, DCS-BW-rotate, DCS-RWM-rotate and DCS-Billiard), or optimized
-Numba BW/reflected BW/BW-rotate/RWM-rotate versus unchanged author SCS. Both offer 100D and 500D skewed t targets, each with VI on or off for both
-map families. All seven includes the seven-method JAX suite on 100D skewed t
-with the selected VI policy; the optimized and additional-target runs are
-separate choices.
+Current version-7 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
+in both JAX and optimized Numba modes, with VI on/off and 100D/500D targets.
+New reports contain only radial estimates/MSE/counts/time plus functional ESS
+and ESS/s. See [the current protocol](COMPARISONS.md); historical sections
+below retain their stated original scope.
+
+**This page preserves an earlier protocol.** It is no longer a launcher
+choice. The [current comparisons](COMPARISONS.md) contain RWM, BW, reflected BW, billiards
+and SCS, with JAX or optimized Numba DCS execution. Both offer 100D/500D and
+VI on/off. All seven experiments uses the five-method JAX suite on 100D.
 
 The historical `skew-t-100d-boundary` CLI identifier and
 `scripts/reproduce_boundary_100d.py` remain available, as does
@@ -160,7 +163,7 @@ and finite behavior near the boundary.
 
 The former **100D boundary comparison** launcher entry has been replaced.
 For runs without commands, follow [the current launcher guide](CLICK_TO_RUN.md)
-and select the four-sampler JAX or optimized Numba comparison. Both include
+and select the five-sampler JAX or optimized Numba comparison. Both include
 reflected BW and offer the target and VI selectors. To run this historical
 three-method boundary protocol, use the command-line entry point below with
 a fresh output folder. Keep the same worker setting when comparing runs.

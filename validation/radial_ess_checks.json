@@ -1,0 +1,324 @@
+{
+  "completed_utc": "2026-11-04T09:55:16.202843+00:00",
+  "previous_commit": "3cde7a66556857ab08a0759be4923e418e1a79fd",
+  "protocols": [
+    "timed-sampler-comparison-v7",
+    "timed-numba-comparison-v7"
+  ],
+  "methods": [
+    "DCS-RWM",
+    "DCS-BW",
+    "SCS",
+    "DCS-BW-reflect",
+    "DCS-Billiard"
+  ],
+  "functionals": [
+    "tail_probability",
+    "mean_norm"
+  ],
+  "tests": {
+    "passed": 312,
+    "regression_suite": 311,
+    "additional_reflected_pilot_test": 1,
+    "seconds": 114.44
+  },
+  "quick_comparisons": {
+    "total_chains": 80,
+    "workers": 2,
+    "chains_per_method": 2,
+    "requested_seconds": 0.05,
+    "warmup": 100,
+    "cases": [
+      {
+        "label": "jax-skew-t-100d-vi-on",
+        "chains": 10,
+        "status": "passed",
+        "summary_sha256": "81fcdaf11f9233bd98596727e2a2ad884d4c5ab43d9104bf9130927a4b28f1c4",
+        "replot_ess_recompute_blocked": true
+      },
+      {
+        "label": "jax-skew-t-100d-vi-off",
+        "chains": 10,
+        "status": "passed",
+        "summary_sha256": "dbd0b5b9c25561d8263943491f3bec0b5372854e31b7a7fed4ade80e329cd5b5",
+        "replot_ess_recompute_blocked": true
+      },
+      {
+        "label": "jax-skew-t-500d-vi-on",
+        "chains": 10,
+        "status": "passed",
+        "summary_sha256": "b74ac05106f2024ae45486e916e7b8affc6e809a9c259244b49849080f533996",
+        "replot_ess_recompute_blocked": true
+      },
+      {
+        "label": "jax-skew-t-500d-vi-off",
+        "chains": 10,
+        "status": "passed",
+        "summary_sha256": "b328da1f9e02e5ab83ae25f0e4371db1dde8788b6caab03b9d21dbe517f64401",
+        "replot_ess_recompute_blocked": true
+      },
+      {
+        "label": "numba-skew-t-100d-vi-on",
+        "chains": 10,
+        "status": "passed",
+        "summary_sha256": "6e5867839cb0241267f633b6eaaa9bed5401e3172bfa5236fd36fdade8b23fea",
+        "replot_ess_recompute_blocked": true
+      },
+      {
+        "label": "numba-skew-t-100d-vi-off",
+        "chains": 10,
+        "status": "passed",
+        "summary_sha256": "30279f6f8baf0b27cfbe5ffb5b36d85524163b62f38786b803ff7090832ff49d",
+        "replot_ess_recompute_blocked": true
+      },
+      {
+        "label": "numba-skew-t-500d-vi-on",
+        "chains": 10,
+        "status": "passed",
+        "summary_sha256": "564d79012e9c384a51fb1615507e4663aa85c95dd285ec2289a528db6a67e914",
+        "replot_ess_recompute_blocked": true
+      },
+      {
+        "label": "numba-skew-t-500d-vi-off",
+        "chains": 10,
+        "status": "passed",
+        "summary_sha256": "a82a5acbfe2a04a867ae5abaa2205335ba65145ffae0007dc58eaf2c0b00bd7f",
+        "replot_ess_recompute_blocked": true
+      }
+    ],
+    "cross_backend_calibration": [
+      {
+        "dimension": 100,
+        "vi": "on",
+        "methods": [
+          "DCS-RWM",
+          "DCS-BW",
+          "SCS",
+          "DCS-BW-reflect",
+          "DCS-Billiard"
+        ],
+        "seeds": 2,
+        "maps_equal": true,
+        "states_scales_and_histories_equal": true
+      },
+      {
+        "dimension": 100,
+        "vi": "off",
+        "methods": [
+          "DCS-RWM",
+          "DCS-BW",
+          "SCS",
+          "DCS-BW-reflect",
+          "DCS-Billiard"
+        ],
+        "seeds": 2,
+        "maps_equal": true,
+        "states_scales_and_histories_equal": true
+      },
+      {
+        "dimension": 500,
+        "vi": "on",
+        "methods": [
+          "DCS-RWM",
+          "DCS-BW",
+          "SCS",
+          "DCS-BW-reflect",
+          "DCS-Billiard"
+        ],
+        "seeds": 2,
+        "maps_equal": true,
+        "states_scales_and_histories_equal": true
+      },
+      {
+        "dimension": 500,
+        "vi": "off",
+        "methods": [
+          "DCS-RWM",
+          "DCS-BW",
+          "SCS",
+          "DCS-BW-reflect",
+          "DCS-Billiard"
+        ],
+        "seeds": 2,
+        "maps_equal": true,
+        "states_scales_and_histories_equal": true
+      }
+    ]
+  },
+  "other_experiments": {
+    "total_chains": 34,
+    "workers": 2,
+    "independent_logistic_reference": {
+      "seconds": 4.1098697500019625,
+      "status": "passed"
+    },
+    "cases": [
+      {
+        "experiment": "skew-t-200d-baselines",
+        "chains": 8,
+        "status": "passed",
+        "summary_sha256": "181a0df450fe9f69c9b010d910f058bb3e1852ec911a1a35d91b5dcfa4e078d2"
+      },
+      {
+        "experiment": "skew-t-50d-nu-0.5",
+        "chains": 6,
+        "status": "passed",
+        "summary_sha256": "1acf778825d11d12c47b2b2ffbdb8af52fa581d8c84d1063fb217645457206a6"
+      },
+      {
+        "experiment": "skew-t-200d-nuts",
+        "chains": 4,
+        "status": "passed",
+        "summary_sha256": "843ab04da99a0a65a49299e55921345859342a79046f6e993921589f3655d048"
+      },
+      {
+        "experiment": "eight-schools",
+        "chains": 4,
+        "status": "passed",
+        "summary_sha256": "9a6489059596128a0b552a2123d77413d060fe7f1d16f53a5a114e5b89667c37"
+      },
+      {
+        "experiment": "garch11",
+        "chains": 4,
+        "status": "passed",
+        "summary_sha256": "d6c6ecb4aa7e44a16e18af9dd43932bedfb3dfe33b294c24f743377a01fd4d13"
+      },
+      {
+        "experiment": "logistic-regression",
+        "chains": 8,
+        "status": "passed",
+        "summary_sha256": "a8eb678696183f68c5edd8bb9758c9ee7df39e8aa65f270b37f5c9977597c0c6"
+      }
+    ]
+  },
+  "comparison_source_hashes": {
+    "dcs_bench/__init__.py": "824e883a0dfde9241e0b7742f2bc61aba10cd82a49576de89c96f6f4450cb8bd",
+    "dcs_bench/api.py": "825b330d2416a6562a7bb91b0ede7beb65294f62c1646674512ec74e730e56a2",
+    "dcs_bench/ball_boundary.py": "a11dfad9e4c2d9276f95b95b64e08a05150da7d75ad2b9c02fa33b56c3ac9d38",
+    "dcs_bench/ball_tuning.py": "ee601b723fbbf118a67a11690066cd714b2e7003ce2874d1d846f7873c6f1f4f",
+    "dcs_bench/billiard.py": "4b87951e2c7932a9cceddce7a8a5c313cd82c324348aa3a806359d8d98352b98",
+    "dcs_bench/burnin.py": "ff229a5d693807313f4d3057b2396ce0918d9ba9f1f799dba975ff8c5286fc06",
+    "dcs_bench/comparison_targets.py": "cf12efe21bd228f6c9b12865c2e2b82553a068acffab734ec56757a5e00ec011",
+    "dcs_bench/compiled_sampling.py": "483dbebaddccd179119d307120d497a64d996964e0ab00e8dd464c88c6b5012f",
+    "dcs_bench/cpu.py": "f230f4c10ed36aa07eaac93d7bba9a4183fee7994b15f94cc0ba6df74c324d67",
+    "dcs_bench/display.py": "045f88f8af94062a74c55917b86704debb59d399d7b9a0370cc98beb0c114379",
+    "dcs_bench/draw_storage.py": "381bc13ace8d79e1362f845855f19fe4b2a260c136113442e11e3c15ccf5215f",
+    "dcs_bench/engine.py": "ce45f47973cf753f1be6844890bbd6cde30a5af94f68a7a80e38324475c7032c",
+    "dcs_bench/fast_dcs.py": "681682c907301ec3e6cfbbe042f08f99fae59cd958547ca62980eaeaa8b5a809",
+    "dcs_bench/functional_ess.py": "e9d66150d6fea6ca40727532120c1f61c885281dea133572ab85efdaef9f7157",
+    "dcs_bench/numba_billiard.py": "8fa765cdd5bc1f0e5005cdc884e2fc57aaf4ec802800e7f331cf54672921e042",
+    "dcs_bench/numba_radial.py": "71e1531b526c2e3bee569ef7c45dfb429505594118bd737c9bb117a635a7dc30",
+    "dcs_bench/numba_rotation.py": "0e26749de0482971e7cef2e3802969c1c4bff5a04f3c2061eed2a8deea7c05f5",
+    "dcs_bench/numba_rwm.py": "3d27234ef02056a3c998188fb314bfe0e1ccdac0afec989734d4be24e881fe2d",
+    "dcs_bench/numba_rwm_rotation.py": "548cd394da95bfb5083192f6b1b32bbbb0d70b9f303e667f0e2ef523bd7cdeff",
+    "dcs_bench/parallel.py": "4e8be301f69bdfd5a7ea19d2a3e84bd2998dc5c487523e01af16cce0bf85df8e",
+    "dcs_bench/plotting.py": "0fd11b296b5b879bd2dbec839b370cd2a31c1449d3c415794ac15df04bd34c60",
+    "dcs_bench/processing.py": "7f9e15d46dcf19e7237809aecfb98e7680c9e4eb41897803367374b33f2ee367",
+    "dcs_bench/radial_reporting.py": "9f5449b7e627dbd3ba54a61ce95e971de0fe7db3ecad87a0417191311c8fc352",
+    "dcs_bench/references.py": "bcd55f6533641182aca380cbfec8192a8e50fd2e04f47d60dfa395438a2eea26",
+    "dcs_bench/rotation.py": "1ef008d05461709eb8b82251ccac6462c117bbd9638db81a8394ad0b69ff8582",
+    "dcs_bench/rwm_rotation.py": "51e39b6232c200e9fe769261606c618cc99094d20cb1c86a1861ffa5db6ad6ee",
+    "dcs_bench/samplers.py": "470c4c1415947a36d7733f863210d0b293fd4cc494863b99e0df09eba4aff219",
+    "dcs_bench/scs_paper.py": "8510470fd7db553d445631b5663bcd4c9dd17d2ef2faf410ed2a9585320ce631",
+    "dcs_bench/simulation_error.py": "2bd364569a7ea02abba8a0099ba4b82d245daf728dee48dbfe1ed9b34ae3063c",
+    "dcs_bench/targets.py": "19d8dbabf4cdac998739c735fec8ee8946b79b7c8de2e25c095542f156bc9a63",
+    "dcs_bench/timed_radial.py": "18aa665baeb4693765865cb9e68c8aaeb9f2bb120fa634a762f00c3d3c4dc5e5",
+    "dcs_bench/transforms.py": "fb7161b32cd5430c7e899e9927a588cfddefb7511411360820f679bcab99efaa",
+    "dcs_bench/tuning.py": "82b5610d2734d7647f1e0ff667d9c40a1eb6ccb7b5d8c5c73e12d44dfd54b42c",
+    "dcs_bench/worker.py": "700c3102b0a85cb48ef1ff8fafe5fd6be7be0ccc0491976da94011656fdf100d",
+    "requirements-cpu.txt": "3a2005be45d5b7c3a0e6e946476f78aa6d7830a902ce5ee5c51a65afa0ed2f8d",
+    "scripts/reproduce_boundary_100d.py": "4a398b4d65f1545b64e6549849f1dc7010c3d37ce11c7f8e9a32fc31fdfe01ae",
+    "scripts/reproduce_comparison.py": "6fa295acb28982193fec2c00270f2b05477a508110d2670ea9d1838b57c189c6",
+    "scripts/reproduce_scs_100d.py": "3ba2e4ea046fc8b0c9aa9320f846e34cfdb79ecac31d9eabec2f67c521012ef4",
+    "scripts/scs_100d_figures.py": "ea5d655ffa3aa4e423aaa2299ea2345d7a4d37646b206b992d1b56c870aadb9d",
+    "third_party/scs_paper/src/scp_core.py": "4772c4944c5e9d96631d095b5b8d7749b5dc52932394391a69ba19c386c0c452",
+    "third_party/scs_paper/src/train.py": "cad66edc58b9fb9b9943b61951ff6ebad09fc86c8f0e3aed993f965dcc5604c1"
+  },
+  "general_source_hashes": {
+    "dcs_bench/worker.py": "700c3102b0a85cb48ef1ff8fafe5fd6be7be0ccc0491976da94011656fdf100d",
+    "dcs_bench/transforms.py": "fb7161b32cd5430c7e899e9927a588cfddefb7511411360820f679bcab99efaa",
+    "dcs_bench/comparison_targets.py": "cf12efe21bd228f6c9b12865c2e2b82553a068acffab734ec56757a5e00ec011",
+    "dcs_bench/numba_rwm.py": "3d27234ef02056a3c998188fb314bfe0e1ccdac0afec989734d4be24e881fe2d",
+    "dcs_bench/numba_billiard.py": "8fa765cdd5bc1f0e5005cdc884e2fc57aaf4ec802800e7f331cf54672921e042",
+    "dcs_bench/targets.py": "19d8dbabf4cdac998739c735fec8ee8946b79b7c8de2e25c095542f156bc9a63",
+    "dcs_bench/billiard.py": "4b87951e2c7932a9cceddce7a8a5c313cd82c324348aa3a806359d8d98352b98",
+    "dcs_bench/timed_radial.py": "18aa665baeb4693765865cb9e68c8aaeb9f2bb120fa634a762f00c3d3c4dc5e5",
+    "dcs_bench/fast_dcs.py": "681682c907301ec3e6cfbbe042f08f99fae59cd958547ca62980eaeaa8b5a809",
+    "dcs_bench/references.py": "bcd55f6533641182aca380cbfec8192a8e50fd2e04f47d60dfa395438a2eea26",
+    "dcs_bench/ball_boundary.py": "a11dfad9e4c2d9276f95b95b64e08a05150da7d75ad2b9c02fa33b56c3ac9d38",
+    "dcs_bench/radial_reporting.py": "9f5449b7e627dbd3ba54a61ce95e971de0fe7db3ecad87a0417191311c8fc352",
+    "dcs_bench/plotting.py": "0fd11b296b5b879bd2dbec839b370cd2a31c1449d3c415794ac15df04bd34c60",
+    "dcs_bench/cpu.py": "f230f4c10ed36aa07eaac93d7bba9a4183fee7994b15f94cc0ba6df74c324d67",
+    "dcs_bench/__init__.py": "824e883a0dfde9241e0b7742f2bc61aba10cd82a49576de89c96f6f4450cb8bd",
+    "dcs_bench/scs_paper.py": "8510470fd7db553d445631b5663bcd4c9dd17d2ef2faf410ed2a9585320ce631",
+    "dcs_bench/rwm_rotation.py": "51e39b6232c200e9fe769261606c618cc99094d20cb1c86a1861ffa5db6ad6ee",
+    "dcs_bench/numba_rwm_rotation.py": "548cd394da95bfb5083192f6b1b32bbbb0d70b9f303e667f0e2ef523bd7cdeff",
+    "dcs_bench/burnin.py": "ff229a5d693807313f4d3057b2396ce0918d9ba9f1f799dba975ff8c5286fc06",
+    "dcs_bench/display.py": "045f88f8af94062a74c55917b86704debb59d399d7b9a0370cc98beb0c114379",
+    "dcs_bench/draw_storage.py": "381bc13ace8d79e1362f845855f19fe4b2a260c136113442e11e3c15ccf5215f",
+    "dcs_bench/api.py": "825b330d2416a6562a7bb91b0ede7beb65294f62c1646674512ec74e730e56a2",
+    "dcs_bench/engine.py": "ce45f47973cf753f1be6844890bbd6cde30a5af94f68a7a80e38324475c7032c",
+    "dcs_bench/ball_tuning.py": "ee601b723fbbf118a67a11690066cd714b2e7003ce2874d1d846f7873c6f1f4f",
+    "dcs_bench/compiled_sampling.py": "483dbebaddccd179119d307120d497a64d996964e0ab00e8dd464c88c6b5012f",
+    "dcs_bench/tuning.py": "82b5610d2734d7647f1e0ff667d9c40a1eb6ccb7b5d8c5c73e12d44dfd54b42c",
+    "dcs_bench/processing.py": "7f9e15d46dcf19e7237809aecfb98e7680c9e4eb41897803367374b33f2ee367",
+    "dcs_bench/numba_rotation.py": "0e26749de0482971e7cef2e3802969c1c4bff5a04f3c2061eed2a8deea7c05f5",
+    "dcs_bench/parallel.py": "4e8be301f69bdfd5a7ea19d2a3e84bd2998dc5c487523e01af16cce0bf85df8e",
+    "dcs_bench/simulation_error.py": "2bd364569a7ea02abba8a0099ba4b82d245daf728dee48dbfe1ed9b34ae3063c",
+    "dcs_bench/rotation.py": "1ef008d05461709eb8b82251ccac6462c117bbd9638db81a8394ad0b69ff8582",
+    "dcs_bench/functional_ess.py": "e9d66150d6fea6ca40727532120c1f61c885281dea133572ab85efdaef9f7157",
+    "dcs_bench/samplers.py": "470c4c1415947a36d7733f863210d0b293fd4cc494863b99e0df09eba4aff219",
+    "dcs_bench/numba_radial.py": "71e1531b526c2e3bee569ef7c45dfb429505594118bd737c9bb117a635a7dc30",
+    "configs/skew-t-200d-nuts.json": "4979c63738e4b3905d28d23abfb099e3b6011d8743561aaaac680434c0dca0b0",
+    "configs/skew-t-50d-nu-0.5.json": "dfc966801ed48dc966a44e6b978ee3095b0b1f8a97448aacbc1c2fffffdf26b6",
+    "configs/garch11.json": "2aee3ae248eee6cee8daaabd6c1e0c1ecf8b4fcda52631c8903b4f58612dad9b",
+    "configs/presets.json": "b3ad87baf7fc4f241ac9738a30a5737727993b2d26fe1cc32a1644a059d2021e",
+    "configs/skew-t-100d-fixed.json": "0f3b74e375515686c0a34655b4dc8a67f1e9c686a688d0d64426535e1dd8c144",
+    "configs/eight-schools.json": "747e8598c63fa8d1f9d89c1a2c84df6406db3922f362a7f7e787cb321ab242c1",
+    "configs/logistic-regression.json": "258a6126d9a515866083cd99c2ec792c91015d4dc84c3e81923878d8400272a8",
+    "configs/skew-t-200d-baselines.json": "a9984e90abf1e326bd8218f2d3d66273ede968bb691c26616f7101d665a86bf4",
+    "run_experiment.py": "6086aca8310571a72c1de8c24367e38914bb400bdf826c0a79cb3045c4540309",
+    "prepare_reference.py": "1bd863afeecfc2cfb2ef314e62cc8d18e143fac6e48e2fee5708c4e0c33ad726",
+    "requirements-cpu.txt": "3a2005be45d5b7c3a0e6e946476f78aa6d7830a902ce5ee5c51a65afa0ed2f8d",
+    "data/posteriordb/manifest.json": "cddd76b97321f6a63cc95fd0c690d303d6a853945af013120757ec852468179e"
+  },
+  "unchanged_files": {
+    "dcs_bench/billiard.py": "4b87951e2c7932a9cceddce7a8a5c313cd82c324348aa3a806359d8d98352b98",
+    "dcs_bench/ball_boundary.py": "a11dfad9e4c2d9276f95b95b64e08a05150da7d75ad2b9c02fa33b56c3ac9d38",
+    "dcs_bench/ball_tuning.py": "ee601b723fbbf118a67a11690066cd714b2e7003ce2874d1d846f7873c6f1f4f",
+    "dcs_bench/targets.py": "19d8dbabf4cdac998739c735fec8ee8946b79b7c8de2e25c095542f156bc9a63",
+    "dcs_bench/transforms.py": "fb7161b32cd5430c7e899e9927a588cfddefb7511411360820f679bcab99efaa",
+    "dcs_bench/tuning.py": "82b5610d2734d7647f1e0ff667d9c40a1eb6ccb7b5d8c5c73e12d44dfd54b42c",
+    "dcs_bench/references.py": "bcd55f6533641182aca380cbfec8192a8e50fd2e04f47d60dfa395438a2eea26",
+    "dcs_bench/scs_paper.py": "8510470fd7db553d445631b5663bcd4c9dd17d2ef2faf410ed2a9585320ce631",
+    "dcs_bench/cpu.py": "f230f4c10ed36aa07eaac93d7bba9a4183fee7994b15f94cc0ba6df74c324d67",
+    "dcs_bench/numba_radial.py": "71e1531b526c2e3bee569ef7c45dfb429505594118bd737c9bb117a635a7dc30",
+    "dcs_bench/numba_rotation.py": "0e26749de0482971e7cef2e3802969c1c4bff5a04f3c2061eed2a8deea7c05f5",
+    "dcs_bench/numba_rwm_rotation.py": "548cd394da95bfb5083192f6b1b32bbbb0d70b9f303e667f0e2ef523bd7cdeff",
+    "dcs_bench/rotation.py": "1ef008d05461709eb8b82251ccac6462c117bbd9638db81a8394ad0b69ff8582",
+    "dcs_bench/rwm_rotation.py": "51e39b6232c200e9fe769261606c618cc99094d20cb1c86a1861ffa5db6ad6ee",
+    "dcs_bench/samplers.py": "470c4c1415947a36d7733f863210d0b293fd4cc494863b99e0df09eba4aff219",
+    "dcs_bench/compiled_sampling.py": "483dbebaddccd179119d307120d497a64d996964e0ab00e8dd464c88c6b5012f",
+    "dcs_bench/fast_dcs.py": "681682c907301ec3e6cfbbe042f08f99fae59cd958547ca62980eaeaa8b5a809",
+    "requirements-cpu.txt": "3a2005be45d5b7c3a0e6e946476f78aa6d7830a902ce5ee5c51a65afa0ed2f8d"
+  },
+  "author_scs_unchanged": true,
+  "ess_definition": "ArviZ method=mean, split raw functional traces, FFT and Geyer initial-positive/monotone sequence; not rank-normalized bulk ESS or quantile tail ESS.",
+  "ess_scope": "Comparison ESS uses all post-burn-in iterations including repeats; general ESS uses every retained draw contributing to its estimator, recording actual stride without extrapolation.",
+  "timing": "Comparison scalar capture and final buffer flush inside production clock; serialized FFT after all wave sampling completes. Diagnostic/setup/wait costs recorded separately.",
+  "interpretation": "Execution/correctness checks only, not accuracy or speed rankings. Full-paper runs remain for independent evaluation. Historical archived reports keep their original methods and measurements.",
+  "full_paper_settings": {
+    "chains_per_method": 50,
+    "seconds_per_chain": 20.0,
+    "warmup": 1500,
+    "target_dimensions": [
+      100,
+      500
+    ],
+    "vi": [
+      "on",
+      "off"
+    ],
+    "burnin_fraction": 0.3333333333333333
+  }
+}

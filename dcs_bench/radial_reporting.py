@@ -1,7 +1,7 @@
 """Small radial summaries for the 200D random-walk comparison.
 
-Every retained draw contributes to the two estimates. This report does not
-calculate quantiles, effective sample sizes, R-hat or individual diagnostics.
+Every retained draw contributes to the two estimates. Optional functional ESS
+uses these same retained scalar series, without quantiles or rank diagnostics.
 New workers cache the estimates with each checkpoint; historical checkpoints
 remain readable and are summarized one chain at a time.
 """
@@ -52,7 +52,7 @@ def _draw_blocks(values, rows):
             yield block.reshape(-1, values.shape[1])
 
 
-def summarize_radial(draws, target, threshold):
+def summarize_radial(draws, target, threshold, *, sampling_seconds=None, draw_stride=1, ess_enabled=False):
     """Estimate the tail probability and radial moment in bounded blocks.
 
 The input is already post-burn-in. Block reductions can differ from an older
@@ -66,9 +66,11 @@ The worker calls this after its production clock has stopped.
         raise ValueError('Radial summaries require nonempty physical draws with the target dimension')
     rows = max(1, _BLOCK_BYTES // (target.d * values.dtype.itemsize))
     tail_count = 0
+    norms = np.empty(len(values)) if ess_enabled or sampling_seconds is not None else None
+    offset = 0
 
     def moment_sums():
-        nonlocal tail_count
+        nonlocal tail_count, offset
         for block in _draw_blocks(values, rows):
             if not np.all(np.isfinite(block)):
                 raise ValueError('Radial summaries require finite physical draws')
@@ -76,14 +78,25 @@ The worker calls this after its production clock has stopped.
             if not np.all(np.isfinite(norm)):
                 raise ValueError('A radial norm exceeded the finite numerical range')
             tail_count += int(np.count_nonzero(norm >= threshold))
+            if norms is not None:
+                norms[offset:offset+len(norm)] = norm
+                offset += len(norm)
             moment = norm if target.nu > 1 else np.log10(1+norm)
             yield float(np.sum(moment, dtype=np.float64))
 
     moment_total = math.fsum(moment_sums())
-    return dict(context, estimates=[tail_count / len(values), moment_total / len(values)],
+    result = dict(context, estimates=[tail_count / len(values), moment_total / len(values)],
                 retained_draws=len(values), seconds=perf_counter()-started,
                 reduction='All retained draws; norms in blocks of at most 8 MiB of physical values; '
                           'read-only contiguous mappings streamed from their backing files')
+    if norms is not None:
+        from .functional_ess import radial_ess, DEFINITION
+        ess, seconds = radial_ess(norms, threshold, sampling_seconds, draw_stride=draw_stride, nu=target.nu)
+        result.update(functional_ess=ess, functional_ess_seconds=seconds,
+            functional_ess_definition=DEFINITION,
+            functional_ess_series_policy='Every retained post-burn-in draw used by the reported estimate; actual sampler thinning stride is recorded, never multiplied into ESS')
+        result['seconds'] = perf_counter()-started
+    return result
 
 
 def _valid_cache(cached, record, target, threshold):
@@ -104,7 +117,7 @@ def _valid_cache(cached, record, target, threshold):
             and np.isfinite(seconds) and seconds >= 0)
 
 
-def process_radial_chains(paths, target, threshold, *, expected=None, label='', progress=print):
+def process_radial_chains(paths, target, threshold, *, expected=None, label='', progress=print, ess_enabled=False):
     """Read cached estimates, falling back to one historical chain at a time."""
     from .engine import read_chain, read_chain_metadata
 
@@ -122,7 +135,7 @@ def process_radial_chains(paths, target, threshold, *, expected=None, label='', 
         record = read_chain_metadata(path, expected)
         read_seconds += perf_counter()-tick
         cached = record.get('radial_summary')
-        if _valid_cache(cached, record, target, threshold):
+        if _valid_cache(cached, record, target, threshold) and (not ess_enabled or 'functional_ess' in cached):
             cached_chains += 1
             if progress is not None:
                 progress(f'{prefix}radial summaries {index+1}/{len(paths)} (cached)')
@@ -133,17 +146,22 @@ def process_radial_chains(paths, target, threshold, *, expected=None, label='', 
             draws, record = read_chain(path, expected)
             read_seconds += perf_counter()-tick
             largest_chain_bytes = max(largest_chain_bytes, draws.nbytes)
-            cached = summarize_radial(draws, target, threshold)
+            options = (dict(sampling_seconds=record.get('sampling_seconds'), draw_stride=record.get('thin', 1), ess_enabled=True)
+                       if ess_enabled else {})
+            cached = summarize_radial(draws, target, threshold, **options)
             summary_seconds += cached['seconds']
             if cached['retained_draws'] != record.get('retained_draws'):
                 raise ValueError(f'Retained draw count does not match checkpoint metadata: {path}')
             del draws
+        if ess_enabled:
+            record = dict(record, **{key: cached[key] for key in
+                ('functional_ess', 'functional_ess_seconds', 'functional_ess_definition', 'functional_ess_series_policy')})
         estimates.append(cached['estimates'])
         records.append(record)
         lengths.append(cached['retained_draws'])
     processing = dict(
         strategy='Cached radial estimates; older checkpoints read one chain at a time',
-        diagnostics_computed=False, quantiles_computed=False,
+        diagnostics_computed=ess_enabled, functional_ess_computed=ess_enabled, quantiles_computed=False,
         diagnostic_subsampling=False, diagnostic_workers=0,
         chains=len(paths), functionals=2, retained_draws=sum(lengths),
         cached_chains=cached_chains, recomputed_chains=len(paths)-cached_chains,

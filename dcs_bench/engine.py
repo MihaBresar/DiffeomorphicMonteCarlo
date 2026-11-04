@@ -35,6 +35,7 @@ def load_config(name, preset='quick', overrides=None):
         raise ValueError(f'Unknown preset: {preset}')
     config['preset'] = preset
     config['burnin_fraction'] = 1/3
+    config['ess_enabled'] = True
     overrides = overrides or {}
     irrelevant = []
     if config['mode'] != 'iterations':

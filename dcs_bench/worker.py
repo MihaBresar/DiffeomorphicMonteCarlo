@@ -101,7 +101,9 @@ def _run_and_save_chain(job, chain, target, config, algorithm, runner, mapping, 
         if compact_radial_report(config):
             print(f'Worker {job["worker_slot"]+1}: {algorithm}, chain {chain["index"]+1} '
                   f'summarizing tail probability and radial moment from {len(draws):,} retained draws', flush=True)
-            record['radial_summary'] = summarize_radial(draws, target, config['threshold'])
+            options = (dict(sampling_seconds=record.get('sampling_seconds'), draw_stride=record.get('thin', 1), ess_enabled=True)
+                       if config.get('ess_enabled', True) else {})
+            record['radial_summary'] = summarize_radial(draws, target, config['threshold'], **options)
         print(f'Worker {job["worker_slot"]+1}: {algorithm}, chain {chain["index"]+1} '
               f'sampling complete ({record["sampling_seconds"]:.2f} s); '
               f'saving {len(draws):,} retained draws ({draws.nbytes/1_000_000:.2f} MB)', flush=True)
