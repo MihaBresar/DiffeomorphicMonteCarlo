@@ -15,11 +15,13 @@ class ComparisonTargetTests(unittest.TestCase):
         large = comparison_target('skew-t-500d')
         self.assertEqual(old['target']['dimension'], 100)
         self.assertEqual(old['threshold'], 50.)
+        self.assertEqual(old['coordinate_threshold'], 3.)
         self.assertEqual(large['target']['dimension'], 500)
         self.assertEqual(large['target']['nu'], 3.)
         self.assertEqual(large['target']['alpha'], {'0': 100., '1': -100.})
         self.assertEqual(large['beta'], 2.)
         self.assertAlmostEqual(large['threshold'], 50.*np.sqrt(5.))
+        self.assertEqual(large['coordinate_threshold'], 3.)
         large['target']['alpha']['0'] = -1
         self.assertEqual(comparison_target('skew-t-500d')['target']['alpha']['0'], 100.)
         with self.assertRaises(ValueError):

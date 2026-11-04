@@ -14,20 +14,39 @@ on physical coordinates. Reflected BW folds a proposed displacement along its
 chord through the ball; it is not the spherical SCS step-out proposal. See the
 [reflection argument](BOUNDARY_100D.md).
 
-## Targets and exact references
+## Targets and references
 
-| Selector | Density and map | Radial threshold | True tail probability | True mean norm |
+| Selector | Density and map | Radial threshold | Radial tail reference | Mean-norm reference |
 |---|---|---:|---:|---:|
 | `skew-t-100d` | Normal-CDF-skewed t, d=100, ν=3, α=(100,−100,0,…), DCS β=2 | 50.00 | 0.0107346153 | 13.7852602890 |
 | `skew-t-500d` | Same skew and ν, d=500, DCS β=2 | 50√5 ≈ 111.80 | 0.0106799328 | 30.8864890662 |
 
 Thresholds are fixed before sampling, independent of method, VI and pilot
 outcomes. JSON/CSV retain full precision. Skewing the t target by its sign
-leaves the radial law unchanged: ||X||²/d has the F(d,ν) law.
+leaves the radial law unchanged for both targets: ||X||²/d has the F(d,ν) law.
+
+Both targets also report **E[X₁]** and **P(X₁ > 3)**. These measurements assess
+the asymmetric part of the distribution; radial measurements alone cannot do
+that. The coordinate threshold is fixed before running the new comparisons.
+The existing target distributions and physical initial points (all ones) are
+unchanged. The usual third-moment skewness coefficient is not defined at ν=3
+and is not reported.
+
+Independent references use symmetric Student-t draws, integrate the sign
+selection exactly conditional on each draw, and apply fixed known-mean control
+variates for the first-coordinate expectations. These variance reductions
+do not use competing sampler output, fit results or adaptive choices. Reference estimates and their Monte Carlo
+standard errors are saved separately from sampling errors. Reference budgets
+are 50,000 draws for Quick check, 1,000,000 for Smaller reproduction and
+5,000,000 for Full paper settings, using a fixed seed independent of fitting
+and sampler streams. The report distinguishes analytic values from estimated
+references and flags reference MCSE above one tenth of observed sampler RMSE.
+An estimated reference is not relabeled an exact truth; its precision must be
+considered when interpreting small MSE differences.
 
 ## What is matched
 
-- Same physical target, radial functionals, analytic truths and physical
+- Same physical target, four functionals, independent references and physical
   initialization (all coordinates equal to one).
 - Same requested per-chain sampling time, number of independent chains,
   warmup-transition budget, 300-transition clock checks and exact first-third
@@ -64,15 +83,16 @@ flags are saved; they must be inspected rather than treating equal resources
 as proof that every method is optimally tuned.
 
 In particular, a target acceptance may be unreachable for a step-out proposal
-whose large-step distribution saturates. In the 100D no-VI smaller run, SCS
+whose large-step distribution saturates. In the historical version-1 100D no-VI smaller run, SCS
 reached its numerical upper guard in 12 of 20 chains. This is a tuning
 limitation to disclose; neither the guard flag nor equal warmup budgets
 establishes optimal tuning.
 
 The JAX comparison uses equivalent full-state scans, physical projection and
-radial reduction for all methods. The Numba comparison deliberately changes
-this implementation work: DCS caches current density/radius, skips recomputing
-unchanged rejected-state values and fuses exact radial accumulation without
+four-functional reduction for all methods. The Numba comparison deliberately
+changes this implementation work: DCS caches current density, radius and first
+coordinate, skips recomputing
+unchanged rejected-state values and fuses all-iteration accumulation without
 returning every full state. SCS retains the unmodified author transition and
 JAX full-state processing. Thus the second comparison measures these concrete
 implementations; its timing does not isolate a purely geometric algorithm
@@ -86,8 +106,9 @@ advantage. The pinned SCS source remains byte-for-byte unchanged.
 | Smaller reproduction | 20 | 2 | 1,000 | 400 × 500 |
 | Full paper settings | 50 | 20 | 1,500 | 1,500 × 2,000 |
 
-VI off uses zero fitting updates regardless of preset. Compilation, fitting,
-warmup, synchronization waits and file/report generation are outside the
+VI off uses zero fitting updates regardless of preset. Independent reference
+preparation, compilation, fitting, warmup, synchronization waits and file/report
+generation are outside the
 sampling clock and recorded separately. Native DCS setup includes the shared
 JAX calibration/scan compilation plus Numba compilation. Actual sampling
 seconds and overshoot are saved; short runs can exceed the requested budget
@@ -95,18 +116,23 @@ by a larger relative amount. All 300 states in each completed block count.
 
 The first third of the actual timed iterations is discarded. Prefix sums at
 100-step boundaries implement this exactly; thinning affects only saved
-traces, not estimates or MSE. Reports retain the original radial boxplots,
-MSE and count/time figure families, use two decimal places where appropriate,
-and export exact integer counts and full-precision values.
+traces, not estimates or MSE. All four functionals, including the two new
+coordinate quantities, are accumulated inside every sampling clock. Reports
+retain the original radial boxplots, MSE and count/time figure families and add
+separate coordinate mean and tail-probability figures. They use two decimal
+places where appropriate and export exact integer counts and full-precision
+values. `reference_values.csv` includes reference values, MCSE and exact flags.
 
-Both current modes report radial quantities only. These do not establish
-correct exploration of skewness or an overall mixing advantage. MSE is the
-average squared error across independent chains; the fitted map is shared,
+Both current modes use protocol version 2 and report radial and coordinate
+quantities. Historical version-1 reports remain radial-only and keep their
+recorded numbers. These measurements do not establish an overall mixing
+advantage. MSE is the average squared error across independent chains; the fitted map is shared,
 so uncertainty is conditional on that fit. Empirical MSE error summaries are
 descriptive, not formal confidence intervals: the supplied t(3) targets
 have infinite fourth radial moment, making rare large errors
-particularly important. Smaller reproduction results are exploratory; use
-longer runs and fresh seed batches before publication claims.
+particularly important for norm and coordinate-mean errors. MSE against an
+estimated reference also carries reference uncertainty. Smaller reproduction
+results are exploratory; use longer runs and fresh seed batches before publication claims.
 
 See [click-to-run instructions](CLICK_TO_RUN.md), [rerun commands](RERUN.md)
 and [native implementation checks](NATIVE_KERNELS.md).

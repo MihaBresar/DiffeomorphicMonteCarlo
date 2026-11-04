@@ -1,5 +1,21 @@
 # Changes
 
+## 2026-11-04 — first-coordinate estimates
+
+- Add the mean of the first physical coordinate and its one-sided tail
+  probability to the existing 100D and 500D skewed t(3) comparisons. Target
+  densities, radial thresholds, DCS β=2 and physical initialization are unchanged.
+- Accumulate all four functionals inside every sampling clock, including repeats
+  after rejection and exact first-third burn-in. Both comparison modes retain
+  VI on/off for both map families.
+- Retain all original radial figure families and add separate first-coordinate
+  estimate/MSE figures. Export independent coordinate reference values and MCSE
+  with estimated references clearly labeled; analytic radial references remain.
+- Record protocols `timed-sampler-comparison-v2` and
+  `timed-numba-comparison-v2`; earlier saved reports retain their original
+  radial-only definitions. Rerun all methods together for the new measurements
+  and timing. SCS's pinned author source remains unchanged.
+
 ## 2026-11-03 — selectable targets, shared VI switch and optimized Numba comparison
 
 - Replace the old visible SCS/boundary choices with a four-method JAX comparison (DCS-RWM, DCS-BW, SCS, DCS-BW-reflect) and a separate Numba DCS-BW/reflect versus author JAX SCS comparison. Keep old CLI and replot compatibility.

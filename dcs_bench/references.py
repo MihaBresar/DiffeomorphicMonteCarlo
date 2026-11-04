@@ -1,9 +1,10 @@
 """Independent references and exact radial expectations."""
 import hashlib
 import json
+from functools import lru_cache
 import numpy as np
 from scipy import special, stats, integrate
-from .targets import ROOT, read_archive
+from .targets import ROOT, Target, read_archive
 
 
 def skew_t_iid(target, rng, n):
@@ -28,6 +29,121 @@ def radial_truth(target, threshold):
         return np.logaddexp(0., logr)/np.log(10)*np.exp(lp)
     value, error = integrate.quad(integrand, -50, 150, epsabs=1e-11, limit=300)
     return ['tail_probability', 'mean_log10_one_plus_norm'], np.array([tail, value]), [0., error]
+
+
+COMPARISON_REFERENCE_VERSION = 'skew-t-coordinate-sign-conditioning-fixed-controls-v1'
+COMPARISON_FUNCTIONALS = ['tail_probability', 'mean_norm', 'mean_x1', 'x1_tail_probability']
+
+
+def comparison_reference(config):
+    """Independent reference expectations for the four current comparison metrics.
+
+    Normal-CDF sign selection is integrated out exactly conditional on each
+    independent symmetric Student-t draw. The fixed controls below have known
+    expectations; they reduce Monte Carlo error without changing the target.
+    Their coefficients never depend on sampler outputs or the reference data.
+    The returned MCSE measures reference simulation error, not chain error.
+    """
+    presets = {'quick': 50_000, 'reproduce': 1_000_000, 'paper': 5_000_000}
+    settings = dict(target=config['target'], threshold=float(config.get('threshold', 50.)),
+                    coordinate_threshold=float(config.get('coordinate_threshold', 3.)),
+                    draws=config.get('reference_samples', presets.get(config.get('preset', 'quick'), 50_000)),
+                    seed=config.get('reference_seed', 941_873),
+                    batch_size=config.get('reference_batch_size', 8192))
+    # Copy via JSON: callers cannot mutate a cached reference. Cache is local to
+    # this process and versioned; source hashes are also recorded by the runner.
+    return json.loads(_comparison_reference_cached(json.dumps(settings, sort_keys=True),
+                                                   COMPARISON_REFERENCE_VERSION))
+
+
+@lru_cache(maxsize=12)
+def _comparison_reference_cached(settings_json, version):
+    settings = json.loads(settings_json)
+    target = Target(settings['target'])
+    if target.kind != 'skew_t' or target.nu <= 2.:
+        raise ValueError('Comparison mean references require a skew-t target with finite variance')
+    n_total, batch_size, seed = settings['draws'], settings['batch_size'], settings['seed']
+    for name, value, minimum in [('reference_samples', n_total, 2),
+                                  ('reference_batch_size', batch_size, 1), ('reference_seed', seed, 0)]:
+        if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+            raise ValueError(f'{name} must be an integer at least {minimum}')
+    threshold, coordinate_threshold = settings['threshold'], settings['coordinate_threshold']
+    if not np.all(np.isfinite([threshold, coordinate_threshold])) or threshold <= 0.:
+        raise ValueError('Reference thresholds must be finite, with positive radial threshold')
+    _, radial_values, _ = radial_truth(target, threshold)
+    alpha_norm = float(np.linalg.norm(target.alpha))
+    direction = target.alpha / alpha_norm if alpha_norm else np.zeros(target.d)
+    absolute_t_mean = float(np.exp(.5*np.log(target.nu) + special.gammaln((target.nu-1.)/2.)
+                                  - .5*np.log(np.pi) - special.gammaln(target.nu/2.)))
+    offsets = np.array([radial_values[0], radial_values[1], direction[0]*absolute_t_mean, 0.])
+    coordinate_base_threshold = coordinate_threshold
+    coordinate_tail_control = bool(direction[0] > 0. and coordinate_base_threshold > 0.)
+    if coordinate_tail_control:
+        offsets[3] = float(2.*stats.t.sf(coordinate_base_threshold, target.nu))
+    exact = [True, True, False, False]
+    if not alpha_norm:
+        offsets[2] = 0.
+        exact[2] = True
+    rng = np.random.default_rng(seed)
+    count, mean, squared = 0, np.zeros(4), np.zeros(4)
+    compact = target.d >= 2 and not np.any(target.alpha[2:])
+    while count < n_total:
+        n = min(batch_size, n_total-count)
+        if compact:
+            normal = rng.standard_normal((n, 2))
+            rest = rng.chisquare(target.d-2, size=n) if target.d > 2 else np.zeros(n)
+            normal_norm2 = np.sum(normal*normal, axis=1)+rest
+            chisquare = rng.chisquare(target.nu, size=n)
+            divisor = np.sqrt(chisquare/target.nu)
+            y_first = normal[:, 0]/divisor
+            projection = (normal@direction[:2])/divisor
+            argument = (normal@target.alpha[:2])*np.sqrt((target.nu+target.d)/(chisquare+normal_norm2))
+        else:
+            normal = rng.standard_normal((n, target.d))
+            chisquare = rng.chisquare(target.nu, size=n)
+            divisor = np.sqrt(chisquare/target.nu)
+            normal_norm2 = np.sum(normal*normal, axis=1)
+            y = normal/divisor[:, None]
+            y_first = y[:, 0]
+            projection = np.einsum('ij,j->i', y, direction)
+            argument = np.einsum('ij,j->i', normal, target.alpha)*np.sqrt((target.nu+target.d)/(chisquare+normal_norm2))
+        probability = special.ndtr(argument)
+        values = np.zeros((n, 4))
+        if alpha_norm:
+            # Spherical base symmetry makes E[Y] parallel to alpha. The
+            # projection onto this direction is a univariate Student t.
+            values[:, 2] = direction[0]*(projection*(2.*probability-1.)-np.abs(projection))
+        plus_first, minus_first = y_first, -y_first
+        values[:, 3] = probability*(plus_first > coordinate_threshold)+(1.-probability)*(minus_first > coordinate_threshold)
+        if coordinate_tail_control:
+            # The sign-conditioned tail is zero off this absolute-value event.
+            # Positive first-coordinate skew gives E[tail] >= P[event]/2, so
+            # this fixed coefficient-one control cannot increase its variance.
+            values[:, 3] -= np.abs(y_first) > coordinate_base_threshold
+        batch_mean = values.mean(axis=0)
+        difference = batch_mean-mean
+        squared += np.sum((values-batch_mean)**2, axis=0)+difference*difference*count*n/(count+n)
+        mean += difference*n/(count+n)
+        count += n
+    truth = mean+offsets
+    mcse = np.sqrt(squared/(count-1)/count)
+    if not np.all(np.isfinite(truth)) or not np.all(np.isfinite(mcse)):
+        raise FloatingPointError('Nonfinite independent comparison references')
+    metadata = dict(functionals=list(COMPARISON_FUNCTIONALS), truth=truth.tolist(), reference_mcse=mcse.tolist(),
+                    exact=exact, target=target.spec, threshold=threshold, coordinate_threshold=coordinate_threshold,
+                    seed=seed, draws=count, batch_size=batch_size, version=version,
+                    source='Independent symmetric Student-t draws with exact conditional sign weighting and fixed known-mean controls',
+                    conditioning='Sign selection is integrated out, with no reference MCMC or sampler-dependent tuning.',
+                    control_variates={
+                        'mean_x1': 'Use rotational symmetry and subtract absolute skew-direction t projection; add analytic absolute-t mean.',
+                        'x1_tail_probability': ('Subtract absolute first-coordinate t tail; add exact two-sided t probability.'
+                                                if coordinate_tail_control else 'No coordinate tail control applied.'),
+                        'x1_tail_control_applied': coordinate_tail_control,
+                        'standardized_coordinate_threshold': coordinate_base_threshold,
+                        'coefficients': 'Fixed by target parameters before drawing reference samples.'},
+                    radial_truth_exact_except_numerical_evaluation=True,
+                    mcse_note='MCSE of independent reference estimates; does not include MCMC error. Close MSE rankings require reference error to be negligible.')
+    return json.dumps(metadata, allow_nan=False)
 
 
 def directional_draws(target, draws):

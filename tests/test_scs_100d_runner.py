@@ -108,7 +108,7 @@ class SCS100DRunnerTests(unittest.TestCase):
         records = {method: [record(i, value, iterations=(i+1)*300*(method_index+1),
                     acceptance=(i+1)/10.) for i, value in enumerate(means)]
                    for method_index, method in enumerate(experiment.METHODS)}
-        with patch.object(experiment, 'radial_truth', return_value=(None, np.array([.1, 20.]), None)):
+        with patch.object(experiment, 'radial_truth', return_value=(['tail_probability', 'mean_norm'], np.array([.1, 20.]), None)):
             summary = experiment.summarize(config, {}, {}, records)
         for method_index, (method, result) in enumerate(summary['cases'].items()):
             with self.subTest(method=method):

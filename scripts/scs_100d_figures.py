@@ -20,22 +20,30 @@ METHODS = ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', 'SCS')
 COLORS = {'DCS-RWM': '#FF8C00', 'DCS-BW': '#9370db', 'DCS-BW-reflect': '#159a8c', 'SCS': '#ff1493'}
 
 
-def _pair(value):
+def _metrics(value, metric_names=METRICS):
     if isinstance(value, dict):
-        value = [next(value[key] for key in keys if key in value) for keys in ALIASES]
+        aliases = dict(zip(METRICS, ALIASES))
+        value = [next(value[key] for key in aliases.get(name, (name,)) if key in value)
+                 for name in metric_names]
     result = np.asarray(value, dtype=float)
-    if result.shape != (2,) or not np.all(np.isfinite(result)):
-        raise ValueError('Each metric pair must contain two finite values')
+    if result.shape != (len(metric_names),) or not np.all(np.isfinite(result)):
+        raise ValueError('Each metric vector must contain one finite value per functional')
     return result
 
 
-def _means(case):
+def _pair(value):
+    return _metrics(value)
+
+
+def _means(case, metric_names=METRICS):
     values = case['chain_means']
     if isinstance(values, dict):
-        values = np.column_stack([next(values[k] for k in keys if k in values) for keys in ALIASES])
+        aliases = dict(zip(METRICS, ALIASES))
+        values = np.column_stack([next(values[key] for key in aliases.get(name, (name,)) if key in values)
+                                  for name in metric_names])
     result = np.asarray(values, dtype=float)
-    if result.shape != (case['chains'], 2) or not np.all(np.isfinite(result)):
-        raise ValueError('chain_means must contain one finite metric pair per chain')
+    if result.shape != (case['chains'], len(metric_names)) or not np.all(np.isfinite(result)):
+        raise ValueError('chain_means must contain one finite value per functional and chain')
     return result
 
 
@@ -115,8 +123,9 @@ def render_report(root, summary):
     figures = root/'figures'
     figures.mkdir(exist_ok=True)
     cases, config = summary['cases'], summary['config']
-    suite = config.get('protocol') in ('timed-sampler-comparison-v1', 'timed-numba-comparison-v1')
-    optimized = config.get('protocol') == 'timed-numba-comparison-v1'
+    suite = config.get('protocol') in ('timed-sampler-comparison-v1', 'timed-numba-comparison-v1',
+                                      'timed-sampler-comparison-v2', 'timed-numba-comparison-v2')
+    optimized = config.get('protocol') in ('timed-numba-comparison-v1', 'timed-numba-comparison-v2')
     vi_mode = config.get('vi', 'on')
     boundary = config.get('protocol') in ('timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2', 'timed-boundary-dcs-scs-v3')
     restored_controls = config.get('protocol') == 'timed-boundary-dcs-scs-v2'
@@ -129,11 +138,29 @@ def render_report(root, summary):
     if len(names) != len(cases) or len(set(names)) != len(names):
         raise ValueError('Configured methods must list every completed case exactly once')
     counts = {name: _counts(cases[name], config, timed) for name in names}
-    truth = _pair(summary['truth'])
-    means = {name: _means(cases[name]) for name in names}
-    mses = {name: _pair(cases[name]['mse']) for name in names}
-    biases = {name: _pair(cases[name]['bias_squared']) for name in names}
-    variances = {name: _pair(cases[name]['variance_ddof0']) for name in names}
+    metric_names = tuple(summary.get('functionals', METRICS))
+    if metric_names not in (METRICS, METRICS+('mean_x1', 'x1_tail_probability')):
+        raise ValueError('Expected radial functionals followed by the optional first-coordinate functionals')
+    truth = _metrics(summary['truth'], metric_names)
+    means = {name: _means(cases[name], metric_names) for name in names}
+    mses = {name: _metrics(cases[name]['mse'], metric_names) for name in names}
+    biases = {name: _metrics(cases[name]['bias_squared'], metric_names) for name in names}
+    variances = {name: _metrics(cases[name]['variance_ddof0'], metric_names) for name in names}
+    reference = summary.get('reference', {})
+    if len(metric_names) == 4 and not all(key in reference for key in ('truth', 'reference_mcse', 'exact')):
+        raise ValueError('Coordinate reports require recorded reference values, MCSE and exact flags')
+    reference_mcse = _metrics(reference.get('reference_mcse', np.zeros(len(metric_names))), metric_names)
+    reference_exact = reference.get('exact', [True]*len(metric_names))
+    if isinstance(reference_exact, bool):
+        reference_exact = [reference_exact]*len(metric_names)
+    if (len(reference_exact) != len(metric_names) or
+            any(not isinstance(value, (bool, np.bool_)) for value in reference_exact) or
+            np.any(reference_mcse < 0)):
+        raise ValueError('Reference flags and nonnegative MCSE must match the functionals')
+    if reference and ('truth' in reference and not np.array_equal(_metrics(reference['truth'], metric_names), truth)):
+        raise ValueError('Reference values must match the values used to compute MSE')
+    if reference.get('functionals') is not None and tuple(reference['functionals']) != metric_names:
+        raise ValueError('Reference functionals must match the report order')
     for name in names:
         if np.any(mses[name] < 0) or np.any(biases[name] < 0) or np.any(variances[name] < 0):
             raise ValueError('MSE, squared bias, and variance must be nonnegative')
@@ -228,8 +255,9 @@ def render_report(root, summary):
         for position, values_, color in zip(x, values, colors):
             offsets = np.linspace(-.11, .11, len(values_)) if len(values_) > 1 else np.zeros(1)
             ax.scatter(position+offsets, values_, color=color, s=23, alpha=.8, zorder=3)
+        reference_label = 'True value = ' if reference_exact[metric] else 'Independent reference = '
         ax.axhline(truth[metric], color='#27384a', linestyle='--', linewidth=1.4,
-                   label='True value = '+number(truth[metric]))
+                   label=reference_label+number(truth[metric]))
         ax.set_xticks(x, names)
         ax.set_ylabel('Per-chain estimate')
         ax.set_title(label+' estimates')
@@ -311,12 +339,65 @@ def render_report(root, summary):
     fig.tight_layout(rect=(0, .12, 1, .88))
     save(fig, 'scs_100d_bias_variance')
 
+    # These figures supplement the original radial figure family. They measure
+    # physical X[0], not a rotated or whitened coordinate chosen after sampling.
+    if len(metric_names) == 4:
+        coordinate_threshold = float(config['coordinate_threshold'])
+        coordinate_panels = ((2, 'Mean of the first coordinate: E[X₁]', 'coordinate_mean'),
+                             (3, 'First-coordinate tail: P(X₁ > '+number(coordinate_threshold)+')',
+                              'coordinate_tail_probability'))
+        for metric, label, filename in coordinate_panels:
+            fig, axes = plt.subplots(1, 2, figsize=(16, 6.5))
+            ax = axes[0]
+            chain_values = [means[name][:, metric] for name in names]
+            boxes = ax.boxplot(chain_values, patch_artist=True, showfliers=False, widths=.5)
+            for box, color in zip(boxes['boxes'], colors):
+                box.set_facecolor(color)
+                box.set_alpha(.35)
+            for position, values_, color in zip(x, chain_values, colors):
+                offsets = np.linspace(-.11, .11, len(values_)) if len(values_) > 1 else np.zeros(1)
+                ax.scatter(position+offsets, values_, color=color, s=23, alpha=.8, zorder=3)
+            reference_label = ('True value' if reference_exact[metric] else 'Independent reference')
+            reference_label += ' = '+number(truth[metric])
+            if not reference_exact[metric]:
+                reference_label += '; MCSE = '+number(reference_mcse[metric], scientific=True)
+            ax.axhline(truth[metric], color='#27384a', linestyle='--', linewidth=1.4,
+                       label=reference_label)
+            ax.set_xticks(x, names)
+            ax.set_title('Estimates from every chain')
+            ax.set_ylabel('Per-chain estimate')
+            ax.legend(fontsize=8)
+            ax.ticklabel_format(axis='y', style='plain', useOffset=False)
+            ax.grid(axis='y', alpha=.2)
+            ax = axes[1]
+            values = np.asarray([mses[name][metric] for name in names])
+            positive = values[values > 0]
+            floor = float(positive.min()/4) if len(positive) else 1e-16
+            ax.set_yscale('log')
+            for position, value, color in zip(x, values, colors):
+                if value > 0:
+                    ax.bar(position, value, color=color, width=.58)
+                else:
+                    ax.plot(position, floor, marker='v', color=color)
+                ax.text(position, max(float(value), floor)*1.15, number(value, scientific=True),
+                        ha='center', va='bottom', fontsize=9)
+            ax.set_ylim(floor, max(float(values.max())*4, floor*10))
+            ax.set_xticks(x, names)
+            ax.set_title('MSE across chains' if reference_exact[metric] else 'MSE against independent reference')
+            ax.set_ylabel('MSE (logarithmic scale)')
+            ax.grid(axis='y', alpha=.2)
+            ax.set_axisbelow(True)
+            fig.suptitle(title+'\n'+label, fontsize=14)
+            fig.text(.5, .055, budget+'. '+estimation_note, ha='center', fontsize=9)
+            fig.tight_layout(rect=(0, .12, 1, .88))
+            save(fig, filename)
+
     # Prefix means come from streaming accumulators in the run, never by
     # treating a thinned trace as all production states.
     prefix_rows, checkpoints = [], {}
     for name in names:
         records = cases[name].get('records', [])
-        checkpoints[name] = [{int(row['iterations']): _pair(row['mean_all_iterations'])
+        checkpoints[name] = [{int(row['iterations']): _metrics(row['mean_all_iterations'], metric_names)
                               for row in record.get('checkpoints', [])} for record in records] if not timed else []
     dictionaries = [row for name in names for row in checkpoints[name]]
     common = sorted(set.intersection(*(set(row) for row in dictionaries))) if dictionaries else []
@@ -327,7 +408,7 @@ def render_report(root, summary):
             for count in common:
                 values = np.asarray([row[count] for row in checkpoints[name]])
                 error = np.mean((values-truth)**2, axis=0)
-                for metric, key in enumerate(METRICS):
+                for metric, key in enumerate(metric_names):
                     prefix_rows.append({'method': name, 'iterations_per_chain': count,
                                         'chains': cases[name]['chains'], 'metric': key,
                                         'truth': truth[metric], 'mse': error[metric]})
@@ -372,13 +453,16 @@ def render_report(root, summary):
         if suite:
             row.update(target=target_title, dimension=dimension, vi=vi_mode, dcs_beta=config.get('beta'),
                        execution_backend='Numba' if optimized and name != 'SCS' else 'JAX')
-        for metric, key in enumerate(METRICS):
+        for metric, key in enumerate(metric_names):
             row[key+'_truth'] = truth[metric]
+            if reference:
+                row[key+'_reference_mcse'] = reference_mcse[metric]
+                row[key+'_reference_exact'] = reference_exact[metric]
             row[key+'_mse'] = mses[name][metric]
             row[key+'_bias_squared'] = biases[name][metric]
             row[key+'_variance_ddof0'] = variances[name][metric]
         variability = mse_variability(means[name], truth)
-        for metric, key in enumerate(METRICS):
+        for metric, key in enumerate(metric_names):
             row[key+'_mse_empirical_mcse'] = variability['mse_empirical_mcse'][metric]
             row[key+'_largest_chain_error_share'] = variability['largest_chain_squared_error_share'][metric]
         case_rows.append(row)
@@ -402,12 +486,18 @@ def render_report(root, summary):
             row.setdefault('iterations', count['generated'][index])
             row.setdefault('discarded_iterations', count['discarded'][index])
             row.setdefault('estimation_iterations', count['used'][index])
-            for metric, key in enumerate(METRICS):
+            for metric, key in enumerate(metric_names):
                 row[key+'_estimate'] = estimate[metric]
                 row[key+'_truth'] = truth[metric]
                 row[key+'_squared_error'] = (estimate[metric]-truth[metric])**2
             chain_rows.append(row)
-    paired_rows = paired_mse_differences(means, {name: cases[name].get('records', []) for name in names}, truth)
+    paired_rows = paired_mse_differences(means, {name: cases[name].get('records', []) for name in names}, truth,
+                                       functionals=metric_names)
+    reference_rows = [{'metric': key, 'reference_value': truth[metric],
+                       'reference_mcse': reference_mcse[metric], 'exact': reference_exact[metric],
+                       'source': reference.get('source', 'Recorded reference'),
+                       'reference_draws': reference.get('draws'), 'reference_seed': reference.get('seed')}
+                      for metric, key in enumerate(metric_names)] if reference else []
     parameter_rows = []
     for family, parameters in summary.get('maps', {}).items():
         for key, value in parameters.items():
@@ -444,6 +534,8 @@ def render_report(root, summary):
         csvs['setup_times.csv'] = setup_rows
     if tuning_rows:
         csvs['reflected_tuning.csv'] = tuning_rows
+    if reference_rows:
+        csvs['reference_values.csv'] = reference_rows
     for filename, rows in csvs.items():
         _write_csv(root/filename, rows)
 
@@ -529,9 +621,35 @@ def render_report(root, summary):
                      'ball-movement pilot search uses up to eight rotating h/2, h, 2h rounds with no special bound of 2. '
                      'A finite noisy local search does not certify an optimal step or optimal radial MSE. '
                      'Every trial is recorded in reflected_tuning.csv; a final-round edge winner is reported explicitly.')
+        if len(metric_names) == 4:
+            notes[3] = ('Every post-burn-in iteration contributes to mean norm, radial tail probability, mean first '
+                        'coordinate and first-coordinate tail probability, including repeated states after rejection. '
+                        'The same four quantities are accumulated inside every sampling clock. Saved trace thinning '
+                        'does not change those estimates. Counts and full-precision errors are exported.')
+            notes[7] = ('Every method samples the same recorded target: '+target_title+'. The original radial '
+                        'measurements are supplemented by E[X₁] and P(X₁ > '+number(config['coordinate_threshold'])+'). '
+                        'These test the asymmetric part of the target; no single set of functionals establishes '
+                        'overall mixing. The unmodified author SCS transition is retained.')
+            notes.append('The coordinate threshold and reference seed are fixed before sampler results are examined. '
+                         'The existing targets and physical initialization remain unchanged. '
+                         'All methods use the same reference values.')
+            notes.append('Reference values marked exact use the analytic radial law of the original skewed t targets. '
+                         'Other reference values are independently estimated and retain their Monte Carlo standard '
+                         'errors (MCSE). Reported MSE uses those estimated reference values without pretending they '
+                         'are exact; its uncertainty also depends on reference precision.')
+            notes.append('The Student-t degrees of freedom are three. The usual third-moment skewness coefficient '
+                         'is therefore not reported; the added mean and tail probability are well-defined.')
     notes.append('Empirical MSE MCSE is the sample standard deviation of chain squared errors divided by the square root of the number of chains. Largest-chain error share measures how much one chain contributes to total squared error. Paired differences align methods by saved seed; negative differences favor the named method over SCS. These are descriptive, conditional on the fitted maps, not formal confidence intervals or convergence diagnostics. Heavy-tailed norm errors can make variance-based uncertainty unreliable; fresh seed batches are needed to assess repeatability.')
     notes += [summary[key] for key in ('target_note', 'mse_note', 'time_scope') if isinstance(summary.get(key), str)]
     warning = '<p class="warning">Quick execution check only — do not interpret sampler rankings.</p>' if smoke else ''
+    uncertain_reference = [key for metric, key in enumerate(metric_names)
+                           if not reference_exact[metric] and reference_mcse[metric] > 0 and
+                           reference_mcse[metric] > .1*np.sqrt(min(mses[name][metric] for name in names))]
+    if uncertain_reference:
+        warning += ('<p class="warning"><strong>Reference precision matters.</strong> For '+
+                    html.escape(', '.join(uncertain_reference))+', the reference MCSE exceeds one tenth '
+                    'of the smallest reported sampler RMSE. Inspect reference_values.csv before interpreting '
+                    'small MSE differences; this is a descriptive precision check, not a confidence interval.</p>')
     guard_hits = [(name, [row for row in cases[name].get('records', []) if row.get('scale_ceiling_reached')])
                   for name in names]
     guard_hits = [(name, rows) for name, rows in guard_hits if rows]
@@ -559,6 +677,8 @@ def render_report(root, summary):
     page += '<p>'+' · '.join('<a href="'+filename+'">'+html.escape(filename)+'</a>' for filename in csvs)+'</p>'
     for filename in figure_names:
         page += '<figure><a href="figures/'+filename+'.pdf"><img src="figures/'+filename+'.png" alt="'+html.escape(filename.replace('_', ' '))+'"></a><figcaption>Click the figure to open its PDF.</figcaption></figure>'
+    if reference_rows:
+        page += '<h2>Reference values and precision</h2><p>Estimated references are independent of every sampler. MCSE describes reference simulation error; it is separate from between-chain variation.</p>'+_table(reference_rows)
     page += '<h2>Counts, errors and runtime</h2>'+_table(case_rows)
     if paired_rows:
         page += '<h2>Paired MSE differences from SCS</h2><p>Negative differences favor the named method. Empirical MCSE is descriptive; it is not a confidence interval.</p>'+_table(paired_rows)

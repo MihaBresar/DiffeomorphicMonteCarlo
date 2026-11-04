@@ -201,19 +201,25 @@ def _calibrate(block, initial, key, warmup, initial_scale, scale_ceiling=None):
     return final[0], jnp.exp(jnp.clip(final[4], -30., log_ceiling)), final[5]
 
 
-def _radial_batch(block, projection, state, key, scale, thin, threshold):
+def _radial_batch(block, projection, state, key, scale, thin, threshold, coordinate_threshold=None):
     """The same full-state projection and statistic work, including rejections."""
     import jax.numpy as jnp
     states, accepted = block(state, key, BATCH_SIZE, scale)
-    norms = jnp.linalg.norm(projection(states), axis=1)
+    physical = projection(states)
+    norms = jnp.linalg.norm(physical, axis=1)
     values = jnp.stack((norms >= threshold, norms, accepted), axis=1)
-    prefixes = jnp.cumsum(values.reshape(3, PREFIX_STRIDE, 3).sum(axis=1), axis=0)
-    return states[-1], prefixes, norms[thin - 1::thin]
+    saved = norms[thin - 1::thin]
+    if coordinate_threshold is not None:
+        x1 = physical[:, 0]
+        values = jnp.column_stack((values, x1, x1 > coordinate_threshold))
+        saved = jnp.column_stack((saved, x1[thin - 1::thin]))
+    prefixes = jnp.cumsum(values.reshape(3, PREFIX_STRIDE, values.shape[1]).sum(axis=1), axis=0)
+    return states[-1], prefixes, saved
 
 
 @lru_cache(maxsize=8)
 def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initial_scale, scale_ceiling=None,
-              tuning_policy=ACCEPTANCE_TUNING):
+              tuning_policy=ACCEPTANCE_TUNING, coordinate_threshold=None):
     """Compile both phases without consuming a chain's RNG or timing budget."""
     import jax
     import jax.numpy as jnp
@@ -228,7 +234,8 @@ def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initi
         burn = lambda state, key: _calibrate(block, state, key, warmup, initial_scale, scale_ceiling)
     else:
         raise ValueError(f'Unknown step tuning policy: {tuning_policy}')
-    batch = lambda state, key, scale: _radial_batch(block, projection, state, key, scale, thin, threshold)
+    batch = lambda state, key, scale: _radial_batch(
+        block, projection, state, key, scale, thin, threshold, coordinate_threshold)
     device = jax.local_devices(backend='cpu')[0]
     initial, key, scale = jax.device_put((initial, jax.random.key(0), jnp.asarray(initial_scale)), device)
     started = time.perf_counter()
@@ -257,7 +264,9 @@ class _Matched:
         # Preserve the original compiled-program key and RNG path for controls.
         if self.tuning_policy == BALL_TUNING:
             arguments += (self.tuning_policy,)
-        burn, self.program, initial, compile_seconds = _programs(*arguments)
+        extra = ({'coordinate_threshold': float(config['coordinate_threshold'])}
+                 if config.get('coordinate_metrics', False) else {})
+        burn, self.program, initial, compile_seconds = _programs(*arguments, **extra)
         self.compile_seconds = compile_seconds if _programs.cache_info().misses > previous else 0.
         key = jax.device_put(jax.random.key(seed), jax.local_devices(backend='cpu')[0])
         burn_key, self.key = jax.random.split(key)
@@ -332,9 +341,15 @@ def _validate(config):
         raise ValueError('dcs_backend must be jax or numba')
     if config.get('dcs_backend') == 'numba' and config['algorithm'] == 'DCS-RWM':
         raise ValueError('The optimized Numba comparison contains BW and reflected BW, not DCS-RWM')
+    if not isinstance(config.get('coordinate_metrics', False), bool):
+        raise ValueError('coordinate_metrics must be a boolean')
+    if config.get('coordinate_metrics', False):
+        value = config.get('coordinate_threshold')
+        if isinstance(value, bool) or not isinstance(value, Real) or not np.isfinite(value):
+            raise ValueError('coordinate_threshold must be finite when coordinate metrics are enabled')
 
 
-def _postburn(prefixes, norms, thin, threshold):
+def _postburn(prefixes, norms, thin, threshold, coordinate_threshold=None):
     """Remove exactly N/3 transitions using stored every-100-step prefixes."""
     iterations = len(prefixes) * PREFIX_STRIDE
     if iterations == 0 or iterations % BATCH_SIZE:
@@ -344,7 +359,11 @@ def _postburn(prefixes, norms, thin, threshold):
     sums = totals - prefixes[burn // PREFIX_STRIDE - 1]
     count = iterations - burn
     retained_norms = norms[burn // thin:]
-    traces = np.column_stack((retained_norms >= threshold, retained_norms))
+    if coordinate_threshold is None:
+        traces = np.column_stack((retained_norms >= threshold, retained_norms))
+    else:
+        radii, x1 = retained_norms[:, 0], retained_norms[:, 1]
+        traces = np.column_stack((radii >= threshold, radii, x1, x1 > coordinate_threshold))
     return traces, iterations, burn, count, totals, sums
 
 
@@ -363,10 +382,17 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
     backend = _backend(mapping_dict, config, int(seed))
     native = config.get('dcs_backend') == 'numba' and config['algorithm'] != 'SCS'
     thin, threshold = config['thin'], float(config.get('threshold', 50.))
+    coordinate_threshold = float(config['coordinate_threshold']) if config.get('coordinate_metrics', False) else None
+    prefix_width = 5 if coordinate_threshold is not None else 3
+    functionals = ['tail_probability', 'mean_norm']
+    if coordinate_threshold is not None:
+        functionals += ['mean_x1', 'x1_tail_probability']
+    def trace_shape(count):
+        return (count, 2) if coordinate_threshold is not None else (count,)
     capacity, batches = 1024, 0
-    prefix_buffer = np.empty((capacity * 3, 3), dtype=float)
-    norm_buffer = np.empty(capacity * BATCH_SIZE // thin, dtype=float)
-    totals = np.zeros(3, dtype=float)
+    prefix_buffer = np.empty((capacity * 3, prefix_width), dtype=float)
+    norm_buffer = np.empty(trace_shape(capacity * BATCH_SIZE // thin), dtype=float)
+    totals = np.zeros(prefix_width, dtype=float)
     if before_sampling is not None:
         before_sampling()
     started, cpu_started = time.perf_counter(), time.process_time()
@@ -374,10 +400,10 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         prefixes, norms = backend.batch()
         if batches == capacity:
             capacity *= 2
-            larger = np.empty((capacity * 3, 3), dtype=float)
+            larger = np.empty((capacity * 3, prefix_width), dtype=float)
             larger[:batches * 3] = prefix_buffer
             prefix_buffer = larger
-            larger = np.empty(capacity * BATCH_SIZE // thin, dtype=float)
+            larger = np.empty(trace_shape(capacity * BATCH_SIZE // thin), dtype=float)
             larger[:batches * BATCH_SIZE // thin] = norm_buffer
             norm_buffer = larger
         prefix_buffer[batches * 3:(batches + 1) * 3] = prefixes + totals
@@ -395,8 +421,9 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
     norms = norm_buffer[:batches * BATCH_SIZE // thin]
     if not np.all(np.isfinite(prefixes)) or not np.all(np.isfinite(norms)):
         raise FloatingPointError('Nonfinite timed radial summaries')
-    traces, iterations, burn, count, totals, sums = _postburn(prefixes, norms, thin, threshold)
-    estimate = sums[:2] / count
+    traces, iterations, burn, count, totals, sums = _postburn(
+        prefixes, norms, thin, threshold, coordinate_threshold)
+    estimate = sums[[0, 1, 3, 4] if coordinate_threshold is not None else [0, 1]] / count
     record = {
         'algorithm': config['algorithm'], 'seed': int(seed),
         'iterations': iterations, 'discarded_iterations': burn, 'estimation_iterations': count,
@@ -429,7 +456,7 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         'postburn_accepted': int(sums[2]), 'postburn_acceptance': float(sums[2] / count),
         'tail_count': int(sums[0]), 'norm_sum': float(sums[1]),
         'mean_all_iterations': estimate.tolist(), 'mean_post_burnin': estimate.tolist(),
-        'estimates': {'tail_probability': float(estimate[0]), 'mean_norm': float(estimate[1])},
+        'estimates': dict(zip(functionals, estimate.tolist())), 'functionals': functionals,
         'all_timed_tail_count': int(totals[0]), 'all_timed_norm_sum': float(totals[1]),
         'burn_fraction': '1/3 of actual timed iterations after separate warmup',
         'estimator': 'all post-burn timed iterations, including rejection repeats; thinning affects saved traces only',
@@ -438,6 +465,11 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         'target_skew_cdf': 'normal' if config.get('target', {}).get('kind', 'skew_t') == 'skew_t' else None,
         'checkpoints': [],
     }
+    if coordinate_threshold is not None:
+        record.update(coordinate_threshold=coordinate_threshold,
+            x1_sum=float(sums[3]), x1_tail_count=int(sums[4]),
+            all_timed_x1_sum=float(totals[3]), all_timed_x1_tail_count=int(totals[4]))
+        record['common_statistic_policy'] += '; x1 and one-sided x1 tail use every same post-MH state'
     record.update(getattr(backend, 'tuning_metadata', {}))
     if native:
         record['rng_note'] = 'Shared JAX calibration; independent domain-separated NumPy PCG64 production stream. Different backends preserve proposal laws, not bitwise production trajectories.'

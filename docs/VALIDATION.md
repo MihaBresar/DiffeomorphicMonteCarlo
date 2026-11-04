@@ -1,8 +1,24 @@
 # Validation of the corrected implementation
 
-## Current selectable-target comparisons (3 November 2026)
+## Asymmetry extension (4 November 2026)
 
-The current suite covers **eight comparison combinations**: 100D and 500D skewed Student-t targets, two implementation modes, and VI on/off for both map families. Both targets use ν=3 and DCS β=2. Checks cover target-specific analytic references, exact one-third burn-in, frozen step calibration, native/JAX numerical agreement and partial-worker scheduling. SCS's pinned source files and licence remain unchanged. The machine-readable [check record](../validation/comparison_suite_checks.json) records the current automated-test and execution-check results.
+Version 2 adds first-coordinate mean/tail measurements for the existing 100D
+and 500D skewed t(3) targets. There are eight combinations of
+target, implementation mode and VI setting. References distinguish analytic
+radial constants from independently estimated values and retain reference MCSE.
+New checks cover independent coordinate references, coordinate accumulation
+including repeated states, exact first-third discard and additional reports.
+The original radial plot families and historical replot support are preserved.
+Fresh runs of every method are needed because all four measurements now enter
+the timed production work.
+
+The following 3 November record describes the earlier radial-only version; its
+test counts and performance results must not be presented as validation of the
+new coordinate measurements.
+
+## Historical selectable-target comparisons (3 November 2026)
+
+That suite covered **eight comparison combinations**: 100D and 500D skewed Student-t targets, two implementation modes, and VI on/off for both map families. Both targets use ν=3 and DCS β=2. Checks covered target-specific analytic references, exact one-third burn-in, frozen step calibration, native/JAX numerical agreement and partial-worker scheduling. SCS's pinned source files and licence remained unchanged. The machine-readable [check record](../validation/comparison_suite_checks.json) records those automated-test and execution-check results.
 
 All **eight Smaller reproduction combinations** completed on the Apple M4 Pro laptop with four workers: **560 chains**, twenty per method/case, two seconds of production each, no retries or discarded attempts. The numerical sources stayed fixed during these runs. The shared JAX and native comparisons used identical fitted maps and step calibration for each target/VI setting. Guard flags are reported, including SCS saturation in 12 of 20 chains in each 100D no-VI comparison. These are conditional, exploratory estimates, not full-paper rankings.
 

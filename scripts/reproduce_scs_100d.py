@@ -269,9 +269,24 @@ def run_chains(root, config, maps):
     return {key: sorted(values, key=lambda x: x['chain']) for key, values in records.items()}
 
 
-def summarize(config, maps, fitting, records):
+def summarize(config, maps, fitting, records, reference=None):
     target = Target(config.get('target', TARGET))
-    truth = radial_truth(target, config.get('threshold', 50.))[1]
+    if config.get('coordinate_metrics', False):
+        if reference is None:
+            from dcs_bench.references import comparison_reference
+            reference = comparison_reference(config)
+        functionals = list(reference['functionals'])
+        truth = np.asarray(reference['truth'], dtype=float)
+    else:
+        functionals, truth, _ = radial_truth(target, config.get('threshold', 50.))
+        reference = dict(functionals=functionals, truth=truth.tolist(), reference_mcse=[0., 0.],
+                         exact=[True, True], source='Analytic Student-t radial law')
+    expected = (['tail_probability', 'mean_norm', 'mean_x1', 'x1_tail_probability']
+                if config.get('coordinate_metrics', False) else ['tail_probability', 'mean_norm'])
+    reference_mcse = np.asarray(reference['reference_mcse'], dtype=float)
+    if functionals != expected or truth.shape != (len(expected),) or reference_mcse.shape != truth.shape \
+            or not np.all(np.isfinite(truth)) or not np.all(np.isfinite(reference_mcse)) or np.any(reference_mcse < 0):
+        raise ValueError('Invalid comparison reference or functional order')
     cases = {}
     for name in config['algorithms']:
         rows = records[name]
@@ -285,7 +300,7 @@ def summarize(config, maps, fitting, records):
             if row['seconds'] < config['time_budget']:
                 raise ValueError('A chain stopped before its requested sampling budget')
         means = np.asarray([r['mean_all_iterations'] for r in rows])
-        if means.shape != (config['runs'], 2) or not np.all(np.isfinite(means)):
+        if means.shape != (config['runs'], len(functionals)) or not np.all(np.isfinite(means)):
             raise ValueError('Nonfinite or malformed chain estimates')
         mse = np.mean((means-truth)**2, axis=0)
         bias_squared = (means.mean(axis=0)-truth)**2
@@ -305,14 +320,19 @@ def summarize(config, maps, fitting, records):
             mean_acceptance=float(np.mean([r['acceptance'] for r in rows])),
             final_scales=[r['final_scale'] for r in rows], records=rows)
         cases[name].update(mse_variability(means, truth))
-    return dict(config=config, truth=truth.tolist(), functionals=['tail_probability', 'mean_norm'],
+        cases[name]['reference_error_material'] = (reference_mcse > .1*np.sqrt(mse)).tolist()
+    return dict(config=config, truth=truth.tolist(), functionals=functionals, reference=reference,
                 maps=maps, fitting=fitting, cases=cases, time_scope=config.get('time_scope', TIME_SCOPE),
                 paired_mse_differences=paired_mse_differences(
-                    {name: case['chain_means'] for name, case in cases.items()}, records, truth),
+                    {name: case['chain_means'] for name, case in cases.items()}, records, truth,
+                    functionals=functionals),
                 target_note=config.get('target_note', 'Shared normal-CDF-skewed t target from the DCS experiment. '
                             'The SCS paper uses a Student-t CDF and nu=1 or2; this applies the SCS kernel '
                             'with recorded benchmark tuning to our nu=3 target.'),
-                mse_note='All post-burn-in iterations, including repeats after rejections; exact radial truth. '
+                mse_note='All post-burn-in iterations, including repeats after rejections. '
+                         'Reference values and their uncertainty are recorded separately; MSE and its empirical '
+                         'variability condition on the common reference. A reference-error flag marks reference MCSE '
+                         'above 10% of that method\'s observed RMSE. '
                          'Empirical bias squared plus between-chain variance with divisor number of chains equals MSE. '
                          'More chains estimate error more precisely but cannot repair insufficient chain mixing.')
 
@@ -329,10 +349,18 @@ def run(config, output):
     write_json(output/'configuration.json', config)
     write_json(output/'manifest.json', manifest)
     try:
+        reference = None
+        if config.get('coordinate_metrics', False):
+            from dcs_bench.references import comparison_reference
+            print('Preparing independent reference for radial and first-coordinate measurements', flush=True)
+            reference_started = time.perf_counter()
+            reference = comparison_reference(config)
+            manifest['reference_seconds'] = time.perf_counter()-reference_started
+            write_json(output/'reference.json', reference)
         maps, fitting = prepare(config)
         write_json(output/'maps.json', {'maps': maps, 'fitting': fitting})
         records = run_chains(output, config, maps)
-        summary = summarize(config, maps, fitting, records)
+        summary = summarize(config, maps, fitting, records, reference=reference)
         write_json(output/'summary.json', summary)
         from scripts.scs_100d_figures import render_report
         render_report(output, summary)

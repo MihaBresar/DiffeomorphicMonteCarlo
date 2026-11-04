@@ -67,6 +67,51 @@ def _evaluate(z, mu, delta, alpha, constants, skewed):
 
 
 @njit(nogil=True, error_model='numpy')
+def _evaluate_extended(z, mu, delta, alpha, constants, skewed):
+    """Density, physical radius and X[0] in one stable map traversal."""
+    d = len(z)
+    beta, scale, tail, delta2, logscale, logdelta, normalizer = constants
+    r2, dot = 0., 0.
+    for j in range(d):
+        r2 += z[j] * z[j]
+        dot += z[j] * delta[j]
+    if not np.isfinite(r2) or r2 >= 1.:
+        return -np.inf, np.nan, np.nan
+    denominator = 1. + 2. * dot + delta2 * r2
+    if denominator <= 0. or not np.isfinite(denominator):
+        return -np.inf, np.nan, np.nan
+    logmo = logdelta - d * np.log(denominator)
+    if beta == 2.:
+        eps = (1. - delta2) * (1. - r2) / denominator
+        logeps = np.log(eps)
+        e = np.sqrt(eps)
+    else:
+        rho2 = 0.
+        for j in range(d):
+            w = ((1. - delta2) * z[j] + (1. + 2. * dot + r2) * delta[j]) / denominator
+            rho2 += w * w
+        if not np.isfinite(rho2) or rho2 >= 1.:
+            return -np.inf, np.nan, np.nan
+        logeps = 0. if rho2 == 0. else np.log(-np.expm1(.5 * beta * np.log(rho2)))
+        e = np.exp(logeps / beta)
+    q, skew, first = 0., 0., 0.
+    for j in range(d):
+        w = ((1. - delta2) * z[j] + (1. + 2. * dot + r2) * delta[j]) / denominator
+        value = mu[j] * e + scale * w
+        q += value * value
+        if j == 0:
+            first = value / e
+        if skewed:
+            skew += alpha[j] * value
+    s = tail * e * e + q
+    lp = (normalizer + (tail / beta - 1.) * logeps + logscale + logmo
+          - (tail + d) / 2. * np.log(s))
+    if skewed:
+        lp += np.log(2.) + _log_ndtr(skew * np.sqrt((tail + d) / s), 0)
+    return (lp, np.sqrt(q) / e, first) if np.isfinite(lp) else (-np.inf, np.nan, np.nan)
+
+
+@njit(nogil=True, error_model='numpy')
 def _proposal_into(state, increment, reflected, proposed):
     """Fill a scratch proposal with the same direct/chord-reflected endpoint."""
     raw2 = 0.
@@ -145,6 +190,56 @@ def _run_block(rng, state, lp, radius, scale, count, thin, threshold, reflected,
     return lp, radius, prefixes, norms
 
 
+@njit(nogil=True, error_model='numpy')
+def _transition_extended(state, lp, radius, first, increment, logu, reflected,
+                         mu, delta, alpha, constants, skewed, proposed):
+    if not _proposal_into(state, increment, reflected, proposed):
+        return lp, radius, first, False
+    next_lp, next_radius, next_first = _evaluate_extended(
+        proposed, mu, delta, alpha, constants, skewed)
+    if logu < next_lp - lp:
+        for j in range(len(state)):
+            state[j] = proposed[j]
+        return next_lp, next_radius, next_first, True
+    return lp, radius, first, False
+
+
+@njit(nogil=True, error_model='numpy')
+def _run_block_extended(rng, state, lp, radius, first, scale, count, thin,
+                        threshold, coordinate_threshold, reflected, mu, delta,
+                        alpha, constants, skewed):
+    """Accumulate every state; thinning affects only the returned traces."""
+    d = len(state)
+    prefixes = np.zeros((count // PREFIX_STRIDE, 5))
+    saved = np.empty((count // thin, 2))
+    increment, proposed = np.empty(d), np.empty(d)
+    tails, norm_sum, accepted, first_sum, first_tails = 0, 0., 0, 0., 0
+    for i in range(count):
+        normals = rng.standard_normal(d + 2)
+        full2 = 0.
+        for j in range(d + 2):
+            full2 += normals[j] * normals[j]
+        factor = scale / np.sqrt(full2)
+        for j in range(d):
+            increment[j] = factor * normals[j]
+        lp, radius, first, accept = _transition_extended(
+            state, lp, radius, first, increment, np.log(rng.random()), reflected,
+            mu, delta, alpha, constants, skewed, proposed)
+        tails += int(radius >= threshold)
+        norm_sum += radius
+        accepted += int(accept)
+        first_sum += first
+        first_tails += int(first > coordinate_threshold)
+        if (i + 1) % PREFIX_STRIDE == 0:
+            row = (i + 1) // PREFIX_STRIDE - 1
+            prefixes[row, 0], prefixes[row, 1], prefixes[row, 2] = tails, norm_sum, accepted
+            prefixes[row, 3], prefixes[row, 4] = first_sum, first_tails
+        if (i + 1) % thin == 0:
+            row = (i + 1) // thin - 1
+            saved[row, 0], saved[row, 1] = radius, first
+    return lp, radius, first, prefixes, saved
+
+
 def _inputs(mapping_dict, config):
     mapping = BallMap(**mapping_dict)
     spec = config.get('target', config)
@@ -179,6 +274,8 @@ class NumbaRadial:
     def __init__(self, mapping, config, seed, calibration):
         if config['algorithm'] not in ('DCS-BW', 'DCS-BW-reflect'):
             raise ValueError('Optimized Numba comparison supports BW and reflected BW')
+        self.coordinate_metrics = bool(config.get('coordinate_metrics', False))
+        self.extended = self.coordinate_metrics
         self.inputs = _inputs(mapping, config)
         self.state = np.array(calibration.state, dtype=np.float64, order='C', copy=True)
         if self.state.shape != (len(self.inputs[0]),) or not np.all(np.isfinite(self.state)):
@@ -190,6 +287,9 @@ class NumbaRadial:
         if self.thin < 1 or PREFIX_STRIDE % self.thin:
             raise ValueError('Native thin must divide100')
         self.threshold = float(config.get('threshold', 50.))
+        self.coordinate_threshold = float(config.get('coordinate_threshold', 3.))
+        if self.extended and not np.isfinite(self.coordinate_threshold):
+            raise ValueError('Coordinate threshold must be finite')
         self.reflected = config['algorithm'] == 'DCS-BW-reflect'
         self.warmup_seconds = float(calibration.warmup_seconds)
         self.warmup_acceptance = calibration.warmup_acceptance
@@ -197,12 +297,20 @@ class NumbaRadial:
         self.tuning_policy = getattr(calibration, 'tuning_policy', None)
         self.tuning_metadata = deepcopy(getattr(calibration, 'tuning_metadata', {}))
         started = time.perf_counter()
-        self.lp, self.radius = _evaluate(self.state, *self.inputs)
-        if not np.isfinite(self.lp) or not np.isfinite(self.radius):
+        if self.extended:
+            self.lp, self.radius, self.first = _evaluate_extended(self.state, *self.inputs)
+        else:
+            self.lp, self.radius = _evaluate(self.state, *self.inputs)
+        if not np.isfinite(self.lp) or not np.isfinite(self.radius) or (self.extended and not np.isfinite(self.first)):
             raise ValueError('Nonfinite native initial density or physical radius')
         # Compile with zero transitions and a disposable RNG before timing.
-        _run_block(np.random.default_rng(0), self.state.copy(), self.lp, self.radius,
-                   self.scale, 0, self.thin, self.threshold, self.reflected, *self.inputs)
+        if self.extended:
+            _run_block_extended(np.random.default_rng(0), self.state.copy(), self.lp, self.radius,
+                self.first, self.scale, 0, self.thin, self.threshold, self.coordinate_threshold,
+                self.reflected, *self.inputs)
+        else:
+            _run_block(np.random.default_rng(0), self.state.copy(), self.lp, self.radius,
+                       self.scale, 0, self.thin, self.threshold, self.reflected, *self.inputs)
         self.numba_compile_seconds = time.perf_counter() - started
         self.compile_seconds = float(calibration.compile_seconds) + self.numba_compile_seconds
         self.rng = np.random.default_rng(np.random.SeedSequence([int(seed), PRODUCTION_DOMAIN]))
@@ -213,8 +321,18 @@ class NumbaRadial:
             calibration_backend='Identical JAX calibration and frozen starting state',
             production_rng='NumPy PCG64; SeedSequence([chain_seed,0x4E424457]); separate from calibration',
             native_statistic_policy='Every post-Metropolis state contributes; current norm reused on rejection')
+        if self.coordinate_metrics:
+            self.implementation = self.implementation.replace('density and norm', 'density, norm and first coordinate')
+            self.implementation = self.implementation.replace('radial accumulation', 'radial and coordinate accumulation')
+            self.tuning_metadata['native_statistic_policy'] = (
+                'Every post-Metropolis state contributes; current norm and first coordinate reused on rejection')
 
     def batch(self):
+        if self.extended:
+            self.lp, self.radius, self.first, prefixes, saved = _run_block_extended(
+                self.rng, self.state, self.lp, self.radius, self.first, self._scale, BATCH_SIZE,
+                self.thin, self.threshold, self.coordinate_threshold, self.reflected, *self.inputs)
+            return prefixes, saved
         self.lp, self.radius, prefixes, norms = _run_block(
             self.rng, self.state, self.lp, self.radius, self._scale, BATCH_SIZE,
             self.thin, self.threshold, self.reflected, *self.inputs)

@@ -12,7 +12,22 @@ Even functionals, including radial functions, retain the symmetric t law. Thus `
 
 Directional checks use the unit skewness direction (e₁ if α=0): `1{uᵀX>0}` and `tanh(uᵀX/sqrt(ν))`. Their references are independent iid estimates with MCSE, or exact symmetry values 1/2 and 0. Coordinate quantiles use the corrected iid construction. One million iid reference draws are used for paper quantiles; exact radial constants need no Monte Carlo sample.
 
-The [current comparison suite](COMPARISONS.md) also offers the original 100D skewed t(3) and a 500D version with the same skew coefficients; their radial thresholds are 50 and 50√5 respectively. Its VI switch applies to both map families, and its maps initialize at unit scale. Other experiment configurations may use the radial-median initialization described below.
+The [current comparison suite](COMPARISONS.md) offers the original 100D skewed
+t(3) and a 500D version with the same skew coefficients. Both use DCS β=2. Their
+radial thresholds remain 50 and 50√5. In addition to mean norm and radial tail
+probability, the suite estimates `E[X₁]` and `P(X₁ > 3)` in physical coordinates.
+The target densities, thresholds for the radial quantities and all-ones
+physical initialization remain unchanged.
+
+The original analytic F-law radial references remain exact. Coordinate
+references are independent estimates with recorded MCSE, using conditional
+sign expectations and fixed known-mean controls. The coordinate threshold is
+fixed before benchmarking. Ordinary third-moment skewness is not defined at
+ν=3 and is not an estimand.
+
+The VI switch applies to both map families, and their maps initialize at unit
+scale. Other experiment configurations may use the radial-median initialization
+described below.
 
 ## Logistic regression
 

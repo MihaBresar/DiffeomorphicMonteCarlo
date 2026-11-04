@@ -17,8 +17,12 @@ def mse_variability(means, truth):
     return dict(mse_empirical_mcse=mcse, largest_chain_squared_error_share=shares.tolist())
 
 
-def paired_mse_differences(means, records, truth, reference='SCS'):
+def paired_mse_differences(means, records, truth, reference='SCS', functionals=None):
     """Align complete, unique seed pairs; never pair by accidental row order."""
+    functionals = ['tail_probability', 'mean_norm'] if functionals is None else list(functionals)
+    truth = np.asarray(truth, dtype=float)
+    if truth.shape != (len(functionals),):
+        raise ValueError('One reference value is required per functional')
     def by_seed(name):
         rows = records.get(name, [])
         values = np.asarray(means[name], dtype=float)
@@ -41,7 +45,7 @@ def paired_mse_differences(means, records, truth, reference='SCS'):
         differences = np.asarray([candidate[seed]-baseline[seed] for seed in sorted(baseline)])
         count = len(differences)
         empirical_mcse = (differences.std(axis=0, ddof=1)/np.sqrt(count)).tolist() if count > 1 else [None]*differences.shape[1]
-        for index, metric in enumerate(('tail_probability', 'mean_norm')):
+        for index, metric in enumerate(functionals):
             rows.append(dict(method=method, reference=reference, metric=metric, paired_chains=count,
                              mse_difference=float(differences[:, index].mean()),
                              difference_empirical_mcse=empirical_mcse[index]))

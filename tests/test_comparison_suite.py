@@ -44,6 +44,9 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertEqual(config['optimizer_samples'], 2000)
                         self.assertEqual(config['target']['nu'], 3.)
                         self.assertEqual(config['target']['alpha'], {'0': 100., '1': -100.})
+                        self.assertTrue(config['coordinate_metrics'])
+                        self.assertEqual(config['coordinate_threshold'], 3.)
+                        self.assertEqual(config['reference_samples'], 5_000_000)
 
     def test_vi_off_bypasses_fitting_for_both_map_families_without_skipping_warmup(self):
         for target_id in ('skew-t-100d', 'skew-t-500d'):
@@ -96,6 +99,11 @@ class ComparisonSuiteTests(unittest.TestCase):
             mean_norm = np.exp(.5*np.log(3.)+special.gammaln((dimension+1)/2)+special.gammaln(1.)
                                -special.gammaln(dimension/2)-special.gammaln(1.5))
             truth = np.array([stats.f.sf(config['threshold']**2/dimension, dimension, 3), mean_norm])
+            reference = dict(functionals=['tail_probability', 'mean_norm', 'mean_x1', 'x1_tail_probability'],
+                             truth=[*truth, .7, .03], reference_mcse=[0., 0., 1e-5, 1e-5],
+                             exact=[True, True, False, False])
+            truth = np.asarray(reference['truth'])
+            errors = np.array([.005, 1., .1, .002])
             records = {}
             for method in config['algorithms']:
                 records[method] = []
@@ -104,15 +112,17 @@ class ComparisonSuiteTests(unittest.TestCase):
                     records[method].append(dict(chain=chain, seed=config['seed']+chain,
                         iterations=count, discarded_iterations=count//3, estimation_iterations=count*2//3,
                         seconds=.1, acceptance=.5, final_scale=.1,
-                        mean_all_iterations=(truth+direction*np.array([.005, 1.])).tolist()))
+                        mean_all_iterations=(truth+direction*errors).tolist()))
             with self.subTest(target=target_id):
-                summary = runner.summarize(config, {}, {}, records)
+                summary = runner.summarize(config, {}, {}, records, reference=reference)
                 np.testing.assert_allclose(summary['truth'], truth, rtol=1e-12, atol=1e-12)
                 self.assertEqual(summary['target_note'], config['target_note'])
                 for case in summary['cases'].values():
-                    np.testing.assert_allclose(case['mse'], [.005**2, 1.], rtol=1e-11, atol=1e-12)
+                    np.testing.assert_allclose(case['mse'], errors**2, rtol=1e-11, atol=1e-12)
                     self.assertEqual(case['total_iterations'], 900)
                     self.assertEqual(case['total_estimation_iterations'], 600)
+                self.assertEqual(len(summary['paired_mse_differences']), 12)
+                self.assertEqual(summary['reference'], reference)
 
     def test_native_dispatch_reuses_same_jax_calibration_and_keeps_author_scs(self):
         from dcs_bench import numba_radial

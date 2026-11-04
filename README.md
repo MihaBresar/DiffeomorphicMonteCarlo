@@ -11,7 +11,7 @@ Choose one of two comparisons:
 - **Sampler comparison (JAX):** DCS-RWM, DCS-BW, author SCS and reflected DCS-BW, all in the same JAX timing/recording framework.
 - **Optimized Numba comparison:** DCS-BW and reflected DCS-BW with fused native loops, versus the unmodified author SCS in JAX. This measures implementation efficiency; it does not equalize framework and output-processing costs.
 
-Each offers **100D skewed t(3)** or **500D skewed t(3)**, both with DCS β=2, and **VI on/off for both map families**. Step sizes are always pretuned separately and frozen before sampling. Reflected BW uses ball-movement calibration without a hard ceiling of 2; ordinary BW, RWM and SCS target acceptance 0.234. See [the comparison protocol](docs/COMPARISONS.md).
+Each offers **100D skewed t(3)** or **500D skewed t(3)**, both with DCS β=2, and **VI on/off for both map families**. Step sizes are always pretuned separately and frozen before sampling. Reflected BW uses ball-movement calibration without a hard ceiling of 2; ordinary BW, RWM and SCS target acceptance 0.234. Reports preserve all radial plots and add the first-coordinate mean and one-sided tail probability, with independent reference precision shown. See [the comparison protocol](docs/COMPARISONS.md).
 
 Download this repository using **Code → Download ZIP**, extract it, and install
 **Python 3.12 (64-bit)**. On Windows double-click **Start.bat**; on macOS open
@@ -96,7 +96,7 @@ Old SCS and boundary comparisons are removed from the launcher. Their command-li
 
 All canonical benchmark kernels now use compiled sampling loops, including hit-and-run and the ordinary/spherical baselines. See [native implementation checks and measured speedups](docs/NATIVE_KERNELS.md) and [the HnR/NUTS audit](docs/HNR_NUTS.md).
 
-The [laptop comparison results](docs/COMPARISON_RESULTS.md) cover all eight Student-t target/VI/backend combinations, with full-precision exports and tuning limitations. These smaller runs do not establish universal rankings.
+The [4 November laptop results](docs/COMPARISON_RESULTS.md) cover all eight original-target/VI/backend combinations and all four measurements: 560 chains, with full-precision errors, counts and timings. Coordinate and radial rankings differ. The earlier 3 November radial-only results remain documented separately; these smaller runs do not establish universal rankings.
 
 ## Saved artifacts
 
@@ -113,7 +113,7 @@ Workers stream draws through bounded buffers, preventing a second full-chain all
 
 The general experiment reports, excluding the current comparison suite and the compact 200D baseline report, include chain estimates, MSE/RMSE and descriptive bootstrap intervals, functional MCSE, bulk/tail ESS, rank R-hat, NUTS divergences, tree saturation indicators, work counts, frozen tuning and timings. Unavailable diagnostics are null with an explanation. MSE is averaged over independent-chain squared errors. Posterior references remain finite Monte Carlo estimates, with their uncertainty reported.
 
-The general skew-t runs, excluding the current comparison suite and the compact 200D baselines, also create a supplementary `*_directional` figure. Radial functions cannot assess whether skewness is sampled correctly, so these check a bounded directional probability and a bounded directional mean against independent references. The current comparison suite reports radial estimation only; their tail and norm metrics do not establish better exploration of the skewed direction or overall mixing.
+The general skew-t runs, excluding the current comparison suite and the compact 200D baselines, also create a supplementary `*_directional` figure. Radial functions cannot assess whether skewness is sampled correctly, so these check a bounded directional probability and a bounded directional mean against independent references. The current comparison suite keeps those radial metrics and adds E[X₁] and P(X₁ > c) to assess the asymmetric part. Thresholds are fixed before sampling. Independent reference estimates include MCSE, and no set of these functionals establishes overall mixing.
 
 The original Q–Q, radial boxplot and linear MSE figure families are restored,
 including both fixed-time and fixed-iteration comparisons. Additional directional

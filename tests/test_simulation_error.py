@@ -23,6 +23,14 @@ class SimulationErrorTests(unittest.TestCase):
         records['DCS-BW'][0]['seed'] = 2
         self.assertEqual(paired_mse_differences(means,records,np.array([0,0])),[])
 
+    def test_coordinate_mse_differences_are_included(self):
+        names = ['tail_probability', 'mean_norm', 'mean_x1', 'x1_tail_probability']
+        rows = paired_mse_differences(
+            {'DCS-BW': [[1, 2, 3, 4]], 'SCS': [[0, 0, 0, 0]]},
+            {'DCS-BW': [{'seed': 7}], 'SCS': [{'seed': 7}]}, [0, 0, 0, 0], functionals=names)
+        self.assertEqual([row['metric'] for row in rows], names)
+        self.assertEqual([row['mse_difference'] for row in rows], [1., 4., 9., 16.])
+
 
 if __name__ == '__main__':
     unittest.main()
