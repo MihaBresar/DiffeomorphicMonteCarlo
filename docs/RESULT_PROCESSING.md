@@ -1,6 +1,6 @@
 # Saving and processing large runs
 
-Current version-7 comparisons add functional ESS for the radial-tail indicator
+Current comparisons (version 7 onward) include functional ESS for the radial-tail indicator
 and norm. They capture unthinned scalar histories into temporary files inside
 the sampling clock, then compute ESS after the wave finishes. A shared lock
 limits FFT work to one chain at a time, and diagnostic time is recorded

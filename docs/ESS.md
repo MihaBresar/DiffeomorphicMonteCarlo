@@ -17,7 +17,7 @@ and [Stan's analysis reference](https://mc-stan.org/docs/reference-manual/analys
 
 ## Which iterations are used
 
-The two version-7 sampler comparisons capture every scalar radius during
+The current sampler comparisons (version 7 onward) capture every scalar radius during
 production, including repeated states after rejection, then discard exactly
 the first third. ESS uses that **unthinned post-burn-in** history. The configured
 `thin` still controls the small saved trace, but does not change ESS, estimates

@@ -9,7 +9,7 @@ removed from new comparison runs. Their saved reports remain readable.
 | `sampler-comparison` | All five methods in JAX |
 | `sampler-comparison-numba` | DCS-RWM, DCS-BW, DCS-BW-reflect and DCS-Billiard in optimized Numba; unchanged author SCS in JAX |
 
-Both modes use protocol version 7. RWM means DCS-RWM in transformed ball
+Both modes use protocol version 8. RWM means DCS-RWM in transformed ball
 coordinates. Its isotropic Gaussian proposal rejects exterior endpoints;
 ordinary BW uses a uniform-ball increment and also rejects exterior endpoints.
 Reflected BW folds exterior endpoints along the proposal chord before its
@@ -60,21 +60,42 @@ losses are not comparable normalized KL values across families.
 
 ## Separate proposal calibration
 
-Ordinary DCS-RWM, DCS-BW and SCS use observed-acceptance dual averaging toward
+DCS-Billiard and SCS each run their **actual production kernel** during the
+separate pilot. They receive exactly the same total transition budget and
+select by the same radial-movement score. For consecutive accepted-or-repeated
+physical states, set Δ = log(1 + ‖X_next‖) − log(1 + ‖X_current‖); the score is
+mean Δ²/(1 + Δ²). Rejections score zero. This bounded proxy does not use target
+truth, production MSE or ESS and is not a guarantee of optimal mixing.
+
+The prespecified search tests five coarse scales h × (0.25, 1, 4, 16, 64),
+then three refinement scales at (0.5, 1, 2) times the coarse winner. The existing
+initial h remains 0.1. The complete warmup budget is allocated across these
+eight windows: 125 transitions each for Smaller reproduction, and 187 or 188
+for Full paper settings. Candidate execution order is randomized by the pilot
+seed within each stage; chronological order and counts are saved. Numerical
+scale guards still apply. This finite search is not a new geometric step cap.
+
+All pilot observations are discarded. The last pilot state and selected scale
+initialize production; no production adaptation is performed. Billiards use
+their effective post-Möbius map, and SCS uses its recorded sphere map. The
+same JAX pilot is used for either JAX or Numba production. Equal transition
+budgets need not take equal time; actual pilot seconds are reported separately
+and excluded from production time. `radial_tuning.csv` records candidate
+steps, scores, acceptance and selections, separately from reflected-BW pilots.
+
+Ordinary DCS-RWM and DCS-BW retain observed-acceptance dual averaging toward
 0.234. Reflected BW retains its ball-movement pilot: up to eight rounds of
 rotating h/2, h and 2h trials, selecting by observed squared movement in the
 shared ball map with rejected moves scoring zero. It has no geometric step
-ceiling of 2. Billiards spend the same total pilot budget on reflected-BW movement
-in their active post-Möbius coordinates: rotating h/2, h and 2h trials, scoring
-squared ball displacement including zero after rejection. The final pilot
-state and selected scale initialize billiard production. No production MSE
-selects the scale, and no extra angle is tuned. Every step freezes before
-sampling. `reflected_tuning.csv` records both methods' pilots separately;
-the saved effective maps identify their distinct VI-on coordinates.
+ceiling of 2. Its trials remain in `reflected_tuning.csv`.
 
-All rules retain broad numerical guards. A guard hit or equal pilot budget
-does not establish optimal tuning. Gaussian RWM's scale is a coordinate
-standard deviation; BW/billiard scale is a proposal-ball radius.
+All methods receive the preset's same total pilot transition budget and freeze
+their scales before sampling. All rules retain broad numerical guards; a guard
+hit or equal budget does not establish optimal tuning. Gaussian RWM's scale is
+a coordinate standard deviation; BW/billiard scale is a proposal-ball radius.
+Historical version-6/7 billiards retain their recorded reflected-BW pilot.
+The maps, β, SCS latitude, production kernels and production-time budgets are
+unchanged in version 8. A fresh run is needed to measure the new calibration.
 
 ## ESS and timing
 

@@ -27,6 +27,7 @@ PREFIX_STRIDE = 100
 STEP_POLICY = 'common raw dual averaging of observed acceptance to 0.234 during separate warmup; smoothed final scale frozen'
 ACCEPTANCE_TUNING = 'indicator_dual_averaging_0234'
 BALL_TUNING = 'ball_esjd_pilot_v1'
+RADIAL_TUNING = 'own_kernel_radial_pilot_v1'
 ROTATION_TUNING = 'split_ball_angular_esjd_v1'
 ROTATION_METHOD = 'DCS-BW-rotate'
 RWM_ROTATION_METHOD = 'DCS-RWM-rotate'
@@ -61,12 +62,14 @@ def resolve_step_tuning(config):
     for method, policy in policies.items():
         if method not in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, RWM_ROTATION_METHOD, BILLIARD_METHOD, 'SCS'):
             raise ValueError(f'Unknown tuning method: {method}')
-        if policy not in (ACCEPTANCE_TUNING, BALL_TUNING, ROTATION_TUNING):
+        if policy not in (ACCEPTANCE_TUNING, BALL_TUNING, RADIAL_TUNING, ROTATION_TUNING):
             raise ValueError(f'Unknown step tuning policy: {policy}')
         if policy == BALL_TUNING and method not in ('DCS-BW-reflect', BILLIARD_METHOD):
             raise ValueError('Ball ESJD calibration is defined for reflected BW and billiards only')
-        if method == BILLIARD_METHOD and policy != BALL_TUNING:
-            raise ValueError('Billiards require the reflected-BW pilot in post-Mobius coordinates')
+        if policy == RADIAL_TUNING and method not in (BILLIARD_METHOD, 'SCS'):
+            raise ValueError('Own-kernel radial calibration is defined for billiards and SCS only')
+        if method == BILLIARD_METHOD and policy not in (BALL_TUNING, RADIAL_TUNING):
+            raise ValueError('Billiards require the historical reflected-BW pilot or own-kernel radial calibration')
         if (policy == ROTATION_TUNING) != (method in ROTATION_METHODS):
             raise ValueError('Rotation mixtures require split reflected-step/angular calibration')
     selected = policies.get(config['algorithm'],
@@ -74,6 +77,8 @@ def resolve_step_tuning(config):
                             BALL_TUNING if config['algorithm'] == BILLIARD_METHOD else ACCEPTANCE_TUNING)
     if selected == BALL_TUNING and config['warmup'] < 3:
         raise ValueError('Ball ESJD calibration requires at least three warmup transitions')
+    if selected == RADIAL_TUNING and config['warmup'] < 8:
+        raise ValueError('Own-kernel radial calibration requires at least eight warmup transitions')
     if selected == ROTATION_TUNING:
         if config['warmup'] < 6:
             raise ValueError('Split ball/angular calibration requires at least six warmup transitions')
@@ -291,17 +296,21 @@ def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initi
     import jax.numpy as jnp
     mapping, spec = json.loads(mapping_json), json.loads(spec_json)
     block, projection, initial, density = _components(mapping, spec, algorithm)
-    # Reproduce the reviewed candidate's exact pilot, state and frozen scale.
-    # Only production uses billiards; pilot resources are not multiplied.
+    # Historical v6/v7 billiards retain the reviewed reflected-BW pilot.
+    # The explicit own-kernel policy uses the actual block for both phases.
     calibration_block = block
-    if algorithm == BILLIARD_METHOD:
-        if tuning_policy != BALL_TUNING:
-            raise ValueError('Billiards require reflected-BW ball-movement calibration')
+    if algorithm == BILLIARD_METHOD and tuning_policy == BALL_TUNING:
         calibration_block, _, _, _ = _components(
             effective_mapping(mapping, algorithm), spec, 'DCS-BW-reflect')
+    elif algorithm == BILLIARD_METHOD and tuning_policy != RADIAL_TUNING:
+        raise ValueError('Billiards require reflected-BW or own-kernel radial calibration')
     if not np.isfinite(float(density(initial))) or not np.all(np.isfinite(np.asarray(projection(initial)))):
         raise ValueError('Nonfinite initial density or physical point')
-    if tuning_policy == BALL_TUNING:
+    if tuning_policy == RADIAL_TUNING:
+        from .radial_tuning import calibrate_radial
+        burn = lambda state, key: calibrate_radial(
+            block, projection, state, key, warmup, initial_scale, scale_ceiling)
+    elif tuning_policy == BALL_TUNING:
         from .ball_tuning import calibrate_ball_esjd
         burn = lambda state, key: calibrate_ball_esjd(calibration_block, state, key, warmup, initial_scale, scale_ceiling)
     elif tuning_policy == ACCEPTANCE_TUNING:
@@ -389,7 +398,7 @@ class _Matched:
             config['algorithm'], config['warmup'], config['thin'],
             float(config.get('threshold', 50.)), self.initial_scale, scale_ceiling)
         # Preserve the original compiled-program key and RNG path for controls.
-        if self.tuning_policy == BALL_TUNING:
+        if self.tuning_policy in (BALL_TUNING, RADIAL_TUNING):
             arguments += (self.tuning_policy,)
         extra = ({'coordinate_threshold': float(config['coordinate_threshold'])}
                  if config.get('coordinate_metrics', False) else {})
@@ -420,6 +429,13 @@ class _Matched:
             self.scale, self.angular_scale = map(float, scales)
             self._scale = scales
             self.tuning_metadata = _rotation_tuning_metadata(histories, self.scale, self.angular_scale, config)
+        elif self.tuning_policy == RADIAL_TUNING:
+            self.state, scale, accepts, history = calibrated
+            history = np.asarray(history)
+            if not np.all(np.isfinite(history)) or not np.all(np.isfinite(np.asarray(self.state))):
+                raise FloatingPointError('Nonfinite own-kernel radial calibration')
+            self.tuning_metadata = _radial_tuning_metadata(
+                history, float(scale), config['warmup'], config['algorithm'])
         elif self.tuning_policy == BALL_TUNING:
             self.state, scale, accepts, history = calibrated
             history = np.asarray(history)
@@ -436,18 +452,22 @@ class _Matched:
         self.implementation = ('Original author JAX SCS transition' if config['algorithm'] == 'SCS'
             else 'DCS JAX transition') + '; separate calibration, full-state scans and radial recording'
         if config['algorithm'] == BILLIARD_METHOD:
+            own_kernel = self.tuning_policy == RADIAL_TUNING
             self.implementation = ('Optimized endpoint-only JAX specular billiard with invariant extra chords; '
-                'post-Mobius coordinates, reflected-BW pilot, shared full-state statistics')
+                'post-Mobius coordinates, ' + ('own-kernel radial pilot' if own_kernel else 'reflected-BW pilot') +
+                ', shared full-state statistics')
             self.tuning_metadata.update(
                 effective_map=deepcopy(mapping),
                 proposal_coordinates='Post-Mobius w; retained supplied centre/R/beta, zero direct deformation',
-                calibration_coordinates='Reflected-BW ball-movement pilot in post-Mobius w, from the common physical all-ones start',
-                calibration_algorithm='DCS-BW-reflect',
+                calibration_coordinates=('Own billiard radial-movement pilot' if own_kernel else 'Reflected-BW ball-movement pilot') +
+                    ' in post-Mobius w, from the common physical all-ones start',
+                calibration_algorithm=BILLIARD_METHOD if own_kernel else 'DCS-BW-reflect',
                 calibrated_state_sha256=hashlib.sha256(np.asarray(self.state).tobytes()).hexdigest(),
                 extra_chord_rule='floor(max(0, atan2(L,2a)/(2atan2(a,b)) - L/(2a)))',
                 extra_density_evaluations=0, extra_gaussian_vectors=0, bounce_loop=False,
                 map_note='The shared input map is retained for provenance; its centre/R/beta are used and its Mobius deformation cancels in this method. With VI these parameters come from the joint fit; without VI the input map is untuned. No delta=0 refit.',
-                tuning_note='Reflected-BW ball-movement pilot in post-Mobius coordinates; the selected scale and final pilot state are reused by billiard production. Same separate transition budget; no production adaptation.')
+                tuning_note=(self.tuning_metadata['tuning_note'] if own_kernel else
+                    'Reflected-BW ball-movement pilot in post-Mobius coordinates; the selected scale and final pilot state are reused by billiard production. Same separate transition budget; no production adaptation.'))
 
     def batch(self):
         import jax
@@ -498,6 +518,41 @@ def _ball_tuning_metadata(history, scale, warmup):
                 tuning_search_status=status,
                 tuning_note='Local finite-budget pilot search of squared ball movement per transition; '
                             'not an optimum certificate or a radial-MSE criterion')
+
+
+def _radial_tuning_metadata(history, scale, warmup, algorithm):
+    """Record actual pilot chronology and distinguish it from historical ESJD."""
+    from .radial_tuning import COARSE_FACTORS, REFINE_FACTORS, WINDOWS, SCORE_DEFINITION
+
+    if history.shape != (WINDOWS, 7) or not np.all(np.isfinite(history)):
+        raise ValueError('Malformed own-kernel radial tuning history')
+    if int(history[:, 1].sum()) != warmup or not np.array_equal(np.sort(history[:, 5]), np.arange(WINDOWS)):
+        raise ValueError('Radial tuning history does not account for its warmup budget and chronology')
+    coarse, refined = history[:len(COARSE_FACTORS)], history[len(COARSE_FACTORS):]
+    if not np.all(coarse[:, 6] == 1.) or not np.all(refined[:, 6] == 2.) or \
+            coarse[:, 4].sum() != 1. or refined[:, 4].sum() != 1.:
+        raise ValueError('Each radial tuning stage must select exactly one candidate')
+    chosen = int(np.argmax(refined[:, 4]))
+    if not np.isclose(refined[chosen, 0], scale, rtol=1e-12, atol=0.):
+        raise ValueError('Frozen step differs from the selected radial pilot step')
+    names = ('lower_candidate_won_refinement', 'middle_candidate_won_refinement',
+             'upper_candidate_won_refinement')
+    status = names[chosen] if np.any(history[:, 2] > 0.) else 'no_positive_radial_jump_observed'
+    rows = [dict(stage='coarse' if stage_index == 1 else 'refinement', round=stage_index,
+        candidate=c, trial_order=int(values[5])+1, scale=float(values[0]), iterations=int(values[1]),
+        radial_score=float(values[2]), acceptance=float(values[3]), selected=bool(values[4]))
+        for stage_index, trials in ((1, coarse), (2, refined)) for c, values in enumerate(trials)]
+    return dict(radial_tuning_history=rows, tuning_pilot_iterations=warmup,
+        radial_tuning_pilot_iterations=warmup, radial_tuning_rounds=2, radial_tuning_windows=WINDOWS,
+        radial_tuning_selected_score=float(refined[chosen, 2]), radial_tuning_search_status=status,
+        radial_tuning_score_definition=SCORE_DEFINITION,
+        radial_tuning_coarse_factors=list(COARSE_FACTORS),
+        radial_tuning_refinement_factors=list(REFINE_FACTORS), calibration_algorithm=algorithm,
+        tuning_note='Each candidate uses this sampler\'s actual production transition and physical norm. '
+            'The prespecified coarse/refinement search uses the full common warmup budget, with seeded '
+            'randomized order within stages; all trials are discarded and the last pilot endpoint and '
+            'selected step start production. Bounded log-radius movement is a proxy, not ESS, MSE, '
+            'or an optimum certificate; no production adaptation.')
 
 
 def _rotation_tuning_metadata(histories, scale, angular_scale, config):
@@ -606,6 +661,8 @@ def _run_timed(mapping_dict, config, seed, before_sampling, after_sampling,
     """
     _validate(config)
     tuning_policy = resolve_step_tuning(config)
+    if tuning_policy == RADIAL_TUNING:
+        from .radial_tuning import STEP_POLICY as radial_step_policy
     scale_ceiling = resolve_step_scale_ceiling(config)
     recorded_ceiling = float(np.exp(15.) if scale_ceiling is None else scale_ceiling)
     ess_enabled = bool(config.get('ess_enabled', False))
@@ -696,9 +753,10 @@ def _run_timed(mapping_dict, config, seed, before_sampling, after_sampling,
         'step_policy': (ROTATION_STEP_POLICY.replace('reflected-BW', 'reflected-Gaussian-RWM')
                         if config['algorithm'] == RWM_ROTATION_METHOD else
                         ROTATION_STEP_POLICY if tuning_policy == ROTATION_TUNING else
+                        radial_step_policy if tuning_policy == RADIAL_TUNING else
                         BALL_STEP_POLICY if tuning_policy == BALL_TUNING else STEP_POLICY),
         'tuning_policy': tuning_policy,
-        'target_acceptance': None if tuning_policy in (BALL_TUNING, ROTATION_TUNING) else .234,
+        'target_acceptance': None if tuning_policy in (BALL_TUNING, RADIAL_TUNING, ROTATION_TUNING) else .234,
         'common_cpu_backend': 'mixed: optimized Numba DCS, author JAX SCS' if config.get('dcs_backend') == 'numba' else 'JAX',
         'backend': 'Numba' if native else 'JAX',
         'implementation_revision': config.get('implementation_revision', IMPLEMENTATION_REVISION),

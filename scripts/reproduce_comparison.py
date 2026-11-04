@@ -27,8 +27,8 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
     reference_samples = supplied.pop('reference_samples', None)
     reference_seed = supplied.pop('reference_seed', None)
     config = runner.configuration(preset, workers, supplied)
-    if config['warmup'] < 3:
-        raise ValueError('The billiard comparison requires at least three warmup transitions')
+    if config['warmup'] < 8:
+        raise ValueError('The radial-pilot comparison requires at least eight warmup transitions')
     reference_samples = ({'quick': 50_000, 'reproduce': 1_000_000, 'paper': 5_000_000}[preset]
                          if reference_samples is None else reference_samples)
     reference_seed = 740317 if reference_seed is None else reference_seed
@@ -38,7 +38,7 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         raise ValueError('reference_seed must be an integer from 0 to 2**32-1')
     spec = selected['target']
     config.update(experiment='sampler-comparison' if comparison == 'jax' else 'sampler-comparison-numba',
-        protocol='timed-sampler-comparison-v7' if comparison == 'jax' else 'timed-numba-comparison-v7',
+        protocol='timed-sampler-comparison-v8' if comparison == 'jax' else 'timed-numba-comparison-v8',
         comparison=comparison, dcs_backend=comparison, target_id=target, target_title=selected['title'],
         target=spec, dimension=spec['dimension'], nu=spec.get('nu'), alpha=spec.get('alpha', {}),
         beta=selected['beta'],
@@ -48,18 +48,20 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         vi=vi, vi_enabled=vi == 'on', ball_map_policy='mobius' if vi == 'on' else 'vanilla',
         sphere_map_policy='vi' if vi == 'on' else 'vanilla',
         algorithms=list(METHODS[comparison]),
-        implementation_revision='shared-jax-radial-ess-v7' if comparison == 'jax' else 'optimized-numba-radial-ess-v7',
+        implementation_revision='shared-jax-own-kernel-radial-v8' if comparison == 'jax' else 'optimized-numba-own-kernel-radial-v8',
         step_policy='separate_method_specific_pretuning_then_frozen',
-        step_tuning_policies={'DCS-BW-reflect': 'ball_esjd_pilot_v1', 'DCS-Billiard': 'ball_esjd_pilot_v1'},
+        step_tuning_policies={'DCS-BW-reflect': 'ball_esjd_pilot_v1',
+            'DCS-Billiard': 'own_kernel_radial_pilot_v1', 'SCS': 'own_kernel_radial_pilot_v1'},
         fitting_policy=('Shared fresh-batch reverse KL, Adam 0.01, gradient-norm cap 10; no coordinate/CDF clipping'
                         if vi == 'on' else 'No VI for either family: R=1, centre=0, deformation=0'),
         target_note=selected['reference_note'],
-        tuning_note='Every method receives the same separate warmup-transition budget. DCS-RWM, '
-            'DCS-BW and SCS use acceptance-target 0.234 dual averaging. Reflected BW uses '
-            'ball-movement pilots in the shared ball map, without a geometric step ceiling of 2. DCS-Billiard uses '
-            'reflected-BW pilots in post-Mobius coordinates, retaining the jointly fitted '
-            'centre, R and beta with effective delta=0. The pilot state and selected step initialize '
-            'billiard production. All steps freeze before sampling; VI off still calibrates proposal steps.')
+        tuning_note='Every method receives the same separate warmup-transition budget. DCS-RWM and '
+            'DCS-BW use acceptance-target 0.234 dual averaging. Reflected BW retains its '
+            'ball-movement pilots without a geometric step ceiling of 2. DCS-Billiard and SCS '
+            'each calibrate their own production kernel with the same radial pilot policy and budget. '
+            'The score uses bounded squared changes of physical log(1+norm), including zero after rejection. '
+            'The final pilot state and selected step initialize production; all steps freeze before sampling. '
+            'VI off still calibrates proposal steps while keeping R=1, centre=0 and deformation=0.')
     config['billiard_map_policy'] = 'post_mobius_retained_joint_fit_centre_scale_beta_delta_zero'
     config['time_scope'] = ('Equal per-chain sampling time includes first-third burn-in, every transition and '
         'all-state radial estimates and unthinned scalar capture for ESS. VI, separate step calibration, compilation, synchronization waits, ESS computation and '

@@ -25,19 +25,21 @@ keep their identity maps. Old fixed-R=√d results retain their historical label
 | `SuperInfiniteFirstTest` | Linear MSE bars for tail probability, mean log norm, then average runtime at equal iterations |
 | `QQ-regresssion` | Two-by-two marginal Q–Q plots for β₁, with ν=4 and ν=6 |
 
-Current reports identify `timed-sampler-comparison-v7` or
-`timed-numba-comparison-v7`. They retain `VsSCS`, `scs_100d_estimates`,
+Current reports identify `timed-sampler-comparison-v8` or
+`timed-numba-comparison-v8`. They retain `VsSCS`, `scs_100d_estimates`,
 `scs_100d_runtime` and `scs_100d_bias_variance`, and add `scs_100d_ess` for
 mean functional ESS per chain and ESS/s. The filenames remain the same in
 500D; titles identify the target. New comparisons report only radial-tail
 probability and mean norm, with analytic references. Coordinate plots are no
 longer generated. CSV/JSON preserve exact counts and full precision.
 
-All methods have equal production-time and pilot budgets. RWM/BW/SCS use
-acceptance-target 0.234 calibration; reflected BW uses ball-movement pilots
-without a geometric step ceiling of 2, and billiards use those pilots in
-post-Möbius coordinates. Every step freezes before production and the first
-third is discarded. Effective maps and pilot histories are recorded.
+All methods have equal production-time and pilot transition budgets. Billiard
+and SCS now tune their own production kernels using the same bounded physical
+radial-movement score. RWM/BW retain acceptance-target 0.234 calibration;
+reflected BW retains ball-movement pilots without a geometric ceiling of 2.
+Every step freezes before production and the first third is discarded. Effective
+maps and histories are recorded; `radial_tuning.csv` contains the new pilots,
+while `reflected_tuning.csv` contains the reflected-BW trials.
 Functional ESS uses unthinned post-burn-in scalar histories, including
 rejections. Any unavailable chain makes that method aggregate unavailable.
 See [ESS definitions and limits](ESS.md). Archived versions retain their
@@ -121,7 +123,7 @@ and `reflected_tuning.csv`, recording map parameters, excluded setup costs and
 every reflected-BW pilot candidate. Version-4 reports additionally save
 `angular_tuning.csv`, angular scales and angles in radians/degrees, and the
 historical warmup splits for rotation mixtures where those methods were recorded. Version-3 and later coordinate reports save
-`reference_values.csv` with the recorded reference values, MCSE and exact flags. Current version-7 runs contain the two analytic radial references.
+`reference_values.csv` with the recorded reference values, MCSE and exact flags. Current version-8 runs contain the two analytic radial references.
 Version-2 reports retain their four reference values. With VI off, fitting costs and training
 counts are zero; proposal calibration still runs.
 

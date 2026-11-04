@@ -1,5 +1,13 @@
 # Changes
 
+## 2026-11-04 — own-kernel radial calibration, version 8
+
+- Calibrate billiard production moves directly instead of inheriting a reflected-BW step. Give author SCS the same separate transition budget and radial pilot policy using its own transition.
+- Select from discarded pilots by bounded squared changes in physical log(1 + norm), including repeated states after rejection. Freeze the selected scale before production; no final MSE or known truth selects it.
+- Preserve RWM/BW acceptance tuning, reflected-BW movement tuning, every production kernel, VI fits and the fully untuned R=1 map option. Numba reuses the corresponding JAX pilot state and scale.
+- Record separate `radial_tuning.csv` and report tables; keep historical reflected-BW billiard pilots and replot behavior labelled by their original protocol.
+- Use fresh runs for version-8 results. Equal pilot transition counts do not imply equal pilot seconds; timing is reported separately.
+
 ## 2026-11-04 — radial comparisons, ESS and native billiards
 
 - Use the same five active methods in JAX and optimized Numba comparisons:

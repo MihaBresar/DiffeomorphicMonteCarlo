@@ -82,10 +82,11 @@ ESS figure and `functional_ess.csv`. Displayed numbers use two decimals.
 VI off keeps unit scale, zero centre and zero deformation, while still tuning
 proposal steps. VI on fits both map families. Billiards retain the fitted
 centre/R/β and use zero production deformation, as explained in
-[the construction](BILLIARD.md). RWM/BW/SCS tune toward acceptance 0.234;
-reflected BW uses ball-movement pilots with no geometric step ceiling of 2;
-billiards use these pilots in their active post-Möbius coordinates. All
-steps then freeze. The first third of production is discarded in every case.
+[the construction](BILLIARD.md). Billiard and SCS each tune their own moves
+with equal pilot transition budgets and the same radial-movement score.
+RWM/BW retain acceptance-target 0.234 tuning; reflected BW retains ball-movement
+pilots with no geometric ceiling of 2. All steps then freeze.
+The new trials and scores are saved in `radial_tuning.csv`. The first third of production is discarded in every case.
 
 ESS is computed after sampling from unthinned scalar histories, including
 rejections. The log reports this stage. FFT work is limited to one chain at a
@@ -96,7 +97,7 @@ it is not replaced by the iteration count. See [ESS interpretation](ESS.md).
 Use a fresh seed batch to check repeatability conditional on the fitted maps.
 The same batch reuses random streams, but time stopping can change counts.
 Run each target/VI combination separately and rerun all five methods together.
-New version-7 runs do not change historical saved reports.
+New version-8 runs do not change historical saved reports.
 
 ## Stop or finish
 

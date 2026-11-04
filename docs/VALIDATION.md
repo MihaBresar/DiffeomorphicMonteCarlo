@@ -1,5 +1,19 @@
 # Validation of the corrected implementation
 
+## Own-kernel radial calibration (4 November 2026)
+
+Version 8 tunes billiards and SCS with their actual production kernels and
+identical eight-window radial pilot rules. All **325 tests** and
+**80 Quick chains** across eight JAX/Numba, dimension and VI configurations
+passed. The pilots spend exactly their budgets; JAX/Numba states, steps and
+histories agree. Historical reports and saved-report regeneration remain valid.
+Production transition functions, maps, target definitions and ESS are unchanged.
+
+Two smaller 100D JAX comparisons and matched historical-pilot controls completed
+**280 chains**. See [all results and limitations](CALIBRATION_RESULTS.md) and
+[the validation record](../validation/own_kernel_calibration_checks.json).
+These exploratory runs do not certify universal dominance.
+
 ## Five-method comparisons, native billiards and ESS (4 November 2026)
 
 Both active comparison modes now use DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard.

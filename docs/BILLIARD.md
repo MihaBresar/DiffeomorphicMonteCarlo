@@ -22,7 +22,7 @@ Reports show mean norm, radial-tail probability, MSE, sample counts, timing,
 functional ESS and ESS per second. They omit coordinate statistics. See
 [the comparison protocol](COMPARISONS.md) and [ESS definitions](ESS.md).
 
-Both implementations use the same JAX pilot state and frozen step. Numba
+Both implementations use the same own-kernel JAX pilot state and frozen step. Numba
 production uses an independent PCG64 stream and fused density/radius summaries;
 it is not a bitwise replay of JAX. Its endpoint follows the same invariant-chord
 rule below, without fast-math approximations. The author SCS code stays in JAX.
@@ -52,11 +52,16 @@ introduces a reverse/forward proposal ratio
 target ratio. No additional Möbius correction is applied when running in w.
 
 The pilot starts afresh at the w coordinate corresponding to the common
-physical all-ones point. It uses the existing reflected-BW ball-movement rule,
-with exactly the preset's warmup budget, and freezes its final scale and state
-before billiard production. It does not reinterpret an old z pilot endpoint
-as w. This calibration isolates the change of production geometry; it does
-not establish that the inherited step is optimal for billiards.
+physical all-ones point. Version 8 calibrates **billiard moves themselves**,
+using exactly the preset's warmup budget. SCS uses the same pilot policy and
+transition budget with its own sphere kernel. Both score bounded changes in
+physical log(1 + norm), with rejections contributing zero, and freeze the
+selected scale and final pilot state before production. No final MSE or known
+reference value is used to tune. See [the full calibration rule](COMPARISONS.md).
+
+The version-6/7 runs instead calibrated reflected BW in the active coordinates
+and transferred its step to billiards. Their saved reports retain that rule.
+Changing calibration does not change the proposal or invariance argument below.
 
 ## Proposal and invariants
 

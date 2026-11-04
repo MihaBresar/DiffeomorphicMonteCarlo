@@ -44,7 +44,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertEqual(config['beta'], beta)
                         self.assertEqual(config['dcs_backend'], backend)
                         self.assertEqual(config['vi_enabled'], vi == 'on')
-                        self.assertEqual(config['step_tuning_policies'], {'DCS-BW-reflect': 'ball_esjd_pilot_v1', 'DCS-Billiard': 'ball_esjd_pilot_v1'})
+                        self.assertEqual(config['step_tuning_policies'], {'DCS-BW-reflect': 'ball_esjd_pilot_v1', 'DCS-Billiard': 'own_kernel_radial_pilot_v1', 'SCS': 'own_kernel_radial_pilot_v1'})
                         self.assertNotIn('mixture_probability', config)
                         self.assertNotIn('initial_angular_scale', config)
                         self.assertNotIn('step_scale_ceilings', config)
@@ -60,7 +60,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertNotIn('coordinate_threshold', config)
                         self.assertTrue(config['ess_enabled'])
                         self.assertEqual(config['reference_samples'], 5_000_000)
-                        self.assertTrue(config['protocol'].endswith('-v7'))
+                        self.assertTrue(config['protocol'].endswith('-v8'))
 
     def test_vi_off_bypasses_fitting_for_both_map_families_without_skipping_warmup(self):
         for target_id in ('skew-t-100d', 'skew-t-500d'):

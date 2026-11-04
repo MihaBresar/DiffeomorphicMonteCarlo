@@ -2,14 +2,14 @@
 
 The current comparison suite is specified in `scripts/reproduce_comparison.py`, with target definitions in `dcs_bench/comparison_targets.py` and budgets in `scripts/reproduce_scs_100d.py`. See [the protocol](COMPARISONS.md). The other six experiments use named JSON files in `configs/`; the older 100D JSON is retained for compatibility. Each generic configuration contains the full paper target, methods, budgets, warmup, thinning, optimization, seeds, quantile levels, and output basename. `presets.json` lists explicit quick and affordable-reproduction overrides. Use `python run_experiment.py IDENTIFIER --preset paper --dry-run` to inspect the exact resolved input.
 
-The version-7 JAX and Numba suites both contain DCS-RWM, DCS-BW, SCS,
+The version-8 JAX and Numba suites both contain DCS-RWM, DCS-BW, SCS,
 DCS-BW-reflect and DCS-Billiard on the original 100D/500D skewed t(3) targets, with VI on/off.
 They report only radial-tail probability and mean norm, using analytic
 references, plus MSE, exact counts, production time, functional ESS and ESS/s.
 Coordinate reference simulation and coordinate statistics are omitted.
 Billiards use the fitted centre/R/β after Möbius with zero active deformation;
-their reflected-BW pilot runs in those coordinates and freezes before
-production. The Numba implementation shares its JAX pilot, then uses fused
+their own-kernel radial pilot runs in those coordinates and freezes before
+production. SCS receives the same radial pilot policy and transition budget. The Numba implementation shares its JAX pilot, then uses fused
 native production. See [billiards](BILLIARD.md) and [ESS](ESS.md).
 
 Historical protocol records retain their original methods and measurements.

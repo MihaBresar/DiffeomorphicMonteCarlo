@@ -1,13 +1,16 @@
 # Reproducibility and timing policy
 
 The [current selectable-target comparisons](COMPARISONS.md) record protocols
-`timed-sampler-comparison-v7` and `timed-numba-comparison-v7`. Both include
+`timed-sampler-comparison-v8` and `timed-numba-comparison-v8`. Both include
 DCS-RWM, DCS-BW, author SCS, DCS-BW-reflect and DCS-Billiard, 100D/500D targets, and VI on/off.
 The same JAX pilot initializes each DCS method in either implementation mode;
 Numba production uses an independent PCG64 stream and fused native summaries.
 SCS calls the unmodified author transition. Billiards retain the jointly fitted
 centre/R/β with zero production deformation after Möbius; this is not a refit.
-See [the construction](BILLIARD.md). Reflected BW keeps its shared ball map
+Billiard and SCS use their own production kernels in equal-budget radial pilots;
+actual pilot seconds are recorded separately and need not match. See
+[the calibration protocol](COMPARISONS.md) and [construction](BILLIARD.md).
+Reflected BW keeps its shared ball map
 and ball-movement pilot with no geometric step ceiling of 2. All steps freeze and one-third of actual
 production iterations is discarded.
 
@@ -29,8 +32,9 @@ tuning rules. Runtime helper threads can remain. Manifests record the policy
 and complete thread settings; generic chain records do too. **Rerun the whole
 method comparison for corrected timed results**, since changed throughput also
 changes retained counts and MSE. Do not combine old and new timing cohorts.
-The CPU correction itself preserved version-5 sampling rules. Version 7 now
-simplifies both suites and adds native billiards and functional ESS. Source hashes
+The CPU correction itself preserved version-5 sampling rules. Version 7
+simplified both suites and added native billiards and functional ESS. Version 8
+changes billiard/SCS calibration to equal-budget own-kernel radial pilots. Source hashes
 and the runtime policy distinguish the CPU correction. See [parallel execution](PARALLEL.md).
 
 The policies below describe the six other main experiments.

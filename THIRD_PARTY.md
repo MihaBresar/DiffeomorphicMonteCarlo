@@ -15,8 +15,11 @@ separate compilation/warmup clocks, and accumulates radial estimates in bounded
 memory while invoking the unmodified author transition. The current 100D
 comparison implements DCS in the same JAX scan framework, with equivalent state
 recording and projection work. Both maps use our common VI fitting protocol and
-both methods receive the same separate, acceptance-based step-size tuning.
-This applies the author's SCS transition to the original DCS normal-CDF skew
+each method receives the same separate pilot transition budget. The current
+version-8 suite calibrates SCS and billiards with their own production kernels
+and a shared radial-movement score; RWM/BW retain acceptance calibration and
+reflected BW retains its ball-movement pilot. See [the current protocol](docs/COMPARISONS.md).
+Historical reports retain their original tuning recipes. This applies the author's SCS transition to the original DCS normal-CDF skew
 target; it does not reproduce the author's original tuning recipe, Student-t-CDF
 skew target or ν=1/2 figures. See [the comparison protocol](docs/SCS_100D.md).
 

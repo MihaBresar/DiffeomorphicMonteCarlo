@@ -1,6 +1,6 @@
 # Running the updated experiments
 
-Current version-7 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
+Current version-8 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
 in both JAX and optimized Numba modes, with VI on/off and 100D/500D targets.
 New reports contain only radial estimates/MSE/counts/time plus functional ESS
 and ESS/s. See [the current protocol](COMPARISONS.md); historical sections
@@ -21,7 +21,7 @@ thinning. At thinning 10 this stores 33,334 post-burn-in states.
 ## Current sampler comparisons
 
 Choose **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)** or
-**Five samplers: optimized Numba DCS versus SCS**. Both version-7 suites
+**Five samplers: optimized Numba DCS versus SCS**. Both version-8 suites
 contain the same methods, with 100D/500D and VI on/off. Numba production differs
 in implementation and recording costs; author SCS remains in JAX.
 
@@ -31,13 +31,15 @@ and ESS/s. Coordinate statistics and rotation methods
 are removed. Both radial references are analytic. Old files retain their
 recorded scope and cannot reconstruct unthinned ESS or a new sampler.
 
-Billiards retain jointly fitted centre/R/β after Möbius with effective δ=0,
-and inherit a separate reflected-BW pilot in those coordinates. RWM/BW/SCS
-use acceptance-target 0.234 pilots. Reflected BW uses ball-movement pilots
-in the shared fitted ball map without a geometric step ceiling of 2. All steps freeze, and the first third of
-production is discarded. Use a fresh sampling batch to assess variability
-conditional on the fitted maps. Keep worker count and machine conditions
-consistent. See [protocol](COMPARISONS.md) and [ESS](ESS.md).
+Billiards retain jointly fitted centre/R/β after Möbius with effective δ=0.
+Billiard and SCS each tune their own production kernel with equal pilot
+transition budgets and the same bounded physical radial-movement score.
+RWM/BW retain acceptance-target 0.234 pilots; reflected BW retains its
+ball-movement pilot in the shared fitted ball map with no geometric ceiling
+of 2. All steps freeze and the first third of production is discarded.
+Use fresh sampling batches to assess variability conditional on the fitted
+maps. Keep worker count and machine conditions consistent. See
+[protocol](COMPARISONS.md) and [ESS](ESS.md).
 
 Other experiment ESS reports describe their recorded retained-draw basis;
 check the saved stride. Historical data cannot recover unrecorded transitions.
@@ -66,8 +68,9 @@ Both current comparisons use 2 chains of 0.05 seconds for Quick check, 20 chains
 2 seconds for Smaller reproduction, and 50 chains of 20 seconds for Full paper
 settings, for every target and VI choice. With VI, both map families receive
 equal fresh-batch budgets. Without VI, both maps use R=1 with zero centre/deformation,
-and no fitting draws. Ordinary methods use acceptance-target 0.234 calibration;
-billiards use reflected-BW ball-movement pilots in their active coordinates within the same transition budget. Every scale freezes before production.
+and no fitting draws. Billiard/SCS use their own-kernel radial pilots, RWM/BW
+use acceptance-target 0.234, and reflected BW uses ball-movement pilots, all
+within the same total transition budget.
 All steps freeze before timed sampling. Numba DCS starts from the same JAX
 pilot state and selected step as its JAX counterpart.
 

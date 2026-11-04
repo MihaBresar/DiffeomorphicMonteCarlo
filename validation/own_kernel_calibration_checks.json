@@ -1,0 +1,305 @@
+{
+  "completed_utc": "2026-11-04T10:28:03.740886+00:00",
+  "previous_commit": "486328c02478ec3e0f168825040d3eccd72a64bd",
+  "protocols": [
+    "timed-sampler-comparison-v8",
+    "timed-numba-comparison-v8"
+  ],
+  "automated_tests": 325,
+  "automated_test_seconds": 114.557,
+  "source_hashes": {
+    "dcs_bench/__init__.py": "824e883a0dfde9241e0b7742f2bc61aba10cd82a49576de89c96f6f4450cb8bd",
+    "dcs_bench/api.py": "825b330d2416a6562a7bb91b0ede7beb65294f62c1646674512ec74e730e56a2",
+    "dcs_bench/ball_boundary.py": "a11dfad9e4c2d9276f95b95b64e08a05150da7d75ad2b9c02fa33b56c3ac9d38",
+    "dcs_bench/ball_tuning.py": "ee601b723fbbf118a67a11690066cd714b2e7003ce2874d1d846f7873c6f1f4f",
+    "dcs_bench/billiard.py": "4b87951e2c7932a9cceddce7a8a5c313cd82c324348aa3a806359d8d98352b98",
+    "dcs_bench/burnin.py": "ff229a5d693807313f4d3057b2396ce0918d9ba9f1f799dba975ff8c5286fc06",
+    "dcs_bench/comparison_targets.py": "cf12efe21bd228f6c9b12865c2e2b82553a068acffab734ec56757a5e00ec011",
+    "dcs_bench/compiled_sampling.py": "483dbebaddccd179119d307120d497a64d996964e0ab00e8dd464c88c6b5012f",
+    "dcs_bench/cpu.py": "f230f4c10ed36aa07eaac93d7bba9a4183fee7994b15f94cc0ba6df74c324d67",
+    "dcs_bench/display.py": "045f88f8af94062a74c55917b86704debb59d399d7b9a0370cc98beb0c114379",
+    "dcs_bench/draw_storage.py": "381bc13ace8d79e1362f845855f19fe4b2a260c136113442e11e3c15ccf5215f",
+    "dcs_bench/engine.py": "ce45f47973cf753f1be6844890bbd6cde30a5af94f68a7a80e38324475c7032c",
+    "dcs_bench/fast_dcs.py": "681682c907301ec3e6cfbbe042f08f99fae59cd958547ca62980eaeaa8b5a809",
+    "dcs_bench/functional_ess.py": "e9d66150d6fea6ca40727532120c1f61c885281dea133572ab85efdaef9f7157",
+    "dcs_bench/numba_billiard.py": "8fa765cdd5bc1f0e5005cdc884e2fc57aaf4ec802800e7f331cf54672921e042",
+    "dcs_bench/numba_radial.py": "71e1531b526c2e3bee569ef7c45dfb429505594118bd737c9bb117a635a7dc30",
+    "dcs_bench/numba_rotation.py": "0e26749de0482971e7cef2e3802969c1c4bff5a04f3c2061eed2a8deea7c05f5",
+    "dcs_bench/numba_rwm.py": "3d27234ef02056a3c998188fb314bfe0e1ccdac0afec989734d4be24e881fe2d",
+    "dcs_bench/numba_rwm_rotation.py": "548cd394da95bfb5083192f6b1b32bbbb0d70b9f303e667f0e2ef523bd7cdeff",
+    "dcs_bench/parallel.py": "4e8be301f69bdfd5a7ea19d2a3e84bd2998dc5c487523e01af16cce0bf85df8e",
+    "dcs_bench/plotting.py": "0fd11b296b5b879bd2dbec839b370cd2a31c1449d3c415794ac15df04bd34c60",
+    "dcs_bench/processing.py": "7f9e15d46dcf19e7237809aecfb98e7680c9e4eb41897803367374b33f2ee367",
+    "dcs_bench/radial_reporting.py": "9f5449b7e627dbd3ba54a61ce95e971de0fe7db3ecad87a0417191311c8fc352",
+    "dcs_bench/radial_tuning.py": "687e25882039876074b0fc4d0b2ef92bcac770c30b3f0529362963fb49f2df19",
+    "dcs_bench/references.py": "bcd55f6533641182aca380cbfec8192a8e50fd2e04f47d60dfa395438a2eea26",
+    "dcs_bench/rotation.py": "1ef008d05461709eb8b82251ccac6462c117bbd9638db81a8394ad0b69ff8582",
+    "dcs_bench/rwm_rotation.py": "51e39b6232c200e9fe769261606c618cc99094d20cb1c86a1861ffa5db6ad6ee",
+    "dcs_bench/samplers.py": "470c4c1415947a36d7733f863210d0b293fd4cc494863b99e0df09eba4aff219",
+    "dcs_bench/scs_paper.py": "8510470fd7db553d445631b5663bcd4c9dd17d2ef2faf410ed2a9585320ce631",
+    "dcs_bench/simulation_error.py": "2bd364569a7ea02abba8a0099ba4b82d245daf728dee48dbfe1ed9b34ae3063c",
+    "dcs_bench/targets.py": "19d8dbabf4cdac998739c735fec8ee8946b79b7c8de2e25c095542f156bc9a63",
+    "dcs_bench/timed_radial.py": "e0d38d9433dc15dea93ef92682793c2ff42ce1ad438df434dca661781503eb0a",
+    "dcs_bench/transforms.py": "fb7161b32cd5430c7e899e9927a588cfddefb7511411360820f679bcab99efaa",
+    "dcs_bench/tuning.py": "82b5610d2734d7647f1e0ff667d9c40a1eb6ccb7b5d8c5c73e12d44dfd54b42c",
+    "dcs_bench/worker.py": "700c3102b0a85cb48ef1ff8fafe5fd6be7be0ccc0491976da94011656fdf100d",
+    "requirements-cpu.txt": "3a2005be45d5b7c3a0e6e946476f78aa6d7830a902ce5ee5c51a65afa0ed2f8d",
+    "scripts/reproduce_boundary_100d.py": "4a398b4d65f1545b64e6549849f1dc7010c3d37ce11c7f8e9a32fc31fdfe01ae",
+    "scripts/reproduce_comparison.py": "ba8904a79c2943f1fd321082bf0f9a8e9c6033278fa37e168747657e47bd2d96",
+    "scripts/reproduce_scs_100d.py": "3ba2e4ea046fc8b0c9aa9320f846e34cfdb79ecac31d9eabec2f67c521012ef4",
+    "scripts/scs_100d_figures.py": "cdba7e6205b8b9cc964debcf27b584ab52d798fce7e844a33acfc75b190dc1fa",
+    "third_party/scs_paper/src/scp_core.py": "4772c4944c5e9d96631d095b5b8d7749b5dc52932394391a69ba19c386c0c452",
+    "third_party/scs_paper/src/train.py": "cad66edc58b9fb9b9943b61951ff6ebad09fc86c8f0e3aed993f965dcc5604c1"
+  },
+  "unchanged_production": {
+    "unchanged_files": [
+      "dcs_bench/billiard.py",
+      "dcs_bench/ball_boundary.py",
+      "dcs_bench/ball_tuning.py",
+      "dcs_bench/transforms.py",
+      "dcs_bench/targets.py",
+      "dcs_bench/tuning.py",
+      "dcs_bench/references.py",
+      "dcs_bench/scs_paper.py",
+      "dcs_bench/numba_billiard.py",
+      "dcs_bench/numba_radial.py",
+      "dcs_bench/numba_rwm.py",
+      "dcs_bench/functional_ess.py",
+      "dcs_bench/cpu.py",
+      "requirements-cpu.txt"
+    ],
+    "unchanged_functions": [
+      "_uniform_ball",
+      "_dcs_components",
+      "_components",
+      "_calibrate",
+      "_radial_batch",
+      "_postburn"
+    ],
+    "all_passed": true
+  },
+  "author_scs_unchanged": true,
+  "quick": {
+    "chains": 80,
+    "cases": [
+      {
+        "label": "jax-skew-t-100d-vi-on",
+        "status": "passed",
+        "chains": 10,
+        "summary_sha256": "c4a41312eab96a4439f2496b22be9bc668b1cc585d5c288c14907c2d9996d4ae",
+        "replot_json_unchanged": true,
+        "replot_ess_recompute_blocked": true,
+        "wall_seconds": 11.41072645800159
+      },
+      {
+        "label": "jax-skew-t-100d-vi-off",
+        "status": "passed",
+        "chains": 10,
+        "summary_sha256": "2dcc1413bc72953496cec8f14b61a2d4be15d210cb60d1e89773139b12e47988",
+        "replot_json_unchanged": true,
+        "replot_ess_recompute_blocked": true,
+        "wall_seconds": 10.859526667001774
+      },
+      {
+        "label": "jax-skew-t-500d-vi-on",
+        "status": "passed",
+        "chains": 10,
+        "summary_sha256": "5d1ffafac39cb153034c49f5c9083396bd6982b25dcd65e3f04ab9b4aa2b6d79",
+        "replot_json_unchanged": true,
+        "replot_ess_recompute_blocked": true,
+        "wall_seconds": 11.42828924999776
+      },
+      {
+        "label": "jax-skew-t-500d-vi-off",
+        "status": "passed",
+        "chains": 10,
+        "summary_sha256": "3981cd73d4bdb72aee6b646d3a6a52ea7dd14e13331554ca62a79448c5b8cf58",
+        "replot_json_unchanged": true,
+        "replot_ess_recompute_blocked": true,
+        "wall_seconds": 10.980408750001516
+      },
+      {
+        "label": "numba-skew-t-100d-vi-on",
+        "status": "passed",
+        "chains": 10,
+        "summary_sha256": "81af1dd969873e47e095a8729c76b274639141fe0dddb301535ca8a57684c557",
+        "replot_json_unchanged": true,
+        "replot_ess_recompute_blocked": true,
+        "wall_seconds": 12.589654916002473
+      },
+      {
+        "label": "numba-skew-t-100d-vi-off",
+        "status": "passed",
+        "chains": 10,
+        "summary_sha256": "e113c18d664bfd4ac505c978a55a55444df753e269b6bf9c53ef3e5ab735f3fb",
+        "replot_json_unchanged": true,
+        "replot_ess_recompute_blocked": true,
+        "wall_seconds": 12.10707145899869
+      },
+      {
+        "label": "numba-skew-t-500d-vi-on",
+        "status": "passed",
+        "chains": 10,
+        "summary_sha256": "e84fbcb11d5f8d28924c743fea45540fbf25dee09461ef51efd67328641ab7da",
+        "replot_json_unchanged": true,
+        "replot_ess_recompute_blocked": true,
+        "wall_seconds": 12.735981958001503
+      },
+      {
+        "label": "numba-skew-t-500d-vi-off",
+        "status": "passed",
+        "chains": 10,
+        "summary_sha256": "ea8015c921991957867ebfa93a5e84be40ca3e65e7f9d5396088285607d22e5e",
+        "replot_json_unchanged": true,
+        "replot_ess_recompute_blocked": true,
+        "wall_seconds": 12.114202749999095
+      }
+    ],
+    "cross_backend_calibration": [
+      {
+        "label": "numba-skew-t-100d-vi-on",
+        "maps_equal": true,
+        "all_states_and_scales_equal": true,
+        "own_kernel_histories_equal": true,
+        "methods": [
+          "DCS-RWM",
+          "DCS-BW",
+          "SCS",
+          "DCS-BW-reflect",
+          "DCS-Billiard"
+        ]
+      },
+      {
+        "label": "numba-skew-t-100d-vi-off",
+        "maps_equal": true,
+        "all_states_and_scales_equal": true,
+        "own_kernel_histories_equal": true,
+        "methods": [
+          "DCS-RWM",
+          "DCS-BW",
+          "SCS",
+          "DCS-BW-reflect",
+          "DCS-Billiard"
+        ]
+      },
+      {
+        "label": "numba-skew-t-500d-vi-on",
+        "maps_equal": true,
+        "all_states_and_scales_equal": true,
+        "own_kernel_histories_equal": true,
+        "methods": [
+          "DCS-RWM",
+          "DCS-BW",
+          "SCS",
+          "DCS-BW-reflect",
+          "DCS-Billiard"
+        ]
+      },
+      {
+        "label": "numba-skew-t-500d-vi-off",
+        "maps_equal": true,
+        "all_states_and_scales_equal": true,
+        "own_kernel_histories_equal": true,
+        "methods": [
+          "DCS-RWM",
+          "DCS-BW",
+          "SCS",
+          "DCS-BW-reflect",
+          "DCS-Billiard"
+        ]
+      }
+    ],
+    "plan_sha256": "adc00dbe01550d1768bf04244bde6708e1d0a4f19ab56ef6819da2070e9ee8ed"
+  },
+  "smaller": {
+    "chains": 280,
+    "primary_chains": 200,
+    "historical_control_chains": 80,
+    "cases": [
+      {
+        "label": "jax-skew-t-100d-vi-on",
+        "status": "passed",
+        "chains": 100,
+        "summary_sha256": "a0bc5432b75fc199080ea184a7ba6f874c555f72a1ec75bc7e1354e91720370c",
+        "replot_json_unchanged": true,
+        "replot_ess_recompute_blocked": true,
+        "wall_seconds": 64.71371137499955
+      },
+      {
+        "label": "old-pilot-jax-skew-t-100d-vi-on",
+        "status": "passed",
+        "exact_primary_maps_reused": true,
+        "primary_maps_sha256": "736e04b92567aadde7c33167d51bfcfd0aafc0fb262e50f94d464b1d9a6b3a02",
+        "chains": 40,
+        "summary_sha256": "2615740a9aa35125ad2b6387c5b856f5670051d20ebef4b5b3a65889bb7b6d90",
+        "replot_json_unchanged": true,
+        "replot_ess_recompute_blocked": true,
+        "wall_seconds": 28.44261862500207
+      },
+      {
+        "label": "jax-skew-t-100d-vi-off",
+        "status": "passed",
+        "chains": 100,
+        "summary_sha256": "d9e7f271b653f94b3944655226a66a0181a81fcdd5ca22598fd7ea31a584936d",
+        "replot_json_unchanged": true,
+        "replot_ess_recompute_blocked": true,
+        "wall_seconds": 68.51964462500109
+      },
+      {
+        "label": "old-pilot-jax-skew-t-100d-vi-off",
+        "status": "passed",
+        "exact_primary_maps_reused": true,
+        "primary_maps_sha256": "fb36517d577988180129e85dea298c9994925dc01fd1966f88ddd4c02bd3af19",
+        "chains": 40,
+        "summary_sha256": "6e8412e21a80df83cd4d378b377430233ea6be981c9710ecce8269068dc3bb40",
+        "replot_json_unchanged": true,
+        "replot_ess_recompute_blocked": true,
+        "wall_seconds": 29.484270832999755
+      }
+    ],
+    "plan_sha256": "4c866ca644c93d244fd195fc1022f7b6f50e641ca56f8754dd6eb83aa9f3358a",
+    "chains_per_method": 20,
+    "seconds_per_chain": 2.0,
+    "pilot_transitions": 1000,
+    "workers": 4,
+    "seed_batch": 6
+  },
+  "pilot": {
+    "policy": "own_kernel_radial_pilot_v1",
+    "methods": [
+      "DCS-Billiard",
+      "SCS"
+    ],
+    "coarse_factors": [
+      0.25,
+      1.0,
+      4.0,
+      16.0,
+      64.0
+    ],
+    "refinement_factors": [
+      0.5,
+      1.0,
+      2.0
+    ],
+    "windows": 8,
+    "score": "Mean delta^2/(1+delta^2) for delta=change of log(1+physical norm), including rejection repeats.",
+    "own_production_kernel": true,
+    "production_steps_frozen": true,
+    "uses_production_errors": false
+  },
+  "full_paper": {
+    "chains_per_method": 50,
+    "seconds_per_chain": 20.0,
+    "pilot_transitions": 1500,
+    "burnin_fraction": 0.3333333333333333,
+    "vi": [
+      "on",
+      "off"
+    ],
+    "dimensions": [
+      100,
+      500
+    ]
+  }
+}
