@@ -1,5 +1,26 @@
 # Validation of the corrected implementation
 
+## Optimized JAX billiard addition (4 November 2026)
+
+Protocol v6 adds `DCS-Billiard` to the JAX comparison, preserving the previous
+six controls and the separate Numba comparison. Its endpoint expressions match
+the reviewed optimized prototype. The candidate uses post-Möbius coordinates,
+retains the jointly fitted centre/R/β, and reuses a reflected-BW pilot in those
+coordinates before freezing the step. See [the method and limits](BILLIARD.md).
+
+All **297 automated tests** and **four public-CLI Quick configurations
+(56 chains)** passed locally: 100D/500D, VI on/off, two concurrent workers.
+Checks cover independent billiard geometry/reversal, volume and transition
+symmetry, exact pilot reuse, map provenance, all eight estimators, one-third
+burn-in, figures and read-only report regeneration. These are execution checks,
+not new MSE rankings. Full-paper settings remain 50 chains per method and
+20 sampling seconds per chain, with 1500 separate pilot transitions.
+
+[Validation record](../validation/billiard_checks.json). The author SCS source,
+targets, references, existing proposal helpers and CPU policy are unchanged.
+GitHub Actions checks Linux and Windows separately; its current status is
+available in the repository's Actions tab.
+
 ## Common JAX CPU-pool correction (4 November 2026)
 
 The earlier numerical-library flags did not constrain all JAX CPU runtime

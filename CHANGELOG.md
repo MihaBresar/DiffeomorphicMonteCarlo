@@ -1,5 +1,25 @@
 # Changes
 
+## 2026-11-04 — optimized JAX billiards
+
+- Add **DCS-Billiard** as the seventh JAX comparison method, alongside SCS,
+  reflected BW and every existing control. Both 100D/500D targets and VI
+  settings are available from the launcher. Numba remains unchanged.
+- Use a closed-form specular endpoint with invariant extra full chords;
+  there is no collision loop or extra Gaussian vector. Remove redundant
+  outgoing-velocity work while retaining endpoint validity checks.
+- Propose after Möbius, retaining the jointly fitted centre, scale and β;
+  the active deformation is zero. Save fitted and effective method maps.
+  Pretune with reflected BW in the active coordinates using the same total
+  pilot budget, then freeze the step before production.
+- Record JAX protocol `timed-sampler-comparison-v6`; Numba remains version 5.
+  Keep all eight measurements, all-state recording, one-third burn-in, common
+  CPU limits, counts, timings and previous figure families. Rerun the complete
+  JAX comparison for new results; archived reports keep their original scope.
+- Document the reversible proposal and the restricted radial-kernel identity.
+  The added sampler is experimental; no universal MSE or speed ordering is
+  asserted, and full-paper results require new measurements.
+
 ## 2026-11-04 — common JAX CPU runtime limit
 
 - Set `PJRT_NPROC=1` before backend creation for every method and the

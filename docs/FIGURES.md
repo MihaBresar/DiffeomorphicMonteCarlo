@@ -8,7 +8,7 @@ The two current sampler-comparison reports identify their selected target,
 **VI on/off for both map families**, and JAX or optimized Numba execution.
 Both support 100D and 500D skewed Student-t targets with ν=3 and DCS β=2.
 See [the current comparison protocol](COMPARISONS.md). The JAX report includes
-DCS-RWM, DCS-BW, SCS, DCS-BW-reflect, DCS-BW-rotate and DCS-RWM-rotate; the optimized report includes four DCS
+DCS-RWM, DCS-BW, SCS, DCS-BW-reflect, DCS-BW-rotate, DCS-RWM-rotate and DCS-Billiard; the optimized report includes four DCS
 methods and unchanged author SCS. Their figures describe the selected run;
 they do not imply a general sampler ranking.
 
@@ -25,7 +25,7 @@ keep their identity maps. Old fixed-R=√d results retain their historical label
 | `SuperInfiniteFirstTest` | Linear MSE bars for tail probability, mean log norm, then average runtime at equal iterations |
 | `QQ-regresssion` | Two-by-two marginal Q–Q plots for β₁, with ν=4 and ν=6 |
 
-Current reports identify `timed-sampler-comparison-v5` or
+Current reports identify `timed-sampler-comparison-v6` or
 `timed-numba-comparison-v5`. They retain `VsSCS`, `scs_100d_estimates`,
 `scs_100d_runtime`, and `scs_100d_bias_variance`; the historical filenames stay
 the same for 500D, while plot titles identify the actual target. Added
@@ -45,14 +45,17 @@ ball-movement pilots, while the original methods target acceptance 0.234.
 Both rotation mixtures split their warmup between reflected steps and unit-direction
 movement pilots, then use fixed 50/50 mixtures. Both scales remain frozen
 during sampling. RWM rotation reports its Gaussian coordinate standard deviation
-and equivalent BW radius separately; these are different scale units. Without VI, both families use
+and equivalent BW radius separately; these are different scale units. JAX version 6
+adds DCS-Billiard, whose frozen step comes from a reflected-BW pilot in its
+post-Möbius coordinates. Tables disclose its effective zero-deformation map
+and retained jointly fitted centre/scale. Without VI, both families use
 unit scale and zero centre/deformation, with no fitting draws.
 
 Replotting earlier three-method or boundary summaries preserves their recorded
 target, tuning policy and design. It does not relabel them as the new suite.
 Legacy CLI identifiers and report regeneration remain supported, although the
 old comparisons are no longer launcher choices. The All seven sequence now
-uses the six-method JAX comparison on 100D skewed t with the chosen VI policy;
+uses the seven-method JAX comparison on 100D skewed t with the chosen VI policy;
 the other six experiments retain their existing map options.
 
 The compact **200D random-walk baselines** report keeps just `VsRWM_NUTS`
@@ -124,7 +127,7 @@ The new comparison suites also save `tuned_parameters.csv`, `setup_times.csv`
 and `reflected_tuning.csv`, recording map parameters, excluded setup costs and
 every reflected-BW pilot candidate. Version-4 reports additionally save
 `angular_tuning.csv`, angular scales and angles in radians/degrees, and the
-shared warmup split for both rotation mixtures, with Gaussian scale units explicit. Version-3, version-4 and version-5 reports save
+shared warmup split for both rotation mixtures, with Gaussian scale units explicit. Version-3 and later reports save
 `reference_values.csv` with all eight reference values, MCSE and exact flags.
 Version-2 reports retain their four reference values. With VI off, fitting costs and training
 counts are zero; proposal calibration still runs.

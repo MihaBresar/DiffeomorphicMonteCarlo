@@ -8,10 +8,14 @@ This corrected implementation centralizes target densities and transformations, 
 
 Choose one of two comparisons:
 
-- **Sampler comparison (JAX):** DCS-RWM, DCS-BW, author SCS, reflected DCS-BW, DCS-BW-rotate and DCS-RWM-rotate, all in the same JAX timing/recording framework.
+- **Sampler comparison (JAX):** DCS-RWM, DCS-BW, author SCS, reflected DCS-BW, DCS-BW-rotate, DCS-RWM-rotate and optimized **DCS-Billiard**, all in the same JAX timing/recording framework.
 - **Optimized Numba comparison:** DCS-BW, reflected DCS-BW, DCS-BW-rotate and DCS-RWM-rotate with fused native loops, versus the unmodified author SCS in JAX. This measures implementation efficiency; it does not equalize framework and output-processing costs.
 
-Each offers **100D skewed t(3)** or **500D skewed t(3)**, both with DCS β=2, and **VI on/off for both map families**. Step sizes are always pretuned separately and frozen before sampling. Reflected BW uses ball-movement calibration without a hard ceiling of 2; ordinary BW, RWM and SCS target acceptance 0.234. DCS-BW-rotate chooses reflected BW or a fixed-radius angular move with equal probability; it splits the same tuning budget between the two proposal scales and freezes both. DCS-RWM-rotate uses the same mixture with reflected Gaussian increments, whose coordinate scale starts at `0.1/sqrt(d+2)` before separate tuning. All earlier controls remain. Reports preserve all radial plots and add means and prespecified tails for X₁, X₂ and X₃, with analytic or independent references and their precision shown. See [the comparison protocol](docs/COMPARISONS.md).
+Each offers **100D skewed t(3)** or **500D skewed t(3)**, both with DCS β=2, and **VI on/off for both map families**. Step sizes are always pretuned separately and frozen before sampling. Reflected BW uses ball-movement calibration without a hard ceiling of 2; ordinary BW, RWM and SCS target acceptance 0.234. DCS-BW-rotate chooses reflected BW or a fixed-radius angular move with equal probability; it splits the same tuning budget between the two proposal scales and freezes both. DCS-RWM-rotate uses the same mixture with reflected Gaussian increments, whose coordinate scale starts at `0.1/sqrt(d+2)` before separate tuning.
+
+DCS-Billiard uses specular reflections with invariant extra chord traversals to move radially and angularly in one proposal. With VI it keeps the jointly fitted centre and scale but works after Möbius, so its production deformation is zero; it is not a new fit constrained to zero deformation. Its separate reflected-BW pilot runs in those same coordinates and freezes the selected step. It is available only in JAX.
+
+All earlier controls remain. Reports preserve all radial plots and add means and prespecified tails for X₁, X₂ and X₃, with analytic or independent references and their precision shown. See [the comparison protocol](docs/COMPARISONS.md).
 
 Download this repository using **Code → Download ZIP**, extract it, and install
 **Python 3.12 (64-bit)**. On Windows double-click **Start.bat**; on macOS open
@@ -28,7 +32,7 @@ when the run finishes. See the [step-by-step click-to-run guide](docs/CLICK_TO_R
 for installation, moving to another computer, and troubleshooting. These
 experiments run locally on your computer.
 
-On Windows, use the latest ZIP, open **Start.bat**, choose a comparison, target and VI setting, then **Smaller reproduction** or **Full paper settings**. On the Ryzen 9 9950X3D you can choose **32 CPU workers**. Both comparisons offer original sampling seeds (batch 0) and fresh batches 1–5; the map-fitting seed remains 42. Repeating a batch reuses its random streams, but wall-clock stopping can change sample counts and MSE. Compare independent batches to assess variability conditional on the fitted maps.
+To test billiards on Windows, download and extract the latest ZIP, open **Start.bat**, and select **Seven samplers: SCS, reflected BW, DCS-Billiard and DCS controls**. Choose **100D** or **500D**, **With VI** or **Without VI**, and then **Full paper settings**. Run each of the four target/VI combinations separately; each includes 50 chains per method at 20.00 seconds per chain after separate step tuning. Choose a fresh sampling batch for an independent repeat. On the Ryzen 9 9950X3D you can choose **32 CPU workers**. Both comparisons offer original sampling seeds (batch 0) and fresh batches 1–5; the map-fitting seed remains 42. Repeating a batch reuses its random streams, but wall-clock stopping can change sample counts and MSE. Compare independent batches to assess variability conditional on the fitted maps.
 
 ## Install and check from a terminal
 
@@ -75,7 +79,7 @@ The full run is substantial. Timed synthetic/regression comparisons require thou
 |---|---|---|
 | `skew-t-200d-nuts` | d=200, ν=3, α=(20,-30,0,…) | 50 chains/method, 20 s each |
 | `skew-t-200d-baselines` | Same target | 50 chains/method, 10 s each |
-| `sampler-comparison` | 100D/500D skew-t(3), DCS β=2 | 50 chains/method, 20 s each; DCS-RWM/BW/reflect/BW-rotate/RWM-rotate and SCS in JAX |
+| `sampler-comparison` | 100D/500D skew-t(3), DCS β=2 | 50 chains/method, 20 s each; DCS-RWM/BW/reflect/BW-rotate/RWM-rotate/Billiard and SCS in JAX |
 | `sampler-comparison-numba` | Same two selectable targets | Same budgets; optimized Numba DCS-BW/reflect/BW-rotate/RWM-rotate versus author JAX SCS |
 | `skew-t-50d-nu-0.5` | Symmetric t, d=50, ν=0.5 | 50 chains/method, 500,000 steps each; discard 166,667 |
 | `logistic-regression` | d=20, independent t priors, ν=4 and 6 | 20 chains/method/ν, 30 s each |
@@ -96,7 +100,7 @@ Old SCS and boundary comparisons are removed from the launcher. Their command-li
 
 All canonical benchmark kernels now use compiled sampling loops, including hit-and-run and the ordinary/spherical baselines. See [native implementation checks and measured speedups](docs/NATIVE_KERNELS.md) and [the HnR/NUTS audit](docs/HNR_NUTS.md).
 
-The [4 November laptop results](docs/COMPARISON_RESULTS.md) cover all eight original-target/VI/backend combinations under version 2, with its four measurements (radial quantities and X₁): 560 chains, with full-precision errors, counts and timings. Coordinate and radial rankings differ. The earlier 3 November radial-only results remain documented separately; these smaller runs do not establish universal rankings. Version 3 added X₂/X₃ measurements; version 4 adds the BW/rotation mixture. Neither addition is present in those archived results. Version 5 adds reflected Gaussian RWM plus rotation. Run every method together in a fresh version-5 comparison.
+The [4 November laptop results](docs/COMPARISON_RESULTS.md) cover all eight original-target/VI/backend combinations under version 2, with its four measurements (radial quantities and X₁): 560 chains, with full-precision errors, counts and timings. Coordinate and radial rankings differ. The earlier 3 November radial-only results remain documented separately; these smaller runs do not establish universal rankings. Version 3 added X₂/X₃ measurements; version 4 adds the BW/rotation mixture. Neither addition is present in those archived results. Version 5 added reflected Gaussian RWM plus rotation. **JAX version 6 adds DCS-Billiard**; the Numba comparison remains version 5. Run every method together in a fresh comparison for the new billiard figures. These archived results do not establish performance of the added sampler. See [the billiard construction and interpretation](docs/BILLIARD.md).
 
 ## Saved artifacts
 

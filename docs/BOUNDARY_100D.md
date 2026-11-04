@@ -2,9 +2,9 @@
 
 **This page preserves the earlier separate boundary experiment.** It is no
 longer a launcher choice. Use the current [configurable comparisons](COMPARISONS.md):
-six samplers in JAX (DCS-RWM, DCS-BW, SCS, DCS-BW-reflect, DCS-BW-rotate and DCS-RWM-rotate), or optimized
+seven samplers in JAX (DCS-RWM, DCS-BW, SCS, DCS-BW-reflect, DCS-BW-rotate, DCS-RWM-rotate and DCS-Billiard), or optimized
 Numba BW/reflected BW/BW-rotate/RWM-rotate versus unchanged author SCS. Both offer 100D and 500D skewed t targets, each with VI on or off for both
-map families. All seven includes the six-method JAX suite on 100D skewed t
+map families. All seven includes the seven-method JAX suite on 100D skewed t
 with the selected VI policy; the optimized and additional-target runs are
 separate choices.
 

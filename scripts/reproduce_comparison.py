@@ -12,7 +12,7 @@ from scripts import reproduce_scs_100d as runner
 from dcs_bench.comparison_targets import TARGET_IDS, comparison_target
 
 COMPARISONS = ('jax', 'numba')
-METHODS = {'jax': ['DCS-RWM', 'DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate', 'DCS-RWM-rotate'],
+METHODS = {'jax': ['DCS-RWM', 'DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate', 'DCS-RWM-rotate', 'DCS-Billiard'],
            'numba': ['DCS-BW', 'SCS', 'DCS-BW-reflect', 'DCS-BW-rotate', 'DCS-RWM-rotate']}
 
 
@@ -38,7 +38,7 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         raise ValueError('reference_seed must be an integer from 0 to 2**32-1')
     spec = selected['target']
     config.update(experiment='sampler-comparison' if comparison == 'jax' else 'sampler-comparison-numba',
-        protocol='timed-sampler-comparison-v5' if comparison == 'jax' else 'timed-numba-comparison-v5',
+        protocol='timed-sampler-comparison-v6' if comparison == 'jax' else 'timed-numba-comparison-v5',
         comparison=comparison, dcs_backend=comparison, target_id=target, target_title=selected['title'],
         target=spec, dimension=spec['dimension'], nu=spec.get('nu'), alpha=spec.get('alpha', {}),
         beta=selected['beta'],
@@ -48,7 +48,7 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         vi=vi, vi_enabled=vi == 'on', ball_map_policy='mobius' if vi == 'on' else 'vanilla',
         sphere_map_policy='vi' if vi == 'on' else 'vanilla',
         algorithms=list(METHODS[comparison]),
-        implementation_revision='shared-jax-rotation-v5' if comparison == 'jax' else 'optimized-numba-rotation-v5',
+        implementation_revision='shared-jax-billiard-v6' if comparison == 'jax' else 'optimized-numba-rotation-v5',
         step_policy='separate_method_specific_pretuning_then_frozen',
         step_tuning_policies={'DCS-BW-reflect': 'ball_esjd_pilot_v1',
                              'DCS-BW-rotate': 'split_ball_angular_esjd_v1',
@@ -61,6 +61,13 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
             'by ball-movement pilots; the rotation mixture splits this same budget between ball and angular '
             'movement pilots; Gaussian RWM starts with the RMS-matched scale initial_scale/sqrt(d+2). Original BW/RWM/SCS use acceptance-target 0.234 dual averaging. All steps freeze '
             'before sampling. VI off leaves both maps untuned but still calibrates every proposal step.')
+    if comparison == 'jax':
+        config['step_tuning_policies']['DCS-Billiard'] = 'ball_esjd_pilot_v1'
+        config['billiard_map_policy'] = 'post_mobius_retained_joint_fit_centre_scale_beta_delta_zero'
+        config['tuning_note'] += (' DCS-Billiard uses the same reflected-BW pilot rule in post-Mobius '
+            'coordinates, retaining the jointly fitted centre, R and beta with effective delta=0. '
+            'The pilot kernel is reflected BW; production alone uses the optimized billiard endpoint. '
+            'It receives the same total pilot transition budget and introduces no additional tuned angle.')
     config['time_scope'] = ('Equal per-chain sampling time includes first-third burn-in, every transition and '
         'all-state radial and X1/X2/X3 estimates. Independent reference generation, VI, separate step calibration, compilation, synchronization waits and '
         'file/report generation are excluded and recorded separately. ' +

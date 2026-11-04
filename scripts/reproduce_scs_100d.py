@@ -139,6 +139,15 @@ def prepare(config):
     return maps, fitting
 
 
+def effective_method_maps(config, maps):
+    """Record each production coordinate map separately from the shared fits."""
+    if not maps:
+        return {}
+    from dcs_bench.timed_radial import effective_mapping
+    return {name: effective_mapping(maps['sphere' if name == 'SCS' else 'ball'], name)
+            for name in config['algorithms']}
+
+
 def initialize_worker(slots):
     global _ALLOCATION
     _ALLOCATION = pin_current_process(slots.get())
@@ -323,7 +332,8 @@ def summarize(config, maps, fitting, records, reference=None):
         cases[name].update(mse_variability(means, truth))
         cases[name]['reference_error_material'] = (reference_mcse > .1*np.sqrt(mse)).tolist()
     return dict(config=config, truth=truth.tolist(), functionals=functionals, reference=reference,
-                maps=maps, fitting=fitting, cases=cases, time_scope=config.get('time_scope', TIME_SCOPE),
+                maps=maps, method_maps=effective_method_maps(config, maps), fitting=fitting,
+                cases=cases, time_scope=config.get('time_scope', TIME_SCOPE),
                 paired_mse_differences=paired_mse_differences(
                     {name: case['chain_means'] for name, case in cases.items()}, records, truth,
                     functionals=functionals),
@@ -359,7 +369,11 @@ def run(config, output):
             manifest['reference_seconds'] = time.perf_counter()-reference_started
             write_json(output/'reference.json', reference)
         maps, fitting = prepare(config)
-        write_json(output/'maps.json', {'maps': maps, 'fitting': fitting})
+        method_maps = effective_method_maps(config, maps)
+        write_json(output/'maps.json', {'maps': maps, 'method_maps': method_maps, 'fitting': fitting})
+        write_json(output/'method_maps.json', method_maps)
+        manifest['method_maps'] = method_maps
+        write_json(output/'manifest.json', manifest)
         records = run_chains(output, config, maps)
         summary = summarize(config, maps, fitting, records, reference=reference)
         write_json(output/'summary.json', summary)

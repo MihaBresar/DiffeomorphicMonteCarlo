@@ -6,13 +6,17 @@ saved reports and their command-line identifiers remain supported.
 
 | Identifier | Production implementations |
 |---|---|
-| `sampler-comparison` | DCS-RWM, DCS-BW, SCS, DCS-BW-reflect, DCS-BW-rotate, DCS-RWM-rotate, all JAX |
+| `sampler-comparison` | DCS-RWM, DCS-BW, SCS, DCS-BW-reflect, DCS-BW-rotate, DCS-RWM-rotate, DCS-Billiard, all JAX |
 | `sampler-comparison-numba` | DCS-BW, DCS-BW-reflect, DCS-BW-rotate and DCS-RWM-rotate in optimized Numba; author SCS in JAX |
 
 RWM here means **DCS-RWM in the transformed ball**, not an ordinary random walk
 on physical coordinates. Reflected BW folds a proposed displacement along its
 chord through the ball; it is not the spherical SCS step-out proposal. See the
 [reflection argument](BOUNDARY_100D.md).
+**DCS-Billiard** instead turns by specular reflection and adds invariant full
+chord traversals. It calculates the endpoint directly, without a bounce loop.
+This experimental sampler is available only in the JAX comparison; all
+previous controls remain. See [its construction and proof](BILLIARD.md).
 
 ## Targets and references
 
@@ -79,7 +83,12 @@ X₁ and X₂: initialization, fitted maps and sampled trajectories can differ.
 VI **off** skips fitting for both the ball and spherical maps: scale R=1,
 centre zero and Möbius/observer deformation zero. DCS β remains 2;
 SCS latitude stays 1.1. Step pretuning still runs. VI **on** fits both map
-families, with one shared ball fit for all DCS methods. VI losses omit
+families, with one shared ball fit for all DCS methods. DCS-Billiard retains
+that fit's centre, scale and β but proposes after the Möbius transformation:
+its effective production deformation is zero. This is not a new fit constrained
+to zero deformation, nor does it retain the full Möbius-preconditioned kernel.
+Both the original fitted map and each method's effective map are recorded.
+VI losses omit
 different base-normalizing constants and are not
 comparable normalized KL values across map families.
 
@@ -94,8 +103,9 @@ wall-time throughput comparisons, especially without OS CPU pinning. Runtime
 helper threads may still exist. The new policy and actual thread settings are
 saved in the manifest. **Rerun all methods together** for corrected timed
 counts, MSE and speed figures; do not combine older timings with new ones.
-Targets, proposal laws, tuning rules and sampling protocol version 5 remain
-unchanged. See [CPU allocation and evidence](PARALLEL.md#cpu-allocation-and-timing).
+That CPU correction preserved targets, proposal laws and tuning rules. The
+current JAX protocol is version 6 because DCS-Billiard has since been added;
+Numba remains version 5. See [CPU allocation and evidence](PARALLEL.md#cpu-allocation-and-timing).
 
 DCS-RWM, ordinary DCS-BW and SCS tune their proposal steps toward acceptance
 0.234 using the same observed-acceptance dual-averaging rule. Reflected BW
@@ -106,6 +116,32 @@ finite-precision scale guards; neither guarantees optimal radial efficiency.
 All steps freeze before sampling. Candidate scores, selected steps and guard
 flags are saved; they must be inspected rather than treating equal resources
 as proof that every method is optimally tuned.
+
+**DCS-Billiard** receives a fresh reflected-BW pilot in its own post-Möbius
+coordinates, beginning at the common physical all-ones point. It uses the same
+number of warmup transitions and the same ball-movement pilot rule, then
+freezes the selected scale and final pilot state for billiard production.
+The pilot does not run the billiard kernel or select on production MSE. With
+VI off, these pilot coordinates equal ordinary reflected BW's coordinates;
+with VI on, their effective maps differ. Equal pilot resources do not imply
+that this inherited calibration optimizes billiard efficiency.
+
+Each production step uses one uniform-ball increment, computes its specular
+billiard endpoint with the prescribed invariant extra chords, and applies one
+Metropolis test using the target density and radial map Jacobian in the active
+coordinates. The same full-state scan, projection and eight-functional
+recording as the other JAX methods remain inside the production clock.
+The optimized implementation omits the outgoing velocity needed only by the
+phase-flow proof, while retaining finite/interior endpoint checks. It changes
+neither the mathematical endpoint nor the random-number budget.
+
+At a fixed scale, the extra full chords preserve the proposed ball radius.
+Accepted radial kernels coincide with chord-reflected BW only for a radial
+transformed target in those same coordinates. This does not guarantee the
+same radial MSE for a skew target, a translated physical norm, different pilot
+scales or an equal-time experiment. Full-paper comparisons should include all
+methods, VI settings, recorded errors and tuning outcomes without assuming a
+ranking in advance.
 
 **DCS-BW-rotate** chooses one reflected BW move or one angular move with
 probability 1/2 each. The choice is independent of the state and fixed before
@@ -193,15 +229,17 @@ separate coordinate mean and tail-probability figures. They use two decimal
 places where appropriate and export exact integer counts and full-precision
 values. `reference_values.csv` includes reference values, MCSE and exact flags.
 
-Both current modes use protocol version 5 and report radial and three-coordinate
-quantities for the expanded method lists. The frozen angular scale, angle in
+JAX uses protocol version 6 and Numba uses version 5; both report radial and
+three-coordinate quantities for their recorded method lists. The frozen angular scale, angle in
 radians/degrees, mixture probability and pilot split appear in the tables;
 `angular_tuning.csv` records every angular candidate and `reflected_tuning.csv`
-records reflected-step candidates for BW and both mixtures, including their scale units.
+records reflected-step candidates for BW, both mixtures and the JAX billiard
+pilot, including their scale units and active proposal coordinates.
 Historical version-1 reports remain radial-only; version-2 reports
 retain their radial and X₁ quantities; version-3 reports have all eight
 quantities without DCS-BW-rotate. Version-4 reports include BW rotation but not
-DCS-RWM-rotate. They keep their recorded numbers.
+DCS-RWM-rotate; version-5 reports contain both mixtures but no billiard method.
+They keep their recorded numbers.
 Replotting cannot reconstruct new all-iteration measurements or a new sampler.
 Run every method together for a new timed comparison. These measurements do not establish an overall mixing
 advantage. MSE is the average squared error across independent chains; the fitted map is shared,

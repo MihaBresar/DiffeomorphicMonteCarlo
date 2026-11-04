@@ -18,10 +18,11 @@ METRICS = ('tail_probability', 'mean_norm')
 X1_METRICS = ('mean_x1', 'x1_tail_probability')
 X23_METRICS = ('mean_x2', 'x2_left_tail_probability', 'mean_x3', 'x3_tail_probability')
 ALIASES = (('tail_probability', 'tail'), ('mean_norm', 'norm'))
-METHODS = ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', 'SCS', 'DCS-BW-rotate', 'DCS-RWM-rotate')
+METHODS = ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', 'SCS', 'DCS-BW-rotate', 'DCS-RWM-rotate', 'DCS-Billiard')
 ROTATION_METHODS = ('DCS-BW-rotate', 'DCS-RWM-rotate')
 COLORS = {'DCS-RWM': '#FF8C00', 'DCS-BW': '#9370db', 'DCS-BW-reflect': '#159a8c',
-          'SCS': '#ff1493', 'DCS-BW-rotate': '#2878b5', 'DCS-RWM-rotate': '#b69a27'}
+          'SCS': '#ff1493', 'DCS-BW-rotate': '#2878b5', 'DCS-RWM-rotate': '#b69a27',
+          'DCS-Billiard': '#ba433c'}
 
 
 def _metrics(value, metric_names=METRICS):
@@ -84,6 +85,8 @@ def _table(rows):
 
 
 def _policy(name, timed=False, matched=False, ball_esjd=False):
+    if name == 'DCS-Billiard':
+        return 'Reflected-BW ball-movement pilots in post-Mobius coordinates; frozen step used by optimized invariant-chord billiard production'
     if name == 'DCS-RWM-rotate':
         return '50/50 reflected Gaussian RWM and fixed-radius rotation; Gaussian coordinate standard deviation and angular scale pretuned within one shared warmup budget, then frozen'
     if name == 'DCS-BW-rotate':
@@ -135,7 +138,8 @@ def render_report(root, summary):
                                       'timed-sampler-comparison-v2', 'timed-numba-comparison-v2',
                                       'timed-sampler-comparison-v3', 'timed-numba-comparison-v3',
                                       'timed-sampler-comparison-v4', 'timed-numba-comparison-v4',
-                                      'timed-sampler-comparison-v5', 'timed-numba-comparison-v5')
+                                      'timed-sampler-comparison-v5', 'timed-numba-comparison-v5',
+                                      'timed-sampler-comparison-v6')
     optimized = config.get('protocol') in ('timed-numba-comparison-v1', 'timed-numba-comparison-v2',
                                           'timed-numba-comparison-v3', 'timed-numba-comparison-v4', 'timed-numba-comparison-v5')
     vi_mode = config.get('vi', 'on')
@@ -151,6 +155,9 @@ def render_report(root, summary):
         raise ValueError('Configured methods must list every completed case exactly once')
     has_rotation = any(name in names for name in ROTATION_METHODS)
     has_rwm_rotation = 'DCS-RWM-rotate' in names
+    has_billiard = 'DCS-Billiard' in names
+    if has_billiard and 'DCS-Billiard' not in summary.get('method_maps', {}):
+        raise ValueError('Billiard reports require the recorded effective post-Mobius map')
     counts = {name: _counts(cases[name], config, timed) for name in names}
     metric_names = tuple(summary.get('functionals', METRICS))
     if metric_names not in (METRICS, METRICS+X1_METRICS, METRICS+X1_METRICS+X23_METRICS):
@@ -189,6 +196,7 @@ def render_report(root, summary):
         target_title = config.get('target_title') or f'{dimension}D skewed Student-t, ν = {nu:g}'
         title = ('EXECUTION CHECK — ' if smoke else '') + target_title
         title += (' — optimized Numba DCS / author SCS' if optimized else
+                  ' — seven samplers, JAX' if has_billiard else
                   ' — six samplers, JAX' if has_rwm_rotation else
                   ' — five samplers, JAX' if has_rotation else ' — four samplers, JAX')
         title += ' — VI '+str(vi_mode)
@@ -220,6 +228,9 @@ def render_report(root, summary):
         if has_rwm_rotation:
             tuning_note = ('VI '+str(vi_mode)+' for both maps. Each rotation mixture splits its warmup between '
                            'reflected-step and angular pilots; all sampling scales frozen.')
+        if has_billiard:
+            tuning_note = ('VI '+str(vi_mode)+'. Equal pilot budgets; all steps frozen. Billiard uses '
+                           'reflected-BW pilots after Mobius, with effective deformation zero.')
     x = np.arange(1, len(names)+1)
     colors = [COLORS[name] for name in names]
     figure_names = []
@@ -228,7 +239,7 @@ def render_report(root, summary):
         if len(names) > 4:
             # Widen expanded plots; historical five-method figure bytes and
             # layouts are preserved when their supplied values are unchanged.
-            fig.set_size_inches(fig.get_figwidth()*(1.2 if len(names) == 5 else 1.44), fig.get_figheight())
+            fig.set_size_inches(fig.get_figwidth()*(1.2 if len(names) == 5 else 1.44 if len(names) == 6 else 1.68), fig.get_figheight())
             for ax in fig.axes:
                 if len(ax.get_xticklabels()) == len(names):
                     for tick in ax.get_xticklabels():
@@ -527,7 +538,7 @@ def render_report(root, summary):
             history = row.pop('tuning_history', None)
             angular_history = row.pop('angular_tuning_history', None)
             row.update(method=name, production_step_policy=_policy(name, timed, matched, ball_esjd))
-            if ball_esjd and name in ('DCS-BW-reflect', *ROTATION_METHODS):
+            if ball_esjd and name in ('DCS-BW-reflect', 'DCS-Billiard', *ROTATION_METHODS):
                 for pilot in history or []:
                     tuning_rows.append(dict(method=name, chain=row['chain'], seed=row.get('seed'),
                         **{key: pilot.get(key) for key in ('round', 'candidate', 'scale', 'iterations',
@@ -537,6 +548,13 @@ def render_report(root, summary):
                     'frozen_step': row.get('frozen_scale', row.get('final_scale')),
                     'selected_ball_esjd': row.get('tuning_selected_esjd'),
                     'search_status': row.get('tuning_search_status')})
+                if name == 'DCS-Billiard':
+                    tuning_summaries[-1].update(pilot_kernel='Reflected BW',
+                        pilot_coordinates='Post-Mobius; effective delta=0')
+                    for pilot_row in tuning_rows:
+                        if pilot_row['method'] == name and pilot_row['chain'] == row['chain']:
+                            pilot_row.update(pilot_kernel='Reflected BW',
+                                pilot_coordinates='Post-Mobius; effective delta=0')
                 if has_rwm_rotation:
                     parameter = ('Gaussian coordinate standard deviation' if name == 'DCS-RWM-rotate' else 'Uniform-ball proposal radius')
                     tuning_summaries[-1].update(scale_parameter=parameter,
@@ -582,6 +600,20 @@ def render_report(root, summary):
                     parameter_rows.append({'map': family, 'parameter': key, 'coordinate': index+1, 'value': coordinate})
             else:
                 parameter_rows.append({'map': family, 'parameter': key, 'coordinate': '', 'value': value})
+    effective_rows, effective_summaries = [], []
+    for name in names:
+        parameters = summary.get('method_maps', {}).get(name)
+        if parameters is None:
+            continue
+        coordinates = (('Post-Mobius ball; retained jointly fitted centre/R/beta, effective delta=0'
+                        if vi_mode == 'on' else 'Post-Mobius ball; untuned unit map, effective delta=0')
+                       if name == 'DCS-Billiard' else 'Sphere' if name == 'SCS' else
+                       'Fitted ball' if vi_mode == 'on' else 'Untuned ball')
+        effective_rows.append(dict(method=name, coordinates=coordinates, **parameters))
+        effective_summaries.append(dict(method=name, coordinates=coordinates,
+            scale_R=parameters.get('scale'), centre_norm=float(np.linalg.norm(parameters.get('mu', []))),
+            deformation_norm=float(np.linalg.norm(parameters.get('observer' if name == 'SCS' else 'delta', []))),
+            beta=parameters.get('beta'), latitude=parameters.get('latitude')))
     setup_rows = []
     for family, fitting in summary.get('fitting', {}).items():
         total_draws = fitting.get('total_training_draws')
@@ -602,6 +634,8 @@ def render_report(root, summary):
     csvs = {'scs_100d_values.csv': case_rows, 'paper_values.csv': case_rows,
             'sample_counts.csv': count_rows, 'scs_100d_chains.csv': chain_rows,
             'tuned_parameters.csv': parameter_rows}
+    if effective_rows:
+        csvs['effective_maps.csv'] = effective_rows
     if paired_rows:
         csvs['paired_mse_differences.csv'] = paired_rows
     if prefix_rows:
@@ -681,6 +715,29 @@ def render_report(root, summary):
                     'Saved trace thinning does not change those estimates. Counts and full-precision errors are exported.')
         notes[5] = ('Map fitting, compilation and step calibration are reported separately and excluded from production timing. '
                     'All DCS methods share one ball map; SCS uses the recorded sphere map.')
+        if has_billiard:
+            notes[2] = ('VI is enabled for both map families with equal optimizer and fresh-draw budgets. '
+                        'DCS-Billiard retains the jointly fitted centre, R and beta but runs after Mobius, '
+                        'with effective delta=0; this is not a new delta=0 VI fit. Other DCS methods retain '
+                        'the shared fitted ball map. All effective maps are recorded separately.' if vi_mode == 'on' else
+                        'VI is disabled for both map families: unit scale, zero centre and zero deformation. '
+                        'DCS-Billiard uses this same untuned radial map. DCS retains beta=2 and SCS latitude 1.1. '
+                        'Proposal-step tuning remains enabled for every method.')
+            notes[5] = ('Map fitting, compilation and step calibration are reported separately and excluded from '
+                        'production timing. The ball and sphere are fitted once each. Billiard reuses the fitted '
+                        'ball centre/R/beta with zero effective deformation; no extra map fitting is performed.')
+            notes.append('DCS-Billiard uses specular billiard reflections with invariant extra complete chords, '
+                         'computed directly without a bounce loop. It uses the same uniform-ball increment law '
+                         'and one Metropolis test. Invalid numerical endpoints are rejected. The original BW, '
+                         'reflected BW and SCS controls are unchanged.')
+            notes.append('Billiard step calibration runs reflected BW in its own post-Mobius coordinates from '
+                         'the common physical start, using the same total warmup-transition budget. The resulting '
+                         'state and selected step initialize billiard production; production does not retune. '
+                         'The pilot table therefore scores reflected-BW movement, not billiard movement or MSE.')
+            notes.append('Complete-chord extensions preserve the proposed ball radius. Accepted radial transition '
+                         'laws coincide with reflected BW only for a radial transformed target in the same '
+                         'coordinates and at the same frozen step. Skewed targets and comparisons across maps '
+                         'do not have this guarantee. Short laptop results do not establish universal dominance.')
         notes[7] = ('Every method samples the same recorded target: '+target_title+'. This is a benchmark of radial '
                     'tail-probability and mean-norm estimation, not a reproduction of the SCS publication figures or '
                     'a general mixing guarantee. The unmodified author SCS transition is retained.')
@@ -804,6 +861,8 @@ def render_report(root, summary):
         page += '<h2>Paired MSE differences from SCS</h2><p>Negative differences favor the named method. Empirical MCSE is descriptive; it is not a confidence interval.</p>'+_table(paired_rows)
     if setup_rows:
         page += '<h2>Map fitting excluded from production time</h2>'+_table(setup_rows)
+    if effective_summaries:
+        page += '<h2>Effective maps used by each sampler</h2><p>Shared fitted parameters and production coordinates are distinct for DCS-Billiard. Full vectors are in <a href="effective_maps.csv">effective_maps.csv</a> and the saved summary.</p>'+_table(effective_summaries)
     if tuning_summaries:
         reflected_heading = 'Reflected-step pilot tuning and frozen steps' if has_rwm_rotation else 'Reflected BW pilot tuning and frozen steps'
         page += '<details><summary>'+reflected_heading+'</summary><p>The score is the mean squared jump in ball coordinates, including zero movement after rejection. It is not an MSE estimate. Full pilot candidates are available in <a href="reflected_tuning.csv">reflected_tuning.csv</a> and the saved summary.</p>'+_table(tuning_summaries)+'</details>'

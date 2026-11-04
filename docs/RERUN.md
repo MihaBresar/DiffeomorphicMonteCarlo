@@ -17,8 +17,8 @@ thinning. At thinning 10 this stores 33,334 post-burn-in states.
 The previous three-method 100D and separate boundary launcher entries have
 been replaced by two choices:
 
-- **Six samplers: DCS-RWM, DCS-BW, SCS, reflected BW and both rotation mixtures**, using the same
-  JAX framework and full-state processing (`timed-sampler-comparison-v5`).
+- **Seven samplers: SCS, reflected BW, DCS-Billiard and DCS controls**, using the same
+  JAX framework and full-state processing (`timed-sampler-comparison-v6`).
 - **Five samplers: optimized Numba DCS versus SCS**, using optimized
   DCS production and the unchanged author SCS JAX transition
   (`timed-numba-comparison-v5`). This comparison includes differences between
@@ -33,7 +33,12 @@ Start a fresh run of **every method in the chosen comparison** for each target
 and VI setting you want to assess. Old results remain valid records of their
 saved protocols; replotting cannot turn them into the new comparison or
 measure the optimized backend or recover all-iteration coordinate estimates.
-Version 5 adds DCS-RWM-rotate alongside the version-4 BW/rotation mixture in both implementations. It retains the version-3
+JAX version 6 adds optimized DCS-Billiard to all six existing methods. Numba
+remains version 5, with both rotation mixtures and no billiard method. The
+billiard move works after Möbius: it retains the jointly fitted centre and
+scale with VI, but its active deformation is zero. Its step is pretuned by
+reflected BW in those same coordinates, with the existing warmup budget.
+The comparison retains the version-3
 X₂ mean/left-tail and X₃ mean/right-tail measurements and the existing X₁ and
 radial quantities. Earlier saved traces cannot reconstruct unsaved all-iteration
 estimates or the new sampler. Rerun every method together even for an existing
@@ -57,7 +62,7 @@ exact integers, and CSV/JSON retain full precision.
 
 | Launcher experiment | Current comparison | Outputs |
 |---|---|---|
-| Six samplers: DCS-RWM, DCS-BW, SCS, reflected BW and both rotation mixtures | Selected target and VI setting; equal time, JAX | `VsSCS`, radial estimates, added coordinate mean/tail, counts, runtime, bias/variance |
+| Seven samplers: SCS, reflected BW, DCS-Billiard and DCS controls | Selected target and VI setting; equal time, JAX | `VsSCS`, radial estimates, added coordinate mean/tail, counts, runtime, bias/variance |
 | Five samplers: optimized Numba DCS versus SCS | Selected target and VI setting; equal time, mixed implementations | Same comparison figure families and exact-value tables |
 | 50D t: infinite first moment, equal samples | 50 chains/method, 500,000 iterations/chain | `SuperInfiniteFirstTest`, tail/log-norm and quantiles |
 | 200D skew-t: DCS versus NUTS | Equal sampling time | `NUTS_PBW_vs` |
@@ -84,7 +89,7 @@ The super-heavy-tail experiment retains equal iteration counts. Its mean norm
 does not exist at ν=0.5, so use its tail probability, finite mean log norm and
 marginal quantiles. These plots cannot be reconstructed by rescaling timed MSE.
 
-**All seven experiments + posterior table** runs the six-method JAX comparison
+**All seven experiments + posterior table** runs the seven-method JAX comparison
 on the 100D skewed-t target and the other six experiments,
 and prepares independent logistic references. Its VI choice controls both maps
 in the comparison; the other experiments retain their existing map options.

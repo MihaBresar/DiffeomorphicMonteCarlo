@@ -7,6 +7,8 @@ relocates them along the proposal chord. Compilation and
 separate step calibration are untimed; all production steps are frozen.
 """
 from functools import lru_cache
+from copy import deepcopy
+import hashlib
 import json
 from numbers import Real
 import time
@@ -26,6 +28,7 @@ ROTATION_TUNING = 'split_ball_angular_esjd_v1'
 ROTATION_METHOD = 'DCS-BW-rotate'
 RWM_ROTATION_METHOD = 'DCS-RWM-rotate'
 ROTATION_METHODS = (ROTATION_METHOD, RWM_ROTATION_METHOD)
+BILLIARD_METHOD = 'DCS-Billiard'
 BALL_STEP_POLICY = ('Discarded-pilot squared jump distance in ball coordinates; '
                     'up to eight rotating h/2, h, 2h triplet rounds within the existing warmup budget, then frozen')
 ROTATION_STEP_POLICY = ('Split the existing discarded warmup budget between reflected-BW ball movement '
@@ -34,22 +37,38 @@ ROTATION_STEP_POLICY = ('Split the existing discarded warmup budget between refl
 IMPLEMENTATION_REVISION = 'jax-dcs-exact-ball-v1'
 
 
+def effective_mapping(mapping, algorithm):
+    """Return the map actually used, without mutating the shared VI fit.
+
+    Billiards move in w = Mobius_delta(z), so the deformation and its Jacobian
+    cancel from their production coordinates. The jointly fitted centre, R
+    and beta remain; this is not a refit with delta constrained to zero.
+    """
+    result = deepcopy(mapping)
+    if algorithm == BILLIARD_METHOD:
+        result['delta'] = [0.] * int(result['dimension'])
+    return result
+
+
 def resolve_step_tuning(config):
     """Keep historical calibration unless a method explicitly opts into ball ESJD."""
     policies = config.get('step_tuning_policies', {})
     if not isinstance(policies, dict):
         raise ValueError('step_tuning_policies must map methods to tuning policy identifiers')
     for method, policy in policies.items():
-        if method not in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, RWM_ROTATION_METHOD, 'SCS'):
+        if method not in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, RWM_ROTATION_METHOD, BILLIARD_METHOD, 'SCS'):
             raise ValueError(f'Unknown tuning method: {method}')
         if policy not in (ACCEPTANCE_TUNING, BALL_TUNING, ROTATION_TUNING):
             raise ValueError(f'Unknown step tuning policy: {policy}')
-        if policy == BALL_TUNING and method != 'DCS-BW-reflect':
-            raise ValueError('Ball ESJD calibration is defined for reflected BW only')
+        if policy == BALL_TUNING and method not in ('DCS-BW-reflect', BILLIARD_METHOD):
+            raise ValueError('Ball ESJD calibration is defined for reflected BW and billiards only')
+        if method == BILLIARD_METHOD and policy != BALL_TUNING:
+            raise ValueError('Billiards require the reflected-BW pilot in post-Mobius coordinates')
         if (policy == ROTATION_TUNING) != (method in ROTATION_METHODS):
             raise ValueError('Rotation mixtures require split reflected-step/angular calibration')
     selected = policies.get(config['algorithm'],
-                            ROTATION_TUNING if config['algorithm'] in ROTATION_METHODS else ACCEPTANCE_TUNING)
+                            ROTATION_TUNING if config['algorithm'] in ROTATION_METHODS else
+                            BALL_TUNING if config['algorithm'] == BILLIARD_METHOD else ACCEPTANCE_TUNING)
     if selected == BALL_TUNING and config['warmup'] < 3:
         raise ValueError('Ball ESJD calibration requires at least three warmup transitions')
     if selected == ROTATION_TUNING:
@@ -87,7 +106,7 @@ def resolve_step_scale_ceiling(config):
     limits = config.get('step_scale_ceilings', {})
     if not isinstance(limits, dict):
         raise ValueError('step_scale_ceilings must map method names to finite numeric limits')
-    methods = ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, RWM_ROTATION_METHOD, 'SCS')
+    methods = ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, RWM_ROTATION_METHOD, BILLIARD_METHOD, 'SCS')
     for name, value in limits.items():
         if name not in methods:
             raise ValueError(f'Unknown step-scale ceiling method: {name}')
@@ -162,7 +181,7 @@ def _dcs_components(mapping_dict, target, algorithm):
         def step(carry, index):
             x, key = carry
             key, subkey = jax.random.split(key)
-            if algorithm in ('DCS-BW', 'DCS-BW-reflect'):
+            if algorithm in ('DCS-BW', 'DCS-BW-reflect', BILLIARD_METHOD):
                 eps = stepsize * _uniform_ball(subkey, dimension)
             else:
                 eps = stepsize * jax.random.normal(subkey, shape=x.shape)
@@ -171,6 +190,9 @@ def _dcs_components(mapping_dict, target, algorithm):
             if algorithm == 'DCS-BW-reflect':
                 from .ball_boundary import reflect_ball_proposal
                 proposed, valid = reflect_ball_proposal(x, eps)
+            elif algorithm == BILLIARD_METHOD:
+                from .billiard import reflect_ball_billiard
+                proposed, valid = reflect_ball_billiard(x, eps)
             key, subkey = jax.random.split(key)
             logu = jnp.log(jax.random.uniform(subkey))
             # No current-state cache: both densities are recomputed for every
@@ -193,6 +215,8 @@ def _components(mapping, spec, algorithm):
     core = scs_paper._author()  # Also enables the same float64 policy for DCS.
     import jax.numpy as jnp
     target = Target(spec)
+    if algorithm == BILLIARD_METHOD:
+        mapping = effective_mapping(mapping, algorithm)
     if algorithm == RWM_ROTATION_METHOD:
         from .rwm_rotation import build_components
         return build_components(mapping, spec)
@@ -262,13 +286,21 @@ def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initi
     """Compile both phases without consuming a chain's RNG or timing budget."""
     import jax
     import jax.numpy as jnp
-    block, projection, initial, density = _components(
-        json.loads(mapping_json), json.loads(spec_json), algorithm)
+    mapping, spec = json.loads(mapping_json), json.loads(spec_json)
+    block, projection, initial, density = _components(mapping, spec, algorithm)
+    # Reproduce the reviewed candidate's exact pilot, state and frozen scale.
+    # Only production uses billiards; pilot resources are not multiplied.
+    calibration_block = block
+    if algorithm == BILLIARD_METHOD:
+        if tuning_policy != BALL_TUNING:
+            raise ValueError('Billiards require reflected-BW ball-movement calibration')
+        calibration_block, _, _, _ = _components(
+            effective_mapping(mapping, algorithm), spec, 'DCS-BW-reflect')
     if not np.isfinite(float(density(initial))) or not np.all(np.isfinite(np.asarray(projection(initial)))):
         raise ValueError('Nonfinite initial density or physical point')
     if tuning_policy == BALL_TUNING:
         from .ball_tuning import calibrate_ball_esjd
-        burn = lambda state, key: calibrate_ball_esjd(block, state, key, warmup, initial_scale, scale_ceiling)
+        burn = lambda state, key: calibrate_ball_esjd(calibration_block, state, key, warmup, initial_scale, scale_ceiling)
     elif tuning_policy == ACCEPTANCE_TUNING:
         burn = lambda state, key: _calibrate(block, state, key, warmup, initial_scale, scale_ceiling)
     else:
@@ -338,6 +370,10 @@ def _rwm_rotation_programs(mapping_json, spec_json, warmup, thin, threshold, ini
 class _Matched:
     """Common JAX driver, calibration, recording and clocks for DCS and SCS."""
     def __init__(self, mapping, config, seed):
+        if config['algorithm'] == BILLIARD_METHOD:
+            if config.get('dcs_backend', 'jax') != 'jax':
+                raise ValueError('DCS-Billiard is available in the shared JAX comparison only')
+            mapping = effective_mapping(mapping, config['algorithm'])
         scs_paper._author()
         import jax
         import jax.numpy as jnp
@@ -397,6 +433,19 @@ class _Matched:
         self.warmup_acceptance = float(accepts) / config['warmup'] if config['warmup'] else None
         self.implementation = ('Original author JAX SCS transition' if config['algorithm'] == 'SCS'
             else 'DCS JAX transition') + '; separate calibration, full-state scans and radial recording'
+        if config['algorithm'] == BILLIARD_METHOD:
+            self.implementation = ('Optimized endpoint-only JAX specular billiard with invariant extra chords; '
+                'post-Mobius coordinates, reflected-BW pilot, shared full-state statistics')
+            self.tuning_metadata.update(
+                effective_map=deepcopy(mapping),
+                proposal_coordinates='Post-Mobius w; retained supplied centre/R/beta, zero direct deformation',
+                calibration_coordinates='Reflected-BW ball-movement pilot in post-Mobius w, from the common physical all-ones start',
+                calibration_algorithm='DCS-BW-reflect',
+                calibrated_state_sha256=hashlib.sha256(np.asarray(self.state).tobytes()).hexdigest(),
+                extra_chord_rule='floor(max(0, atan2(L,2a)/(2atan2(a,b)) - L/(2a)))',
+                extra_density_evaluations=0, extra_gaussian_vectors=0, bounce_loop=False,
+                map_note='The shared input map is retained for provenance; its centre/R/beta are used and its Mobius deformation cancels in this method. With VI these parameters come from the joint fit; without VI the input map is untuned. No delta=0 refit.',
+                tuning_note='Reflected-BW ball-movement pilot in post-Mobius coordinates; the selected scale and final pilot state are reused by billiard production. Same separate transition budget; no production adaptation.')
 
     def batch(self):
         import jax
@@ -487,7 +536,7 @@ def _rotation_tuning_metadata(histories, scale, angular_scale, config):
 
 
 def _validate(config):
-    if config['algorithm'] not in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, RWM_ROTATION_METHOD, 'SCS'):
+    if config['algorithm'] not in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, RWM_ROTATION_METHOD, BILLIARD_METHOD, 'SCS'):
         raise ValueError('Unknown timed comparison method')
     if not np.isfinite(config['time_budget']) or config['time_budget'] <= 0:
         raise ValueError('time_budget must be positive and finite')
@@ -500,6 +549,8 @@ def _validate(config):
         raise ValueError('dcs_backend must be jax or numba')
     if config.get('dcs_backend') == 'numba' and config['algorithm'] == 'DCS-RWM':
         raise ValueError('Plain DCS-RWM is not part of the optimized Numba comparison')
+    if config.get('dcs_backend') == 'numba' and config['algorithm'] == BILLIARD_METHOD:
+        raise ValueError('DCS-Billiard is available in the shared JAX comparison only')
     if not isinstance(config.get('coordinate_metrics', False), bool):
         raise ValueError('coordinate_metrics must be a boolean')
     if config.get('coordinate_metrics', False):
@@ -609,14 +660,15 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         'common_cpu_backend': 'mixed: optimized Numba DCS, author JAX SCS' if config.get('dcs_backend') == 'numba' else 'JAX',
         'backend': 'Numba' if native else 'JAX',
         'implementation_revision': config.get('implementation_revision', IMPLEMENTATION_REVISION),
-        'boundary_policy': ('chord_reflection_or_fixed_radius_rotation' if config['algorithm'] in ROTATION_METHODS else
+        'boundary_policy': ('specular_ball_billiard_invariant_extra_chords' if config['algorithm'] == BILLIARD_METHOD else
+                            'chord_reflection_or_fixed_radius_rotation' if config['algorithm'] in ROTATION_METHODS else
                             'reflect_along_proposal_chord' if config['algorithm'] == 'DCS-BW-reflect'
                             else 'author_cap_stepout' if config['algorithm'] == 'SCS' else 'direct_rejection'),
         'step_scale_ceiling': recorded_ceiling,
         'scale_ceiling_reached': bool(backend.scale >= recorded_ceiling*(1-1e-10)),
         'proposal_generator': ('50/50_reflected_isotropic_gaussian_or_tangent_rotation' if config['algorithm'] == RWM_ROTATION_METHOD else
                                '50/50_reflected_uniform_ball_or_tangent_rotation' if config['algorithm'] == ROTATION_METHOD else
-                               'normal_d_plus_2_projection' if config['algorithm'] in ('DCS-BW', 'DCS-BW-reflect')
+                               'normal_d_plus_2_projection' if config['algorithm'] in ('DCS-BW', 'DCS-BW-reflect', BILLIARD_METHOD)
                                else 'author_tangent_normal' if config['algorithm'] == 'SCS'
                                else 'isotropic_normal'),
         'common_statistic_policy': ('All 300 post-MH states enter statistics; optimized DCS caches unchanged radii and accumulates without full-state output'

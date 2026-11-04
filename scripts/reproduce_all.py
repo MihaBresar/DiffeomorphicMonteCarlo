@@ -22,7 +22,7 @@ def main():
     parser.add_argument('--workers', type=int, default=1)
     parser.add_argument('--ball-map-policy', choices=['mobius', 'vanilla'], default='mobius')
     parser.add_argument('--vi', choices=['on', 'off'], default='on',
-                        help='VI on/off for both maps in the six-method JAX comparison')
+                        help='VI on/off for both map families in the seven-method JAX comparison')
     args = parser.parse_args()
     output = (args.output_root or ROOT/'results'/args.preset).resolve()
     reference = output/'logistic-reference'
@@ -53,7 +53,7 @@ def main():
                 if name == 'sampler-comparison':
                     import json
                     manifest = json.loads((directory/'manifest.json').read_text(encoding='utf-8'))
-                    if manifest.get('protocol') == 'timed-sampler-comparison-v5' and manifest.get('status') == 'complete' and manifest.get('config', {}).get('vi') == args.vi:
+                    if manifest.get('protocol') == 'timed-sampler-comparison-v6' and manifest.get('status') == 'complete' and manifest.get('config', {}).get('vi') == args.vi:
                         continue
                     raise ValueError('The sampler comparison requires a fresh output folder after an interrupted run or a VI change.')
                 command.append('--resume')

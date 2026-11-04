@@ -90,7 +90,7 @@ class RWMRotationReportTests(unittest.TestCase):
                     render.assert_called_once()
                     run.assert_not_called()
         page = (Path(__file__).resolve().parents[1]/'launcher/index.html').read_text(encoding='utf-8')
-        for text in ('Six samplers:', 'Five samplers: optimized Numba DCS versus SCS',
+        for text in ('Seven samplers:', 'Five samplers: optimized Numba DCS versus SCS',
                      'DCS-RWM-rotate', 'DCS-BW-rotate', 'Gaussian RWM starts', 'splits the same tuning budget'):
             self.assertIn(text,page)
 
