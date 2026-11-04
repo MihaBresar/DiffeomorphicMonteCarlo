@@ -1,5 +1,18 @@
 # Changes
 
+## 2026-11-04 — common JAX CPU runtime limit
+
+- Set `PJRT_NPROC=1` before backend creation for every method and the
+  coordinator. The earlier Eigen-only limits did not constrain all compiled
+  kernels; extra per-worker CPU consumption distorted dimension-dependent
+  RWM/BW wall-time rates on the laptop.
+- Record `pjrt-single-compute-thread-v1` and `PJRT_NPROC` consistently in
+  execution plans, manifests and generic chain records. Runtime helper threads
+  may remain; the setting controls compute pools and operator parallelism.
+- Preserve targets, proposals, tuning and version-5 scientific protocols.
+  Rerun the complete comparison for corrected time, sample-count and MSE
+  figures; historical timing cohorts must not be combined with new runs.
+
 ## 2026-11-04 — reflected Gaussian RWM with rotations
 
 - Add DCS-RWM-rotate to both current comparisons, preserving every existing

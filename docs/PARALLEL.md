@@ -16,8 +16,9 @@ Run **Quick check** first. Its production configuration has two chains per
 method, so it uses at most two workers even if you select a larger count. The
 four-chain logistic reference can use up to four. Full paper experiments have
 20 or 50 production chains per method and can use the larger selected count.
-The smaller reproduction has eight chains and therefore uses at most eight
-workers. This can account for low CPU utilization even with 16 or 32 workers
+The generic smaller reproductions have eight chains; the current sampler
+comparisons have 20. They use at most eight or 20 simultaneous workers,
+respectively. This can account for low CPU utilization even with 16 or 32 workers
 selected. Fitting, plotting, reference preparation and the final incomplete
 batch can use fewer threads. We do not add chains merely to fill the CPU, since
 that would change the specified experiment. Sixteen workers may give better
@@ -47,7 +48,7 @@ once in the coordinator and its frozen parameters are shared with all workers.
 The four independent logistic reference chains also run in parallel.
 
 Workers start fresh Python interpreters instead of forking a live JAX runtime.
-NumPy/JAX imports occur after each worker's CPU assignment. A worker compiles its
+CPU affinity is established before a worker's sampling backend initializes. A worker compiles its
 NUTS functions once and reuses them for subsequent chains. All workers finish
 imports and compilation before warmup/sampling starts, so one chain's production
 does not compete with another worker's initial compilation. Draw arrays are
@@ -70,9 +71,32 @@ back through a process pool.
   provided. Performance and efficiency cores may have different speeds.
 
 All workers set BLAS/OpenMP and TensorFlow thread limits to one. JAX is configured
-for CPU, one host device, and disabled multithreaded Eigen operations. On systems
-without CPU pinning, these settings do not guarantee that every runtime operation
-uses exactly one physical core.
+for CPU, one host device, and disabled multithreaded Eigen operations. They also
+set **`PJRT_NPROC=1` before backend creation**, limiting the pinned JAX 0.4.35 CPU
+compute pools and the compiler's intra-operation parallelism budget. This
+overrides an inherited `PJRT_NPROC`; it takes precedence over `NPROC`, which is
+left unchanged. The common entry point applies the same setting to the
+coordinator before fitting and reference preparation. Runtime helper threads
+can remain; this is not a claim that the process contains only one thread.
+
+The recorded policy is **`pjrt-single-compute-thread-v1`**. An audit on
+4 November 2026 found that the earlier Eigen-only flags left other XLA kernels
+free to consume multiple CPU cores per worker. Which method was affected
+changed with dimension, distorting wall-time throughput comparisons on the
+unbound macOS workers. The correction applies to every method, including SCS,
+without changing the target, proposal or tuning rules. **Rerun all methods
+together for new wall-time, sample-count and MSE figures**: changing throughput
+also changes how many iterations finish in a fixed-time experiment. Historical
+reports remain readable, but their rates must not be mixed with corrected runs.
+
+The pinned XLA source reads the setting in
+[`DefaultThreadPoolSize`](https://github.com/openxla/xla/blob/76da730179313b3bebad6dea6861768421b7358c/xla/pjrt/utils.cc#L814)
+and uses it for the
+[CPU runtime pools and compilation budget](https://github.com/openxla/xla/blob/76da730179313b3bebad6dea6861768421b7358c/xla/pjrt/cpu/cpu_client.cc#L385).
+The Eigen flag alone controls Eigen calls, and the LLVM parallel-codegen flag
+controls compilation rather than sampling. Process CPU time divided by measured
+wall time is useful evidence of actual consumption; a worker count or environment
+setting by itself does not prove equal resource use.
 
 The native mechanisms are documented in Python's
 [CPU affinity API](https://docs.python.org/3.12/library/os.html#os.sched_setaffinity)
@@ -88,7 +112,7 @@ for isolated timing comparisons.
 
 Each experiment's `manifest.json` records the execution plan, CPU topology,
 environment, and total wall time of each invocation. Each chain records worker
-slot, PID, assigned CPU, verified pinning, thread settings, and start/finish
+slot, PID, assigned CPU, verified pinning, thread settings (including `PJRT_NPROC`), and start/finish
 timestamps, in addition to its existing warmup and production timings.
 `nuts_compilation.json` sums compilation durations across worker launches,
 including resumed launches. That sum is an amortized resource cost, not elapsed

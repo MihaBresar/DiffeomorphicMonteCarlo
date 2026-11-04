@@ -8,7 +8,8 @@ import sys
 
 THREAD_VARIABLES = ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS',
                     'VECLIB_MAXIMUM_THREADS', 'NUMEXPR_NUM_THREADS',
-                    'TF_NUM_INTRAOP_THREADS', 'TF_NUM_INTEROP_THREADS')
+                    'TF_NUM_INTRAOP_THREADS', 'TF_NUM_INTEROP_THREADS', 'PJRT_NPROC')
+CPU_THREAD_POLICY = 'pjrt-single-compute-thread-v1'
 
 
 def _windows_api():
@@ -109,11 +110,19 @@ def execution_plan(workers, chains):
     return {'requested_workers': workers, 'max_concurrent_chains': count,
             'cpu_ids': info['cpu_ids'][:count], 'hardware': info,
             'threads_per_worker': 1, 'start_method': 'fresh Python subprocess',
+            'cpu_thread_policy': CPU_THREAD_POLICY,
+            'jax_threads_per_compute_pool': 1,
+            'thread_limit_scope': 'Numerical compute pools; runtime helper threads can remain',
             'schedule': 'one method at a time; workers claim the next pending chain from a shared queue'}
 
 
 def worker_environment():
     env = dict(os.environ)
+    # In pinned JAX/XLA 0.4.35, PJRT_NPROC controls both CPU runtime pools
+    # and the compiler's intra-op parallelism budget. Eigen-only flags do
+    # not constrain all generated kernels. This overrides inherited PJRT
+    # settings and takes precedence over NPROC without changing that variable.
+    # Apply before backend creation; helper threads may still exist.
     env.update({key: '1' for key in THREAD_VARIABLES})
     env.update(JAX_PLATFORMS='cpu', JAX_ENABLE_X64='true', PYTHONUNBUFFERED='1',
                PYTHONUTF8='1', PYTHONIOENCODING='utf-8')

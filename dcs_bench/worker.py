@@ -7,7 +7,7 @@ import signal
 import sys
 import time
 
-from .cpu import THREAD_VARIABLES, pin_current_process, worker_environment
+from .cpu import CPU_THREAD_POLICY, THREAD_VARIABLES, pin_current_process, worker_environment
 
 
 def pending_chains(job):
@@ -92,6 +92,7 @@ def _run_and_save_chain(job, chain, target, config, algorithm, runner, mapping, 
                           'worker_slot': job['worker_slot'], 'pid': os.getpid(), **allocation,
                           'started_utc': started, 'sampling_finished_utc': datetime.now(timezone.utc).isoformat(),
                           'requested_workers': config['workers'],
+                          'cpu_thread_policy': CPU_THREAD_POLICY,
                           'threads': {key: os.environ.get(key) for key in (*THREAD_VARIABLES, 'XLA_FLAGS')}})
         for field in ('producing_source_fingerprint', 'producing_source_hashes'):
             if field in job:

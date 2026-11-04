@@ -16,7 +16,7 @@ import numpy as np
 from .targets import ROOT, Target
 from .tuning import fit_map, validate_ball_map_policy
 from .references import make_reference
-from .cpu import cpu_info, execution_plan, validate_workers
+from .cpu import CPU_THREAD_POLICY, THREAD_VARIABLES, cpu_info, execution_plan, validate_workers
 from .parallel import launch_chains, compilation_summary
 
 ALIASES = {'skew-t-100d-baselines': 'skew-t-200d-baselines'}
@@ -121,8 +121,8 @@ def environment():
     result = {'python': platform.python_version(), 'platform': platform.platform(),
         'processor': platform.processor(), 'cpu_count': os.cpu_count(), 'cpu_allocation': cpu_info(),
         'jax_backend': jax.default_backend(), 'jax_devices': [str(d) for d in jax.devices()],
-        'packages': packages, 'threads': {k: os.environ.get(k) for k in
-            ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'VECLIB_MAXIMUM_THREADS', 'XLA_FLAGS')}}
+        'packages': packages, 'cpu_thread_policy': CPU_THREAD_POLICY,
+        'threads': {k: os.environ.get(k) for k in (*THREAD_VARIABLES, 'XLA_FLAGS')}}
     for name, args in [('git_commit', ['git', 'rev-parse', 'HEAD']), ('git_status', ['git', 'status', '--short'])]:
         try:
             proc = subprocess.run(args, cwd=ROOT, text=True, capture_output=True)
@@ -294,7 +294,7 @@ def run(config, output, resume=False, reference_dir=None):
         saved_config = json.loads((output/'configuration.json').read_text())
         source_update = resume_source_update(saved_config, config, manifest, hashes)
         current_environment = environment()
-        for key in ('python', 'platform', 'processor', 'cpu_count', 'cpu_allocation', 'jax_backend', 'jax_devices', 'packages', 'threads'):
+        for key in ('python', 'platform', 'processor', 'cpu_count', 'cpu_allocation', 'jax_backend', 'jax_devices', 'packages', 'cpu_thread_policy', 'threads'):
             if manifest['environment'].get(key) != current_environment.get(key):
                 raise ValueError(f'Resume environment changed ({key}); use a new output directory to avoid mixing benchmark conditions')
         # Keep all checkpoints in the original cohort, while recording the

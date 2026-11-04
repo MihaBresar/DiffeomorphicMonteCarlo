@@ -10,10 +10,8 @@ if os.name == 'nt':
             _stream.reconfigure(encoding='utf-8', errors='backslashreplace')
 if hasattr(signal, 'SIGBREAK'):
     signal.signal(signal.SIGBREAK, signal.default_int_handler)
-for _name in ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'VECLIB_MAXIMUM_THREADS', 'NUMEXPR_NUM_THREADS'):
-    os.environ.setdefault(_name, '1')
-os.environ.setdefault('JAX_PLATFORMS', 'cpu')
-os.environ.setdefault('JAX_ENABLE_X64', 'true')
+from dcs_bench.cpu import worker_environment
+os.environ.update(worker_environment())  # Before coordinator NumPy/JAX imports.
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path

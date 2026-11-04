@@ -2,6 +2,18 @@
 
 The [current selectable-target comparisons](COMPARISONS.md) record protocols `timed-sampler-comparison-v5` (six methods in JAX) and `timed-numba-comparison-v5` (four optimized Numba DCS methods versus author JAX SCS). Both have two targets and VI on/off for both map families. Ordinary DCS-RWM/BW and SCS use acceptance-target 0.234 pretuning; reflected BW uses ball-movement pilots within the same warmup budget. DCS-BW-rotate and DCS-RWM-rotate each divide that budget between reflected-step and angular pilots, freeze both scales and independently choose one component per iteration with probability 1/2. The latter uses Gaussian increments and starts its coordinate standard deviation at 0.1/sqrt(d+2), matching BW’s initial expected squared increment length; final scales are tuned independently and their units are reported. Rotations preserve radius about the fitted centre and use the physical-density Metropolis ratio. All production steps freeze, and the first third of actual sampling iterations is discarded. The Numba mode changes framework and output-processing costs explicitly; the JAX mode shares those costs. SCS calls the unmodified author transition. The two original radial measurements are supplemented by the means of X₁, X₂ and X₃ and the tails X₁ > 3, X₂ < −3 and X₃ > 3. All eight are accumulated inside the same sampling clocks. Independent X₁ references record MCSE; X₂ uses their exact symmetry relations and shared MCSE, while X₃ has analytic t(3) references. Historical version-1 reports retain radial-only values, version-2 reports retain radial/X₁ values and version-3 reports retain eight quantities without rotation; version-4 reports include BW rotation but not RWM rotation.
 
+All new runs use CPU policy **`pjrt-single-compute-thread-v1`**, setting
+`PJRT_NPROC=1` before JAX backend creation for both DCS and SCS. Earlier
+Eigen-only limits did not constrain every generated CPU kernel: the laptop
+audit found dimension-dependent extra CPU consumption and distorted sampling
+rates. The common correction changes execution resources, not proposal or
+tuning rules. Runtime helper threads can remain. Manifests record the policy
+and complete thread settings; generic chain records do too. **Rerun the whole
+method comparison for corrected timed results**, since changed throughput also
+changes retained counts and MSE. Do not combine old and new timing cohorts.
+The scientific sampling protocols remain version 5; source hashes and runtime
+policy distinguish this correction. See [parallel execution](PARALLEL.md).
+
 The policies below describe the six other main experiments.
 
 All paper inputs are explicit JSON files. The manifest records their resolved values, scientific source hashes, Git commit/status when available, Python and package versions, OS/CPU count, JAX devices, float64/CPU policy and numerical-library thread settings. A run made from a dirty or uncommitted checkout records that fact; use a tagged clean checkout for the publication archive.

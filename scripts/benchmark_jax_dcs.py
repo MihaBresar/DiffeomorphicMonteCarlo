@@ -17,7 +17,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from dcs_bench.cpu import THREAD_VARIABLES, cpu_info, worker_environment
+from dcs_bench.cpu import CPU_THREAD_POLICY, THREAD_VARIABLES, cpu_info, worker_environment
 os.environ.update(worker_environment())
 
 import numpy as np
@@ -174,6 +174,7 @@ def run(saved_summary, baseline_root=None, repeats=5, batches=150):
         verified_shared_dependency_sha256=dependencies,
         environment=dict(python=sys.version, platform=platform.platform(),
             processor=platform.processor(), cpu_allocation=cpu_info(),
+            cpu_thread_policy=CPU_THREAD_POLICY,
             jax_devices=[str(device) for device in jax.devices()],
             packages={name: importlib.metadata.version(name) for name in ('jax', 'jaxlib', 'numpy', 'scipy')},
             thread_settings={name: os.environ.get(name) for name in

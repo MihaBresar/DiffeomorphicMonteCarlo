@@ -85,6 +85,18 @@ comparable normalized KL values across map families.
 
 ## Method-specific choices
 
+The current CPU execution policy is **`pjrt-single-compute-thread-v1`** for
+every method. It sets `PJRT_NPROC=1` before the pinned JAX backend starts,
+in addition to the existing numerical-library limits. The earlier Eigen-only
+flags allowed some compiled kernels to consume multiple CPU cores per worker;
+the affected method changed with dimension in the laptop audit. This distorted
+wall-time throughput comparisons, especially without OS CPU pinning. Runtime
+helper threads may still exist. The new policy and actual thread settings are
+saved in the manifest. **Rerun all methods together** for corrected timed
+counts, MSE and speed figures; do not combine older timings with new ones.
+Targets, proposal laws, tuning rules and sampling protocol version 5 remain
+unchanged. See [CPU allocation and evidence](PARALLEL.md#cpu-allocation-and-timing).
+
 DCS-RWM, ordinary DCS-BW and SCS tune their proposal steps toward acceptance
 0.234 using the same observed-acceptance dual-averaging rule. Reflected BW
 uses ball squared-displacement pilots within the same number of warmup

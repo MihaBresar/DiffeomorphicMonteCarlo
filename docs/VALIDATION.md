@@ -1,5 +1,37 @@
 # Validation of the corrected implementation
 
+## Common JAX CPU-pool correction (4 November 2026)
+
+The earlier numerical-library flags did not constrain all JAX CPU runtime
+pools. Current workers and the coordinator additionally set `PJRT_NPROC=1`
+before JAX initialization, under execution policy
+`pjrt-single-compute-thread-v1`. This applies equally to every method. It
+limits compute pools and compiled parallel-task assignment; it does not
+promise that the process has no auxiliary threads.
+
+The saved four-worker Smaller runs showed a dimension-dependent reversal:
+plain RWM/BW throughput was about 0.60× in 100D and 1.76× in 500D. The slower
+method consumed about 1.90–2.21 CPU seconds per wall second. Isolated production
+kernel replays with the common pool limit removed all recorded parallel-task
+annotations and reduced CPU/wall ratios to about one. In that separate
+single-process experiment, RWM/BW was 1.09× in 100D and 1.20× in 500D.
+Boundary/acceptance diagnostics and frozen scales were unchanged. Alternative
+exact BW generators did not improve on the existing generator in this probe.
+
+All **288 tests**, **eight Quick configurations (88 chains)** and a separate
+**four-worker, six-method timing check in 100D and 500D (48 chains)** passed.
+The timing check used VI on, four chains per method, two sampling seconds per
+chain and 1000 separate calibration transitions. The full validation record
+contains the actual rates, CPU/wall ratios, settings and source hashes.
+
+See [CPU-pool validation](../validation/jax_thread_pool_checks.json).
+Sampling transitions, map/tuning algorithms, references, burn-in and estimators
+are unchanged. **Rerun complete fixed-time comparisons** under the corrected
+execution policy: changed throughput changes the number of generated samples
+and thus the fixed-time MSE. Earlier results below describe their original
+execution settings. The short timing check is not a new accuracy ranking.
+Windows/Linux verification runs separately in GitHub Actions.
+
 ## Reflected Gaussian RWM with rotations (4 November 2026)
 
 Version 5 adds **DCS-RWM-rotate** to the existing comparisons: six methods
