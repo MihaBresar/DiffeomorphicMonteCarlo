@@ -20,11 +20,12 @@ class CoordinateReferenceTests(unittest.TestCase):
         for target_id in ('skew-t-100d', 'skew-t-500d'):
             config = self.config(target_id)
             result = comparison_reference(config)
-            self.assertEqual(result['functionals'], ['tail_probability', 'mean_norm', 'mean_x1', 'x1_tail_probability'])
+            self.assertEqual(result['functionals'], ['tail_probability', 'mean_norm', 'mean_x1', 'x1_tail_probability',
+                                                     'mean_x2', 'x2_left_tail_probability', 'mean_x3', 'x3_tail_probability'])
             expected = radial_truth(Target(config['target']), config['threshold'])[1]
             np.testing.assert_array_equal(result['truth'][:2], expected)
             self.assertEqual(result['reference_mcse'][:2], [0., 0.])
-            self.assertEqual(result['exact'], [True, True, False, False])
+            self.assertEqual(result['exact'], [True, True, False, False, False, False, True, True])
             self.assertEqual(result['seed'], 711)
             self.assertTrue(np.all(np.isfinite(result['truth'])))
             self.assertGreater(result['truth'][2], .7)
@@ -40,7 +41,10 @@ class CoordinateReferenceTests(unittest.TestCase):
         config = self.config(samples=40000)
         result = comparison_reference(config)
         draws = skew_t_iid(Target(config['target']), np.random.default_rng(723), 80000)
-        values = np.column_stack((draws[:, 0], draws[:, 0] > config['coordinate_threshold']))
+        threshold = config['coordinate_threshold']
+        values = np.column_stack((draws[:, 0], draws[:, 0] > threshold,
+                                  draws[:, 1], draws[:, 1] < -threshold,
+                                  draws[:, 2], draws[:, 2] > threshold))
         raw_mean = values.mean(axis=0)
         joint_se = np.sqrt(values.var(axis=0, ddof=1)/len(values)+np.square(result['reference_mcse'][2:]))
         np.testing.assert_array_less(np.abs(raw_mean-result['truth'][2:]), 6.*joint_se)
@@ -63,6 +67,41 @@ class CoordinateReferenceTests(unittest.TestCase):
         expected = np.sqrt(3.)*np.exp(special.gammaln(1.)-special.gammaln(1.5))/np.sqrt(np.pi)
         self.assertAlmostEqual(result['truth'][2], expected, places=12)
         self.assertAlmostEqual(result['truth'][3], 2.*stats.t.sf(3., 3.), places=12)
+
+    def test_mirrored_x2_reuses_x1_reference_and_uncertainty(self):
+        for target_id in ('skew-t-100d', 'skew-t-500d'):
+            result = comparison_reference(self.config(target_id))
+            self.assertEqual(result['truth'][4], -result['truth'][2])
+            self.assertEqual(result['truth'][5], result['truth'][3])
+            self.assertEqual(result['reference_mcse'][4:6], result['reference_mcse'][2:4])
+            self.assertEqual(result['exact'][4:6], result['exact'][2:4])
+            self.assertIn('dependent', result['coordinate_reference_relations']['shared_reference_error'])
+
+    def test_x3_reference_is_analytic_for_both_dimensions_and_thresholds(self):
+        for target_id in ('skew-t-100d', 'skew-t-500d'):
+            for threshold in (-1., 0., 3.):
+                config = dict(self.config(target_id), coordinate_threshold=threshold)
+                result = comparison_reference(config)
+                self.assertEqual(result['truth'][6], 0.)
+                self.assertEqual(result['truth'][7], stats.t.sf(threshold, config['target']['nu']))
+                self.assertEqual(result['reference_mcse'][6:], [0., 0.])
+                self.assertEqual(result['exact'][6:], [True, True])
+
+    def test_symmetric_x2_has_analytic_reference(self):
+        config = self.config()
+        config['target'] = dict(config['target'], alpha={'0': 100.})
+        result = comparison_reference(config)
+        self.assertEqual(result['truth'][4:6], [0., stats.t.sf(3., 3.)])
+        self.assertEqual(result['reference_mcse'][4:6], [0., 0.])
+        self.assertEqual(result['exact'][4:6], [True, True])
+
+    def test_unsupported_coordinate_symmetries_fail_explicitly(self):
+        config = self.config()
+        for target in (dict(config['target'], dimension=2),
+                       dict(config['target'], alpha={'0': 100., '1': -100., '2': 1.}),
+                       dict(config['target'], alpha={'0': 100., '1': 10.})):
+            with self.assertRaisesRegex(ValueError, 'references require'):
+                comparison_reference(dict(config, target=target))
 
 
 if __name__ == '__main__':

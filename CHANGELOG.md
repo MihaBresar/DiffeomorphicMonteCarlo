@@ -1,5 +1,19 @@
 # Changes
 
+## 2026-11-04 — mirrored and symmetric coordinate checks
+
+- Add E[X₂], P(X₂ < −3), E[X₃] and P(X₃ > 3) to both comparison modes,
+  both existing targets and both VI settings. Retain the radial and X₁ plots.
+- Use the exact X₂/−X₁ symmetry for mirrored references and an analytic t(3)
+  marginal reference for X₃. Preserve reference MCSE and full-precision exports.
+- Accumulate all eight quantities on every post-burn-in state inside each
+  sampling clock. The target, proposals, fitting and tuning are unchanged.
+- Record protocols `timed-sampler-comparison-v3` and
+  `timed-numba-comparison-v3`. Version-1 and version-2 reports keep their
+  recorded scope; rerun all methods together to obtain X₂/X₃ results.
+- Read UTF-8 reports explicitly in tests, fixing the previous Windows-only
+  text-decoding failures.
+
 ## 2026-11-04 — first-coordinate estimates
 
 - Add the mean of the first physical coordinate and its one-sided tail

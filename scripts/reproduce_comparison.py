@@ -36,7 +36,7 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         raise ValueError('reference_seed must be an integer from 0 to 2**32-1')
     spec = selected['target']
     config.update(experiment='sampler-comparison' if comparison == 'jax' else 'sampler-comparison-numba',
-        protocol='timed-sampler-comparison-v2' if comparison == 'jax' else 'timed-numba-comparison-v2',
+        protocol='timed-sampler-comparison-v3' if comparison == 'jax' else 'timed-numba-comparison-v3',
         comparison=comparison, dcs_backend=comparison, target_id=target, target_title=selected['title'],
         target=spec, dimension=spec['dimension'], nu=spec.get('nu'), alpha=spec.get('alpha', {}),
         beta=selected['beta'],
@@ -46,7 +46,7 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         vi=vi, vi_enabled=vi == 'on', ball_map_policy='mobius' if vi == 'on' else 'vanilla',
         sphere_map_policy='vi' if vi == 'on' else 'vanilla',
         algorithms=list(METHODS[comparison]),
-        implementation_revision='shared-jax-coordinate-v2' if comparison == 'jax' else 'optimized-numba-coordinate-v2',
+        implementation_revision='shared-jax-three-coordinate-v3' if comparison == 'jax' else 'optimized-numba-three-coordinate-v3',
         step_policy='separate_method_specific_pretuning_then_frozen',
         step_tuning_policies={'DCS-BW-reflect': 'ball_esjd_pilot_v1'},
         fitting_policy=('Shared fresh-batch reverse KL, Adam 0.01, gradient-norm cap 10; no coordinate/CDF clipping'
@@ -56,7 +56,7 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
             'by ball-movement pilots; other methods use acceptance-target 0.234 dual averaging. All steps freeze '
             'before sampling. VI off leaves both maps untuned but still calibrates every proposal step.')
     config['time_scope'] = ('Equal per-chain sampling time includes first-third burn-in, every transition and '
-        'all-state radial and first-coordinate estimates. Independent reference generation, VI, separate step calibration, compilation, synchronization waits and '
+        'all-state radial and X1/X2/X3 estimates. Independent reference generation, VI, separate step calibration, compilation, synchronization waits and '
         'file/report generation are excluded and recorded separately. ' +
         ('All methods use JAX full-state scans.' if comparison == 'jax' else
          'DCS uses optimized Numba density/radius caching and fused summaries; SCS uses the unmodified author '

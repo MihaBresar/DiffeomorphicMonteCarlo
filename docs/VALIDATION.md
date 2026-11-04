@@ -1,6 +1,30 @@
 # Validation of the corrected implementation
 
-## Asymmetry extension (4 November 2026)
+## Three-coordinate extension (4 November 2026)
+
+Version 3 retains the version-2 radial and X₁ measurements and adds the X₂
+mean/left tail and X₃ mean/right tail. The X₂ reference relations follow from
+the target's reflection symmetry; the X₃ references use its analytic t(3)
+marginal. Both comparison implementations accumulate all eight measurements
+within their sampling clocks, counting repeated states and discarding exactly
+the first third of timed iterations. The existing targets, fitting, tuning
+and transition laws are unchanged.
+
+All **252 automated tests** and **eight quick comparison configurations**
+passed locally, covering **56 chains**. Checks include mirrored/analytic
+reference values, all-state coordinate accumulation, frozen calibration,
+unchanged prior trajectories and statistics, and all ten figure families.
+The previous Windows-only HTML-decoding test failures were corrected by
+reading reports explicitly as UTF-8. See the
+[three-coordinate check record](../validation/three_coordinate_checks.json).
+These quick runs check execution, not sampler rankings; full-paper runs and
+the new remote Windows/Linux workflow are separate validation steps.
+
+The version-2 smaller-run results below do not contain X₂/X₃ measurements
+and must not be presented as validation of their performance rankings.
+Fresh runs of all methods are required to obtain those measurements.
+
+## Historical first-coordinate extension (4 November 2026)
 
 Version 2 adds first-coordinate mean/tail measurements for the existing 100D
 and 500D skewed t(3) targets. There are eight combinations of

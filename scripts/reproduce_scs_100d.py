@@ -281,7 +281,8 @@ def summarize(config, maps, fitting, records, reference=None):
         functionals, truth, _ = radial_truth(target, config.get('threshold', 50.))
         reference = dict(functionals=functionals, truth=truth.tolist(), reference_mcse=[0., 0.],
                          exact=[True, True], source='Analytic Student-t radial law')
-    expected = (['tail_probability', 'mean_norm', 'mean_x1', 'x1_tail_probability']
+    expected = (['tail_probability', 'mean_norm', 'mean_x1', 'x1_tail_probability',
+                 'mean_x2', 'x2_left_tail_probability', 'mean_x3', 'x3_tail_probability']
                 if config.get('coordinate_metrics', False) else ['tail_probability', 'mean_norm'])
     reference_mcse = np.asarray(reference['reference_mcse'], dtype=float)
     if functionals != expected or truth.shape != (len(expected),) or reference_mcse.shape != truth.shape \
@@ -352,7 +353,7 @@ def run(config, output):
         reference = None
         if config.get('coordinate_metrics', False):
             from dcs_bench.references import comparison_reference
-            print('Preparing independent reference for radial and first-coordinate measurements', flush=True)
+            print('Preparing reference values for radial and X1/X2/X3 measurements', flush=True)
             reference_started = time.perf_counter()
             reference = comparison_reference(config)
             manifest['reference_seconds'] = time.perf_counter()-reference_started

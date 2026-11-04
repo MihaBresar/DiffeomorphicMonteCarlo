@@ -2,7 +2,7 @@
 
 ## Current coordinate checks, 4 November 2026
 
-The current version-2 runs add **E[X₁]** and **P(X₁ > 3)** to the existing
+The recorded version-2 runs add **E[X₁]** and **P(X₁ > 3)** to the existing
 100D and 500D targets. No additional distribution was included. All eight
 target/VI/backend combinations completed: 20 chains per method, 2 seconds of
 production per chain, four workers, 1,000 separate warmup transitions, and
@@ -46,7 +46,7 @@ rejection repeat, with their accumulation inside the sampling clock.
 ## Historical radial-only results, 3 November 2026
 
 These are **historical version-1, radial-only results**. They predate the
-first-coordinate measurements in the current version-2 suite. Replotting preserves these recorded estimates; it cannot add
+first-coordinate measurements in the version-2 suite. Replotting preserves these recorded estimates; it cannot add
 unsaved all-iteration coordinate statistics or measure the new processing cost.
 
 These are Smaller reproduction results from an Apple M4 Pro laptop with four workers: 20 chains per method, 2 seconds of production per chain, 1,000 separate warmup transitions, and 400 VI updates with 500 fresh draws per update when enabled. One third of actual production iterations is discarded. All eight Student-t comparisons and 560 chains completed on their first attempt. Both dimensions use ν=3 and DCS β=2. These results are conditional on fit seed 42 and sampling seed batch 0.

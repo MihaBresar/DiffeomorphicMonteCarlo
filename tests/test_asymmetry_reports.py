@@ -15,15 +15,23 @@ from scripts.scs_100d_figures import render_report
 from tests.test_comparison_ui import comparison_summary
 
 
-def coordinate_summary(optimized=False):
+def coordinate_summary(optimized=False, all_coordinates=False):
     summary = comparison_summary(optimized=optimized)
     summary['config'].update(protocol='timed-numba-comparison-v2' if optimized else 'timed-sampler-comparison-v2',
                              coordinate_metrics=True, coordinate_threshold=3.)
     truth = np.r_[summary['truth'], .812345678912345, .024567891234567]
     summary['truth'] = truth.tolist()
     summary['functionals'] = ['tail_probability', 'mean_norm', 'mean_x1', 'x1_tail_probability']
+    if all_coordinates:
+        summary['config']['protocol'] = 'timed-numba-comparison-v3' if optimized else 'timed-sampler-comparison-v3'
+        truth = np.r_[truth, -truth[2], truth[3], 0., .02883444281121866]
+        summary['truth'] = truth.tolist()
+        summary['functionals'] += ['mean_x2', 'x2_left_tail_probability', 'mean_x3', 'x3_tail_probability']
     for index, case in enumerate(summary['cases'].values()):
         deviations = np.array([[.02, .002], [-.03, -.001], [.01, .0003]])*(index+1)
+        if all_coordinates:
+            deviations = np.column_stack([deviations, -deviations[:, 0], deviations[:, 1],
+                                          deviations[:, 0]*.7, deviations[:, 1]*.6])
         values = np.column_stack([case['chain_means'], truth[2:]+deviations])
         case.update(chain_means=values.tolist(), mse=np.mean((values-truth)**2, axis=0).tolist(),
                     bias_squared=((values.mean(axis=0)-truth)**2).tolist(),
@@ -32,10 +40,55 @@ def coordinate_summary(optimized=False):
                             'reference_mcse': [0., 0., .002, .00005],
                             'exact': [True, True, False, False],
                             'source': 'Independent skew-t reference', 'draws': 1000000, 'seed': 97531}
+    if all_coordinates:
+        summary['reference']['reference_mcse'] += [.002, .00005, 0., 0.]
+        summary['reference']['exact'] += [False, False, True, True]
     return summary
 
 
 class AsymmetryReportTests(unittest.TestCase):
+    def test_x2_x3_figures_and_full_precision_values_preserve_existing_outputs(self):
+        from matplotlib.figure import Figure
+        summary = coordinate_summary(all_coordinates=True)
+        before = deepcopy(summary)
+        titles = {}
+        original_savefig = Figure.savefig
+        def record_title(figure, filename, *args, **kwargs):
+            titles[Path(filename).stem] = figure._suptitle.get_text()
+            return original_savefig(figure, filename, *args, **kwargs)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            old_report = render_report(root/'v2', coordinate_summary())
+            with patch.object(Figure, 'savefig', new=record_title):
+                report = render_report(root/'v3', summary)
+            added = ['coordinate_x2_mean', 'coordinate_x2_left_tail_probability',
+                     'coordinate_x3_mean', 'coordinate_x3_tail_probability']
+            self.assertEqual(report['figures'], old_report['figures']+added)
+            for filename in old_report['figures']:
+                self.assertEqual((root/'v2/figures'/f'{filename}.png').read_bytes(),
+                                 (root/'v3/figures'/f'{filename}.png').read_bytes())
+            self.assertIn('P(X₂ < -3.00)', titles['coordinate_x2_left_tail_probability'])
+            self.assertIn('P(X₃ > 3.00)', titles['coordinate_x3_tail_probability'])
+            with (root/'v3/scs_100d_chains.csv').open(newline='') as stream:
+                for row in csv.DictReader(stream):
+                    estimate = summary['cases'][row['method']]['chain_means'][int(row['chain'])]
+                    for index, metric in enumerate(summary['functionals']):
+                        self.assertEqual(float(row[metric+'_estimate']), estimate[index])
+            with (root/'v3/paper_values.csv').open(newline='') as stream:
+                for row in csv.DictReader(stream):
+                    for index, metric in enumerate(summary['functionals']):
+                        self.assertEqual(float(row[metric+'_mse']), summary['cases'][row['method']]['mse'][index])
+            with (root/'v3/reference_values.csv').open(newline='') as stream:
+                references = list(csv.DictReader(stream))
+            self.assertEqual([row['exact'] for row in references],
+                             ['True', 'True', 'False', 'False', 'False', 'False', 'True', 'True'])
+            page = (root/'v3/paper_values.html').read_text(encoding='utf-8')
+            self.assertIn('same eight quantities', page)
+            self.assertIn('P(X₂ &lt; -3.00)', page)
+            self.assertIn('P(X₃ &gt; 3.00)', page)
+            self.assertIn('mean zero and tail reference are analytic', page)
+        self.assertEqual(summary, before)
+
     def test_coordinate_outputs_keep_radial_pngs_and_exact_values(self):
         summary = coordinate_summary()
         old = comparison_summary()
@@ -70,7 +123,7 @@ class AsymmetryReportTests(unittest.TestCase):
             with (root/'extended/reference_values.csv').open(newline='') as stream:
                 references = list(csv.DictReader(stream))
             self.assertEqual([row['exact'] for row in references], ['True', 'True', 'False', 'False'])
-            page = (root/'extended/paper_values.html').read_text()
+            page = (root/'extended/paper_values.html').read_text(encoding='utf-8')
             self.assertIn('Reference values and precision', page)
             self.assertIn('P(X₁ &gt; 3.00)', page)
             self.assertIn('same four quantities', page)
@@ -83,7 +136,7 @@ class AsymmetryReportTests(unittest.TestCase):
             root = Path(directory)
             report = render_report(root, summary)
             self.assertIn('coordinate_mean', report['figures'])
-            page = (root/'paper_values.html').read_text()
+            page = (root/'paper_values.html').read_text(encoding='utf-8')
             self.assertIn('Reference precision matters.', page)
             self.assertIn('P(X₁ &gt; 3.00)', page)
             self.assertNotIn('DCS-RWM', page)
@@ -92,11 +145,11 @@ class AsymmetryReportTests(unittest.TestCase):
 
     def test_original_target_choices_and_v2_replots_without_sampling(self):
         self.assertEqual(launcher.COMPARISON_TARGETS, ('skew-t-100d', 'skew-t-500d'))
-        page = (launcher.ROOT/'launcher/index.html').read_text()
+        page = (launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8')
         self.assertIn('value="skew-t-100d"', page)
         self.assertIn('value="skew-t-500d"', page)
-        for optimized in (False, True):
-            summary = coordinate_summary(optimized=optimized)
+        for optimized, all_coordinates in ((False, False), (True, False), (False, True), (True, True)):
+            summary = coordinate_summary(optimized=optimized, all_coordinates=all_coordinates)
             with tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 (root/'summary.json').write_text(json.dumps(summary))
@@ -115,6 +168,10 @@ class AsymmetryReportTests(unittest.TestCase):
             summary = coordinate_summary()
             summary['reference']['truth'][2] += 1.
             with self.assertRaisesRegex(ValueError, 'must match'):
+                render_report(directory, summary)
+            summary = coordinate_summary(all_coordinates=True)
+            summary.pop('reference')
+            with self.assertRaisesRegex(ValueError, 'require recorded reference'):
                 render_report(directory, summary)
 
 

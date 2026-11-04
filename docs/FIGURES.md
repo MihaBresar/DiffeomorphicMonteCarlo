@@ -25,15 +25,19 @@ keep their identity maps. Old fixed-R=√d results retain their historical label
 | `SuperInfiniteFirstTest` | Linear MSE bars for tail probability, mean log norm, then average runtime at equal iterations |
 | `QQ-regresssion` | Two-by-two marginal Q–Q plots for β₁, with ν=4 and ν=6 |
 
-Current reports identify `timed-sampler-comparison-v2` or
-`timed-numba-comparison-v2`. They retain `VsSCS`, `scs_100d_estimates`,
+Current reports identify `timed-sampler-comparison-v3` or
+`timed-numba-comparison-v3`. They retain `VsSCS`, `scs_100d_estimates`,
 `scs_100d_runtime`, and `scs_100d_bias_variance`; the historical filenames stay
 the same for 500D, while plot titles identify the actual target. Added
 `coordinate_mean` and `coordinate_tail_probability` figures show per-chain
-estimates and MSE for E[X₁] and P(X₁ > c). The threshold is 3 for both targets. Reference lines are explicitly labeled
-independent estimates where applicable, with MCSE shown. Historical version-1
-reports remain radial-only; replotting cannot reconstruct unsaved coordinate
-statistics.
+estimates and MSE for E[X₁] and P(X₁ > c). Additional
+`coordinate_x2_mean`, `coordinate_x2_left_tail_probability`,
+`coordinate_x3_mean` and `coordinate_x3_tail_probability` figures show
+E[X₂], P(X₂ < −c), E[X₃] and P(X₃ > c). The threshold is 3 for both targets.
+X₂ uses mirrored X₁ references with the same MCSE; X₃ references are analytic.
+Reference lines are explicitly labeled independent estimates where applicable,
+with MCSE shown. Historical version-1 reports remain radial-only and version-2
+reports retain X₁ only; replotting cannot reconstruct unsaved coordinate statistics.
 Every method receives equal sampling time and separate proposal calibration;
 the first third of timed iterations is discarded. Reflected BW uses
 ball-movement pilots, while the original methods target acceptance 0.234.
@@ -114,8 +118,9 @@ Each experiment saves:
 
 The new comparison suites also save `tuned_parameters.csv`, `setup_times.csv`
 and `reflected_tuning.csv`, recording map parameters, excluded setup costs and
-every reflected-BW pilot candidate. Version-2 reports also save
-`reference_values.csv` with all four reference values, MCSE and exact flags. With VI off, fitting costs and training
+every reflected-BW pilot candidate. Version-3 reports save
+`reference_values.csv` with all eight reference values, MCSE and exact flags.
+Version-2 reports retain their four reference values. With VI off, fitting costs and training
 counts are zero; proposal calibration still runs.
 
 Generated iterations include repeated states after rejected proposals. Retained

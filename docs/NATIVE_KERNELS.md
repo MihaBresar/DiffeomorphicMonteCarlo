@@ -3,7 +3,7 @@
 All seven launcher experiments use compiled loops for their canonical sampling
 methods. `compiled_sampling.py` covers DCS-RWM, DCS-BW, DCS-HnR, ordinary Gaussian
 and stable random walks, and SCS. It supports the skew-t, logistic, Eight Schools
-(centered and noncentered), and GARCH densities. The current `sampler-comparison` runs DCS-RWM/BW/reflect and author SCS in a shared compiled JAX scan framework. The separate `sampler-comparison-numba` runs optimized native BW/reflect against unchanged author JAX SCS; both targets and both VI settings are available. The native loops accumulate radial and first-coordinate quantities, caching unchanged values after rejection. See [the exact comparison scope](COMPARISONS.md).
+(centered and noncentered), and GARCH densities. The current `sampler-comparison` runs DCS-RWM/BW/reflect and author SCS in a shared compiled JAX scan framework. The separate `sampler-comparison-numba` runs optimized native BW/reflect against unchanged author JAX SCS; both targets and both VI settings are available. The native loops accumulate radial and first-three-coordinate quantities, caching unchanged values after rejection. See [the exact comparison scope](COMPARISONS.md).
 NumPyro/BlackJAX NUTS retain their compiled implementations.
 
 Each worker compiles before the sampling start barrier. Warmup is separate;
@@ -27,7 +27,7 @@ always use compiled paths for the methods listed above.
 
 ## Optimized radial BW loops
 
-`numba_radial.py` fuses transformed density, physical radius and radial summaries for BW/reflect on skew-t targets. It caches the current density/radius through rejections, reuses scratch buffers, and stores only cumulative sums plus thinned radii. Every repeated post-Metropolis state still enters the estimates. It uses float64, no fast-math and uniform-ball displacements from d+2 Gaussian variables. Arbitrary β remains supported; β=2 uses the exact boundary-gap simplification.
+`numba_radial.py` fuses transformed density, physical radius and coordinate summaries for BW/reflect on skew-t targets. It caches the current density, radius and first three coordinates through rejections, reuses scratch buffers, and stores only cumulative sums plus thinned functionals. Every repeated post-Metropolis state still enters the estimates. It uses float64, no fast-math and uniform-ball displacements from d+2 Gaussian variables. Arbitrary β remains supported; β=2 uses the exact boundary-gap simplification.
 
 Native production starts at the identical JAX-calibrated state and frozen step used in the shared-framework mode. PCG64 production streams are independent of the calibration stream, so parity means matching proposal and target laws, not identical seeded trajectories. Controlled-increment tests compare Metropolis decisions, density/Jacobian formulas, reflected chords and all-state cumulative statistics, including d=500.
 

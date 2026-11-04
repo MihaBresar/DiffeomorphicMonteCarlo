@@ -69,19 +69,22 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 The two current comparison choices are:
 
 - **Four samplers: DCS-RWM, DCS-BW, SCS and DCS-BW-reflect** runs all four in
-  the same JAX CPU framework, with full-state recording and common radial and first-coordinate
+  the same JAX CPU framework, with full-state recording and common radial and three-coordinate
   processing.
 - **Optimized Numba DCS-BW and reflected BW versus SCS** runs the two ball-walk
   methods in optimized Numba loops against the unchanged author SCS JAX
   transition. DCS reuses the same JAX step calibration, then caches densities
-  and coordinate values and accumulates all four estimates inside the sampling loop. This measures
+  and coordinate values and accumulates all eight estimates inside the sampling loop. This measures
   the selected implementations, including their different processing costs.
 
 Each choice offers **100D skewed Student-t, ν=3** and **500D skewed Student-t,
 ν=3**. Both use DCS β=2.
-The original radial plots remain, and two extra figures show the first-coordinate
-mean and one-sided tail probability. Independent reference values
-and their precision are shown in the report.
+The original radial plots remain. Six coordinate figures show means of X₁,
+X₂ and X₃ and the tails X₁ > 3, X₂ < −3 and X₃ > 3. X₂ is the mirrored
+skewed coordinate; X₃ has a symmetric Student-t marginal. Independent and
+analytic reference values, with their precision, are shown in the report.
+Start fresh runs of every method for these measurements; older results do
+not contain the all-iteration X₂/X₃ values.
 See [the current comparison protocol](COMPARISONS.md) for target definitions,
 thresholds, tuning and timing policies.
 

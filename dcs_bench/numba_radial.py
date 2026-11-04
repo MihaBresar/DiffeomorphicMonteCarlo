@@ -68,7 +68,7 @@ def _evaluate(z, mu, delta, alpha, constants, skewed):
 
 @njit(nogil=True, error_model='numpy')
 def _evaluate_extended(z, mu, delta, alpha, constants, skewed):
-    """Density, physical radius and X[0] in one stable map traversal."""
+    """Density, physical radius and X[:3] in one stable map traversal."""
     d = len(z)
     beta, scale, tail, delta2, logscale, logdelta, normalizer = constants
     r2, dot = 0., 0.
@@ -76,10 +76,10 @@ def _evaluate_extended(z, mu, delta, alpha, constants, skewed):
         r2 += z[j] * z[j]
         dot += z[j] * delta[j]
     if not np.isfinite(r2) or r2 >= 1.:
-        return -np.inf, np.nan, np.nan
+        return -np.inf, np.nan, np.nan, np.nan, np.nan
     denominator = 1. + 2. * dot + delta2 * r2
     if denominator <= 0. or not np.isfinite(denominator):
-        return -np.inf, np.nan, np.nan
+        return -np.inf, np.nan, np.nan, np.nan, np.nan
     logmo = logdelta - d * np.log(denominator)
     if beta == 2.:
         eps = (1. - delta2) * (1. - r2) / denominator
@@ -91,16 +91,20 @@ def _evaluate_extended(z, mu, delta, alpha, constants, skewed):
             w = ((1. - delta2) * z[j] + (1. + 2. * dot + r2) * delta[j]) / denominator
             rho2 += w * w
         if not np.isfinite(rho2) or rho2 >= 1.:
-            return -np.inf, np.nan, np.nan
+            return -np.inf, np.nan, np.nan, np.nan, np.nan
         logeps = 0. if rho2 == 0. else np.log(-np.expm1(.5 * beta * np.log(rho2)))
         e = np.exp(logeps / beta)
-    q, skew, first = 0., 0., 0.
+    q, skew, first, second, third = 0., 0., 0., 0., 0.
     for j in range(d):
         w = ((1. - delta2) * z[j] + (1. + 2. * dot + r2) * delta[j]) / denominator
         value = mu[j] * e + scale * w
         q += value * value
         if j == 0:
             first = value / e
+        elif j == 1:
+            second = value / e
+        elif j == 2:
+            third = value / e
         if skewed:
             skew += alpha[j] * value
     s = tail * e * e + q
@@ -108,7 +112,8 @@ def _evaluate_extended(z, mu, delta, alpha, constants, skewed):
           - (tail + d) / 2. * np.log(s))
     if skewed:
         lp += np.log(2.) + _log_ndtr(skew * np.sqrt((tail + d) / s), 0)
-    return (lp, np.sqrt(q) / e, first) if np.isfinite(lp) else (-np.inf, np.nan, np.nan)
+    return ((lp, np.sqrt(q) / e, first, second, third) if np.isfinite(lp)
+            else (-np.inf, np.nan, np.nan, np.nan, np.nan))
 
 
 @njit(nogil=True, error_model='numpy')
@@ -191,29 +196,30 @@ def _run_block(rng, state, lp, radius, scale, count, thin, threshold, reflected,
 
 
 @njit(nogil=True, error_model='numpy')
-def _transition_extended(state, lp, radius, first, increment, logu, reflected,
+def _transition_extended(state, lp, radius, first, second, third, increment, logu, reflected,
                          mu, delta, alpha, constants, skewed, proposed):
     if not _proposal_into(state, increment, reflected, proposed):
-        return lp, radius, first, False
-    next_lp, next_radius, next_first = _evaluate_extended(
+        return lp, radius, first, second, third, False
+    next_lp, next_radius, next_first, next_second, next_third = _evaluate_extended(
         proposed, mu, delta, alpha, constants, skewed)
     if logu < next_lp - lp:
         for j in range(len(state)):
             state[j] = proposed[j]
-        return next_lp, next_radius, next_first, True
-    return lp, radius, first, False
+        return next_lp, next_radius, next_first, next_second, next_third, True
+    return lp, radius, first, second, third, False
 
 
 @njit(nogil=True, error_model='numpy')
-def _run_block_extended(rng, state, lp, radius, first, scale, count, thin,
+def _run_block_extended(rng, state, lp, radius, first, second, third, scale, count, thin,
                         threshold, coordinate_threshold, reflected, mu, delta,
                         alpha, constants, skewed):
     """Accumulate every state; thinning affects only the returned traces."""
     d = len(state)
-    prefixes = np.zeros((count // PREFIX_STRIDE, 5))
-    saved = np.empty((count // thin, 2))
+    prefixes = np.zeros((count // PREFIX_STRIDE, 9))
+    saved = np.empty((count // thin, 4))
     increment, proposed = np.empty(d), np.empty(d)
     tails, norm_sum, accepted, first_sum, first_tails = 0, 0., 0, 0., 0
+    second_sum, second_tails, third_sum, third_tails = 0., 0, 0., 0
     for i in range(count):
         normals = rng.standard_normal(d + 2)
         full2 = 0.
@@ -222,22 +228,29 @@ def _run_block_extended(rng, state, lp, radius, first, scale, count, thin,
         factor = scale / np.sqrt(full2)
         for j in range(d):
             increment[j] = factor * normals[j]
-        lp, radius, first, accept = _transition_extended(
-            state, lp, radius, first, increment, np.log(rng.random()), reflected,
+        lp, radius, first, second, third, accept = _transition_extended(
+            state, lp, radius, first, second, third, increment, np.log(rng.random()), reflected,
             mu, delta, alpha, constants, skewed, proposed)
         tails += int(radius >= threshold)
         norm_sum += radius
         accepted += int(accept)
         first_sum += first
         first_tails += int(first > coordinate_threshold)
+        second_sum += second
+        second_tails += int(second < -coordinate_threshold)
+        third_sum += third
+        third_tails += int(third > coordinate_threshold)
         if (i + 1) % PREFIX_STRIDE == 0:
             row = (i + 1) // PREFIX_STRIDE - 1
             prefixes[row, 0], prefixes[row, 1], prefixes[row, 2] = tails, norm_sum, accepted
             prefixes[row, 3], prefixes[row, 4] = first_sum, first_tails
+            prefixes[row, 5], prefixes[row, 6] = second_sum, second_tails
+            prefixes[row, 7], prefixes[row, 8] = third_sum, third_tails
         if (i + 1) % thin == 0:
             row = (i + 1) // thin - 1
             saved[row, 0], saved[row, 1] = radius, first
-    return lp, radius, first, prefixes, saved
+            saved[row, 2], saved[row, 3] = second, third
+    return lp, radius, first, second, third, prefixes, saved
 
 
 def _inputs(mapping_dict, config):
@@ -290,6 +303,8 @@ class NumbaRadial:
         self.coordinate_threshold = float(config.get('coordinate_threshold', 3.))
         if self.extended and not np.isfinite(self.coordinate_threshold):
             raise ValueError('Coordinate threshold must be finite')
+        if self.extended and len(self.state) < 3:
+            raise ValueError('Coordinate measurements require at least three dimensions')
         self.reflected = config['algorithm'] == 'DCS-BW-reflect'
         self.warmup_seconds = float(calibration.warmup_seconds)
         self.warmup_acceptance = calibration.warmup_acceptance
@@ -298,15 +313,16 @@ class NumbaRadial:
         self.tuning_metadata = deepcopy(getattr(calibration, 'tuning_metadata', {}))
         started = time.perf_counter()
         if self.extended:
-            self.lp, self.radius, self.first = _evaluate_extended(self.state, *self.inputs)
+            self.lp, self.radius, self.first, self.second, self.third = _evaluate_extended(self.state, *self.inputs)
         else:
             self.lp, self.radius = _evaluate(self.state, *self.inputs)
-        if not np.isfinite(self.lp) or not np.isfinite(self.radius) or (self.extended and not np.isfinite(self.first)):
+        if (not np.isfinite(self.lp) or not np.isfinite(self.radius)
+                or (self.extended and not np.all(np.isfinite([self.first, self.second, self.third])))):
             raise ValueError('Nonfinite native initial density or physical radius')
         # Compile with zero transitions and a disposable RNG before timing.
         if self.extended:
             _run_block_extended(np.random.default_rng(0), self.state.copy(), self.lp, self.radius,
-                self.first, self.scale, 0, self.thin, self.threshold, self.coordinate_threshold,
+                self.first, self.second, self.third, self.scale, 0, self.thin, self.threshold, self.coordinate_threshold,
                 self.reflected, *self.inputs)
         else:
             _run_block(np.random.default_rng(0), self.state.copy(), self.lp, self.radius,
@@ -322,15 +338,15 @@ class NumbaRadial:
             production_rng='NumPy PCG64; SeedSequence([chain_seed,0x4E424457]); separate from calibration',
             native_statistic_policy='Every post-Metropolis state contributes; current norm reused on rejection')
         if self.coordinate_metrics:
-            self.implementation = self.implementation.replace('density and norm', 'density, norm and first coordinate')
+            self.implementation = self.implementation.replace('density and norm', 'density, norm and first three coordinates')
             self.implementation = self.implementation.replace('radial accumulation', 'radial and coordinate accumulation')
             self.tuning_metadata['native_statistic_policy'] = (
-                'Every post-Metropolis state contributes; current norm and first coordinate reused on rejection')
+                'Every post-Metropolis state contributes; current norm and first three coordinates reused on rejection')
 
     def batch(self):
         if self.extended:
-            self.lp, self.radius, self.first, prefixes, saved = _run_block_extended(
-                self.rng, self.state, self.lp, self.radius, self.first, self._scale, BATCH_SIZE,
+            self.lp, self.radius, self.first, self.second, self.third, prefixes, saved = _run_block_extended(
+                self.rng, self.state, self.lp, self.radius, self.first, self.second, self.third, self._scale, BATCH_SIZE,
                 self.thin, self.threshold, self.coordinate_threshold, self.reflected, *self.inputs)
             return prefixes, saved
         self.lp, self.radius, prefixes, norms = _run_block(

@@ -25,9 +25,12 @@ Thresholds are fixed before sampling, independent of method, VI and pilot
 outcomes. JSON/CSV retain full precision. Skewing the t target by its sign
 leaves the radial law unchanged for both targets: ||X||²/d has the F(d,ν) law.
 
-Both targets also report **E[X₁]** and **P(X₁ > 3)**. These measurements assess
-the asymmetric part of the distribution; radial measurements alone cannot do
-that. The coordinate threshold is fixed before running the new comparisons.
+Both targets also report **E[X₁], E[X₂], E[X₃]**, **P(X₁ > 3)**,
+**P(X₂ < −3)** and **P(X₃ > 3)**. X₂ has the same marginal law as −X₁,
+so the left tail is the natural mirrored comparison. X₃ has an ordinary
+symmetric univariate t(3) marginal. These prespecified measurements test both
+the skewed coordinates and an unskewed coordinate; radial measurements alone
+cannot do that. The coordinate threshold is fixed before sampling.
 The existing target distributions and physical initial points (all ones) are
 unchanged. The usual third-moment skewness coefficient is not defined at ν=3
 and is not reported.
@@ -44,9 +47,19 @@ references and flags reference MCSE above one tenth of observed sampler RMSE.
 An estimated reference is not relabeled an exact truth; its precision must be
 considered when interpreting small MSE differences.
 
+The X₂ mean reference is the negative of the X₁ reference; its left-tail
+reference equals the X₁ right-tail reference. Their MCSE values are shared,
+and these estimated references are not independent of each other. X₃ has
+analytic mean zero and tail probability `scipy.stats.t.sf(3, 3)`
+(approximately 0.02883444), with zero reference MCSE. To see these symmetries,
+the transformation (x₁,x₂) ↦ (−x₂,−x₁) preserves the target; when integrating
+out x₁,x₂ for the X₃ marginal, exchanging them pairs Φ(a) with Φ(−a).
+This does not imply independent coordinates or identical finite-run MSE for
+X₁ and X₂: initialization, fitted maps and sampled trajectories can differ.
+
 ## What is matched
 
-- Same physical target, four functionals, independent references and physical
+- Same physical target, eight functionals, independent references and physical
   initialization (all coordinates equal to one).
 - Same requested per-chain sampling time, number of independent chains,
   warmup-transition budget, 300-transition clock checks and exact first-third
@@ -89,9 +102,9 @@ limitation to disclose; neither the guard flag nor equal warmup budgets
 establishes optimal tuning.
 
 The JAX comparison uses equivalent full-state scans, physical projection and
-four-functional reduction for all methods. The Numba comparison deliberately
-changes this implementation work: DCS caches current density, radius and first
-coordinate, skips recomputing
+eight-functional reduction for all methods. The Numba comparison deliberately
+changes this implementation work: DCS caches current density, radius and first three
+coordinates, skips recomputing
 unchanged rejected-state values and fuses all-iteration accumulation without
 returning every full state. SCS retains the unmodified author transition and
 JAX full-state processing. Thus the second comparison measures these concrete
@@ -116,16 +129,17 @@ by a larger relative amount. All 300 states in each completed block count.
 
 The first third of the actual timed iterations is discarded. Prefix sums at
 100-step boundaries implement this exactly; thinning affects only saved
-traces, not estimates or MSE. All four functionals, including the two new
+traces, not estimates or MSE. All eight functionals, including the six
 coordinate quantities, are accumulated inside every sampling clock. Reports
 retain the original radial boxplots, MSE and count/time figure families and add
 separate coordinate mean and tail-probability figures. They use two decimal
 places where appropriate and export exact integer counts and full-precision
 values. `reference_values.csv` includes reference values, MCSE and exact flags.
 
-Both current modes use protocol version 2 and report radial and coordinate
-quantities. Historical version-1 reports remain radial-only and keep their
-recorded numbers. These measurements do not establish an overall mixing
+Both current modes use protocol version 3 and report radial and three-coordinate
+quantities. Historical version-1 reports remain radial-only; version-2 reports
+retain their radial and X₁ quantities. They keep their recorded numbers, and
+replotting cannot reconstruct the new all-iteration X₂/X₃ estimates. These measurements do not establish an overall mixing
 advantage. MSE is the average squared error across independent chains; the fitted map is shared,
 so uncertainty is conditional on that fit. Empirical MSE error summaries are
 descriptive, not formal confidence intervals: the supplied t(3) targets

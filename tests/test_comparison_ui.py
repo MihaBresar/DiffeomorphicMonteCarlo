@@ -62,7 +62,7 @@ class ComparisonUiTests(unittest.TestCase):
             with patch.object(controller, 'start_job', side_effect=lambda work, status: work()), \
                     patch.object(controller, 'run_command') as execute:
                 controller.run(experiment='sampler-comparison-numba', comparison_target='skew-t-500d', vi='off')
-                saved = json.loads((Path(directory)/controller.current_run/'launcher-run.json').read_text())
+                saved = json.loads((Path(directory)/controller.current_run/'launcher-run.json').read_text(encoding='utf-8'))
                 self.assertEqual(saved['comparison_target'], 'skew-t-500d')
                 self.assertEqual(saved['vi'], 'off')
                 command = execute.call_args.args[0]
@@ -135,7 +135,7 @@ class ComparisonUiTests(unittest.TestCase):
                     else:
                         self.assertIn('0.234', row['production_step_policy'])
                 self.assertIn('reflected_tuning.csv', report['csv_files'])
-                page = (root/'paper_values.html').read_text()
+                page = (root/'paper_values.html').read_text(encoding='utf-8')
                 self.assertIn(summary['config']['target_title'], page)
                 self.assertNotIn('Numerical step-size guard reached.', page)
                 if optimized:
@@ -160,7 +160,7 @@ class ComparisonUiTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             render_report(root, summary)
-            page = (root/'paper_values.html').read_text()
+            page = (root/'paper_values.html').read_text(encoding='utf-8')
             self.assertIn('Numerical step-size guard reached.', page)
             self.assertIn('SCS: 1/3 chains', page)
             self.assertIn('calibration saturation, not evidence of an optimal step', page)

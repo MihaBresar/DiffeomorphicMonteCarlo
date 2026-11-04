@@ -31,12 +31,13 @@ def radial_truth(target, threshold):
     return ['tail_probability', 'mean_log10_one_plus_norm'], np.array([tail, value]), [0., error]
 
 
-COMPARISON_REFERENCE_VERSION = 'skew-t-coordinate-sign-conditioning-fixed-controls-v1'
-COMPARISON_FUNCTIONALS = ['tail_probability', 'mean_norm', 'mean_x1', 'x1_tail_probability']
+COMPARISON_REFERENCE_VERSION = 'skew-t-three-coordinate-sign-conditioning-fixed-controls-v2'
+COMPARISON_FUNCTIONALS = ['tail_probability', 'mean_norm', 'mean_x1', 'x1_tail_probability',
+                         'mean_x2', 'x2_left_tail_probability', 'mean_x3', 'x3_tail_probability']
 
 
 def comparison_reference(config):
-    """Independent reference expectations for the four current comparison metrics.
+    """Independent reference expectations for the eight current comparison metrics.
 
     Normal-CDF sign selection is integrated out exactly conditional on each
     independent symmetric Student-t draw. The fixed controls below have known
@@ -62,6 +63,15 @@ def _comparison_reference_cached(settings_json, version):
     target = Target(settings['target'])
     if target.kind != 'skew_t' or target.nu <= 2.:
         raise ValueError('Comparison mean references require a skew-t target with finite variance')
+    # These extra references exploit actual target symmetries, not an assumed
+    # resemblance between coordinates. Reject unsupported custom targets rather
+    # than silently assigning them the current suite's exact marginal laws.
+    if target.d < 3 or target.alpha[2] != 0.:
+        raise ValueError('Three-coordinate references require dimension >= 3 and zero skew coefficient for X3')
+    x2_symmetric = target.alpha[1] == 0.
+    x2_mirrors_x1 = target.alpha[1] == -target.alpha[0]
+    if not (x2_symmetric or x2_mirrors_x1):
+        raise ValueError('X2 references require zero X2 skew or opposite X1/X2 skew coefficients')
     n_total, batch_size, seed = settings['draws'], settings['batch_size'], settings['seed']
     for name, value, minimum in [('reference_samples', n_total, 2),
                                   ('reference_batch_size', batch_size, 1), ('reference_seed', seed, 0)]:
@@ -127,6 +137,20 @@ def _comparison_reference_cached(settings_json, version):
         count += n
     truth = mean+offsets
     mcse = np.sqrt(squared/(count-1)/count)
+    univariate_tail = float(stats.t.sf(coordinate_threshold, target.nu))
+    if x2_symmetric:
+        x2_truth, x2_mcse, x2_exact = [0., univariate_tail], [0., 0.], [True, True]
+        x2_relation = 'Zero X2 skew coefficient gives an ordinary univariate Student-t marginal.'
+    else:
+        # (-X2,-X1,X3,...) preserves both radius and the skewing argument.
+        # Therefore X2 has the reflected X1 law, including its left tail.
+        x2_truth, x2_mcse, x2_exact = [-truth[2], truth[3]], mcse[2:4], exact[2:4]
+        x2_relation = 'X2 has the law of -X1: E[X2]=-E[X1] and P(X2<-c)=P(X1>c).'
+    # With zero X3 skew coefficient, opposite signs of the other integrated
+    # coordinates pair Phi(a)+Phi(-a)=1, leaving the ordinary t marginal.
+    truth = np.r_[truth, x2_truth, 0., univariate_tail]
+    mcse = np.r_[mcse, x2_mcse, 0., 0.]
+    exact += x2_exact + [True, True]
     if not np.all(np.isfinite(truth)) or not np.all(np.isfinite(mcse)):
         raise FloatingPointError('Nonfinite independent comparison references')
     metadata = dict(functionals=list(COMPARISON_FUNCTIONALS), truth=truth.tolist(), reference_mcse=mcse.tolist(),
@@ -134,6 +158,10 @@ def _comparison_reference_cached(settings_json, version):
                     seed=seed, draws=count, batch_size=batch_size, version=version,
                     source='Independent symmetric Student-t draws with exact conditional sign weighting and fixed known-mean controls',
                     conditioning='Sign selection is integrated out, with no reference MCMC or sampler-dependent tuning.',
+                    coordinate_reference_relations={
+                        'x2': x2_relation,
+                        'x3': 'X3 has an ordinary univariate Student-t marginal: zero mean and exact t survival probability.',
+                        'shared_reference_error': 'For mirrored X2, mean and tail references reuse X1 estimates; their reference errors are dependent.'},
                     control_variates={
                         'mean_x1': 'Use rotational symmetry and subtract absolute skew-direction t projection; add analytic absolute-t mean.',
                         'x1_tail_probability': ('Subtract absolute first-coordinate t tail; add exact two-sided t probability.'

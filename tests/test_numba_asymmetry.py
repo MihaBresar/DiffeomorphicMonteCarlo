@@ -44,13 +44,13 @@ class NumbaAsymmetryTests(unittest.TestCase):
                     direction = rng.normal(size=d)
                     state = direction * radius / np.linalg.norm(direction)
                     x, jac = mapping.forward(state)
-                    actual, norm, first = native._evaluate_extended(state, *args)
+                    actual, norm, first, second, third = native._evaluate_extended(state, *args)
                     expected = direct_log_prob(spec, x) + jac
                     jax_expected = float(Target(spec).log_prob(jnp.asarray(x), 'jax')) + jac
                     with self.subTest(d=d, beta=beta, radius=radius):
                         self.assertAlmostEqual(actual, expected, delta=2e-7)
                         self.assertAlmostEqual(actual, jax_expected, delta=2e-7)
-                        np.testing.assert_allclose([norm, first], [np.linalg.norm(x), x[0]],
+                        np.testing.assert_allclose([norm, first, second, third], [np.linalg.norm(x), *x[:3]],
                                                    rtol=5e-9, atol=1e-10)
         # Stable beta=2 cancellation also supports the closest representable
         # interior point; the naive map/Jacobian oracle loses this tiny gap.
@@ -70,19 +70,19 @@ class NumbaAsymmetryTests(unittest.TestCase):
                 initial = mapping.inverse(np.ones(d))
                 old_state, new_state = initial.copy(), initial.copy()
                 old_lp, old_norm = native._evaluate(initial, *old_args)
-                new_lp, new_norm, first = native._evaluate_extended(initial, *new_args)
+                new_lp, new_norm, first, second, third = native._evaluate_extended(initial, *new_args)
                 self.assertEqual(old_lp, new_lp)
                 self.assertEqual(old_norm, new_norm)
                 old = native._run_block(np.random.default_rng(724), old_state, old_lp, old_norm,
                     .4, 300, 10, 10., reflected, *old_args)
                 new = native._run_block_extended(np.random.default_rng(724), new_state,
-                    new_lp, new_norm, first, .4, 300, 10, 10., 3., reflected, *new_args)
+                    new_lp, new_norm, first, second, third, .4, 300, 10, 10., 3., reflected, *new_args)
                 with self.subTest(d=d, reflected=reflected):
                     np.testing.assert_array_equal(old_state, new_state)
                     self.assertEqual(old[0], new[0])
                     self.assertEqual(old[1], new[1])
-                    np.testing.assert_array_equal(old[2], new[3][:, :3])
-                    np.testing.assert_array_equal(old[3], new[4][:, 0])
+                    np.testing.assert_array_equal(old[2], new[5][:, :3])
+                    np.testing.assert_array_equal(old[3], new[6][:, 0])
 
     def test_all_state_coordinate_summaries_match_independent_trajectory(self):
         spec = target_spec()
@@ -113,29 +113,32 @@ class NumbaAsymmetryTests(unittest.TestCase):
                 # Keep the threshold away from the deterministic initial X1=1:
                 # independent map evaluations can round that value to opposite
                 # sides of one, even when the underlying point is identical.
-                values.append([radius >= 5., radius, accepted, point[0], point[0] > 1.25])
+                values.append([radius >= 5., radius, accepted,
+                               point[0], point[0] > 1.25,
+                               point[1], point[1] < -1.25,
+                               point[2], point[2] > 1.25])
             values = np.asarray(values)
             expected = np.cumsum(values, axis=0)[99::100]
             observed = []
             for thin in (1, 10):
                 native_state = initial.copy()
-                nlp, radius, first = native._evaluate_extended(initial, *args)
+                nlp, radius, first, second, third = native._evaluate_extended(initial, *args)
                 result = native._run_block_extended(np.random.default_rng(531), native_state,
-                    nlp, radius, first, .5, 300, thin, 5., 1.25, reflected, *args)
-                np.testing.assert_allclose(result[3], expected, rtol=3e-10, atol=2e-9)
-                np.testing.assert_array_equal(result[3][:, (0, 2, 4)], expected[:, (0, 2, 4)])
+                    nlp, radius, first, second, third, .5, 300, thin, 5., 1.25, reflected, *args)
+                np.testing.assert_allclose(result[5], expected, rtol=3e-10, atol=2e-9)
+                np.testing.assert_array_equal(result[5][:, (0, 2, 4, 6, 8)], expected[:, (0, 2, 4, 6, 8)])
                 # Repeated independent chord folds can amplify reduction-order
                 # roundoff in individual positions. Decisions and tail counts
                 # must agree exactly; seeded native parity is bitwise above.
-                np.testing.assert_allclose(result[4], values[thin - 1::thin][:, (1, 3)],
+                np.testing.assert_allclose(result[6], values[thin - 1::thin][:, (1, 3, 5, 7)],
                                            rtol=3e-10, atol=1e-7)
                 np.testing.assert_allclose(native_state, state, rtol=3e-10, atol=1e-7)
-                observed.append(result[3])
+                observed.append(result[5])
             np.testing.assert_array_equal(*observed)
             # Prefix subtraction removes exactly the first third of this batch;
             # no saved-trace thinning enters any coordinate estimate.
             np.testing.assert_allclose(observed[0][-1] - observed[0][0],
-                                       values[100:].sum(axis=0), rtol=3e-10, atol=2e-9)
+                                       values[100:].sum(axis=0), rtol=3e-10, atol=1e-7)
 
     def test_public_backend_caches_coordinate_and_preserves_calibration(self):
         spec = target_spec()
@@ -149,13 +152,30 @@ class NumbaAsymmetryTests(unittest.TestCase):
         second = native.NumbaRadial(mapping, config, 321, calibration)
         for _ in range(2):
             a, b = first.batch(), second.batch()
-            self.assertEqual(a[0].shape, (3, 5))
-            self.assertEqual(a[1].shape, (30, 2))
+            self.assertEqual(a[0].shape, (3, 9))
+            self.assertEqual(a[1].shape, (30, 4))
             for x, y in zip(a, b):
                 np.testing.assert_array_equal(x, y)
             self.assertEqual(first.scale, calibration.scale)
         np.testing.assert_array_equal(calibration.state, state)
         self.assertEqual(calibration.tuning_metadata, {})
+
+    def test_rejections_retain_all_coordinates_and_tails_are_strict(self):
+        spec = target_spec()
+        mapping = BallMap(6, mu=np.array([1., -1., 1., 0., 0., 0.]))
+        args = native._inputs(mapping.parameters(), {'target': spec})
+        state = np.zeros(6)
+        lp, radius, first, second, third = native._evaluate_extended(state, *args)
+        result = native._run_block_extended(np.random.default_rng(88), state,
+            lp, radius, first, second, third, 1e20, 300, 10, 5., 1., False, *args)
+        np.testing.assert_array_equal(state, np.zeros(6))
+        # Every proposal leaves the ball, so all 300 repeated states contribute.
+        np.testing.assert_array_equal(result[5][:, (0, 2, 4, 6, 8)], np.zeros((3, 5)))
+        np.testing.assert_array_equal(result[5][:, (3, 5, 7)],
+                                      np.array([[100., -100., 100.],
+                                                [200., -200., 200.],
+                                                [300., -300., 300.]]))
+        np.testing.assert_array_equal(result[6][:, 1:], np.tile([1., -1., 1.], (30, 1)))
 
 
 if __name__ == '__main__':

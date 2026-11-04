@@ -18,10 +18,10 @@ The previous three-method 100D and separate boundary launcher entries have
 been replaced by two choices:
 
 - **Four samplers: DCS-RWM, DCS-BW, SCS and DCS-BW-reflect**, using the same
-  JAX framework and full-state processing (`timed-sampler-comparison-v2`).
+  JAX framework and full-state processing (`timed-sampler-comparison-v3`).
 - **Optimized Numba DCS-BW and reflected BW versus SCS**, using optimized
   DCS production and the unchanged author SCS JAX transition
-  (`timed-numba-comparison-v2`). This comparison includes differences between
+  (`timed-numba-comparison-v3`). This comparison includes differences between
   the implementations and their output processing.
 
 Both offer 100D and 500D skewed Student-t targets with ν=3 and DCS β=2. Each can
@@ -33,7 +33,9 @@ Start a fresh run of **every method in the chosen comparison** for each target
 and VI setting you want to assess. Old results remain valid records of their
 saved protocols; replotting cannot turn them into the new comparison or
 measure the optimized backend or recover all-iteration coordinate estimates.
-The new coordinate measurements are part of the timing budget, so rerun every
+Version 3 adds X₂ mean/left-tail and X₃ mean/right-tail measurements to the
+existing X₁ and radial quantities. Old saved traces cannot reconstruct these
+all-iteration estimates. The new coordinate measurements are part of the timing budget, so rerun every
 method together even for an existing target. Keep older radial results as
 historical records. Keep the same worker count and machine
 conditions across methods. For a second independent sampling check, choose

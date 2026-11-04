@@ -53,7 +53,7 @@ def main():
                 if name == 'sampler-comparison':
                     import json
                     manifest = json.loads((directory/'manifest.json').read_text(encoding='utf-8'))
-                    if manifest.get('protocol') == 'timed-sampler-comparison-v2' and manifest.get('status') == 'complete' and manifest.get('config', {}).get('vi') == args.vi:
+                    if manifest.get('protocol') == 'timed-sampler-comparison-v3' and manifest.get('status') == 'complete' and manifest.get('config', {}).get('vi') == args.vi:
                         continue
                     raise ValueError('The sampler comparison requires a fresh output folder after an interrupted run or a VI change.')
                 command.append('--resume')

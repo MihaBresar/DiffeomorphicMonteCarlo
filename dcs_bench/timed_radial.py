@@ -210,9 +210,11 @@ def _radial_batch(block, projection, state, key, scale, thin, threshold, coordin
     values = jnp.stack((norms >= threshold, norms, accepted), axis=1)
     saved = norms[thin - 1::thin]
     if coordinate_threshold is not None:
-        x1 = physical[:, 0]
-        values = jnp.column_stack((values, x1, x1 > coordinate_threshold))
-        saved = jnp.column_stack((saved, x1[thin - 1::thin]))
+        x1, x2, x3 = physical[:, 0], physical[:, 1], physical[:, 2]
+        values = jnp.column_stack((values, x1, x1 > coordinate_threshold,
+                                   x2, x2 < -coordinate_threshold,
+                                   x3, x3 > coordinate_threshold))
+        saved = jnp.column_stack((saved, physical[thin - 1::thin, :3]))
     prefixes = jnp.cumsum(values.reshape(3, PREFIX_STRIDE, values.shape[1]).sum(axis=1), axis=0)
     return states[-1], prefixes, saved
 
@@ -347,6 +349,8 @@ def _validate(config):
         value = config.get('coordinate_threshold')
         if isinstance(value, bool) or not isinstance(value, Real) or not np.isfinite(value):
             raise ValueError('coordinate_threshold must be finite when coordinate metrics are enabled')
+        if int(scs_paper.target_spec(config)['dimension']) < 3:
+            raise ValueError('Coordinate comparisons require at least three dimensions')
 
 
 def _postburn(prefixes, norms, thin, threshold, coordinate_threshold=None):
@@ -362,8 +366,9 @@ def _postburn(prefixes, norms, thin, threshold, coordinate_threshold=None):
     if coordinate_threshold is None:
         traces = np.column_stack((retained_norms >= threshold, retained_norms))
     else:
-        radii, x1 = retained_norms[:, 0], retained_norms[:, 1]
-        traces = np.column_stack((radii >= threshold, radii, x1, x1 > coordinate_threshold))
+        radii, x1, x2, x3 = retained_norms.T
+        traces = np.column_stack((radii >= threshold, radii, x1, x1 > coordinate_threshold,
+                                 x2, x2 < -coordinate_threshold, x3, x3 > coordinate_threshold))
     return traces, iterations, burn, count, totals, sums
 
 
@@ -383,12 +388,13 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
     native = config.get('dcs_backend') == 'numba' and config['algorithm'] != 'SCS'
     thin, threshold = config['thin'], float(config.get('threshold', 50.))
     coordinate_threshold = float(config['coordinate_threshold']) if config.get('coordinate_metrics', False) else None
-    prefix_width = 5 if coordinate_threshold is not None else 3
+    prefix_width = 9 if coordinate_threshold is not None else 3
     functionals = ['tail_probability', 'mean_norm']
     if coordinate_threshold is not None:
-        functionals += ['mean_x1', 'x1_tail_probability']
+        functionals += ['mean_x1', 'x1_tail_probability', 'mean_x2', 'x2_left_tail_probability',
+                        'mean_x3', 'x3_tail_probability']
     def trace_shape(count):
-        return (count, 2) if coordinate_threshold is not None else (count,)
+        return (count, 4) if coordinate_threshold is not None else (count,)
     capacity, batches = 1024, 0
     prefix_buffer = np.empty((capacity * 3, prefix_width), dtype=float)
     norm_buffer = np.empty(trace_shape(capacity * BATCH_SIZE // thin), dtype=float)
@@ -423,7 +429,7 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
         raise FloatingPointError('Nonfinite timed radial summaries')
     traces, iterations, burn, count, totals, sums = _postburn(
         prefixes, norms, thin, threshold, coordinate_threshold)
-    estimate = sums[[0, 1, 3, 4] if coordinate_threshold is not None else [0, 1]] / count
+    estimate = sums[[0, 1, 3, 4, 5, 6, 7, 8] if coordinate_threshold is not None else [0, 1]] / count
     record = {
         'algorithm': config['algorithm'], 'seed': int(seed),
         'iterations': iterations, 'discarded_iterations': burn, 'estimation_iterations': count,
@@ -468,8 +474,12 @@ def run_timed(mapping_dict, config, seed, before_sampling=None, after_sampling=N
     if coordinate_threshold is not None:
         record.update(coordinate_threshold=coordinate_threshold,
             x1_sum=float(sums[3]), x1_tail_count=int(sums[4]),
-            all_timed_x1_sum=float(totals[3]), all_timed_x1_tail_count=int(totals[4]))
-        record['common_statistic_policy'] += '; x1 and one-sided x1 tail use every same post-MH state'
+            x2_sum=float(sums[5]), x2_left_tail_count=int(sums[6]),
+            x3_sum=float(sums[7]), x3_tail_count=int(sums[8]),
+            all_timed_x1_sum=float(totals[3]), all_timed_x1_tail_count=int(totals[4]),
+            all_timed_x2_sum=float(totals[5]), all_timed_x2_left_tail_count=int(totals[6]),
+            all_timed_x3_sum=float(totals[7]), all_timed_x3_tail_count=int(totals[8]))
+        record['common_statistic_policy'] += '; x1/x2/x3 means and right/left/right tails use every same post-MH state'
     record.update(getattr(backend, 'tuning_metadata', {}))
     if native:
         record['rng_note'] = 'Shared JAX calibration; independent domain-separated NumPy PCG64 production stream. Different backends preserve proposal laws, not bitwise production trajectories.'

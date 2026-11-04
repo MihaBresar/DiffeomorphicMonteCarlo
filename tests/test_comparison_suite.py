@@ -47,6 +47,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertTrue(config['coordinate_metrics'])
                         self.assertEqual(config['coordinate_threshold'], 3.)
                         self.assertEqual(config['reference_samples'], 5_000_000)
+                        self.assertTrue(config['protocol'].endswith('-v3'))
 
     def test_vi_off_bypasses_fitting_for_both_map_families_without_skipping_warmup(self):
         for target_id in ('skew-t-100d', 'skew-t-500d'):
@@ -99,11 +100,13 @@ class ComparisonSuiteTests(unittest.TestCase):
             mean_norm = np.exp(.5*np.log(3.)+special.gammaln((dimension+1)/2)+special.gammaln(1.)
                                -special.gammaln(dimension/2)-special.gammaln(1.5))
             truth = np.array([stats.f.sf(config['threshold']**2/dimension, dimension, 3), mean_norm])
-            reference = dict(functionals=['tail_probability', 'mean_norm', 'mean_x1', 'x1_tail_probability'],
-                             truth=[*truth, .7, .03], reference_mcse=[0., 0., 1e-5, 1e-5],
-                             exact=[True, True, False, False])
+            reference = dict(functionals=['tail_probability', 'mean_norm', 'mean_x1', 'x1_tail_probability',
+                                         'mean_x2', 'x2_left_tail_probability', 'mean_x3', 'x3_tail_probability'],
+                             truth=[*truth, .7, .03, -.7, .03, 0., stats.t.sf(3., 3.)],
+                             reference_mcse=[0., 0., 1e-5, 1e-5, 1e-5, 1e-5, 0., 0.],
+                             exact=[True, True, False, False, False, False, True, True])
             truth = np.asarray(reference['truth'])
-            errors = np.array([.005, 1., .1, .002])
+            errors = np.array([.005, 1., .1, .002, .2, .004, .05, .003])
             records = {}
             for method in config['algorithms']:
                 records[method] = []
@@ -121,7 +124,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                     np.testing.assert_allclose(case['mse'], errors**2, rtol=1e-11, atol=1e-12)
                     self.assertEqual(case['total_iterations'], 900)
                     self.assertEqual(case['total_estimation_iterations'], 600)
-                self.assertEqual(len(summary['paired_mse_differences']), 12)
+                self.assertEqual(len(summary['paired_mse_differences']), 24)
                 self.assertEqual(summary['reference'], reference)
 
     def test_native_dispatch_reuses_same_jax_calibration_and_keeps_author_scs(self):

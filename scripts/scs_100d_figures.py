@@ -15,6 +15,8 @@ from dcs_bench.display import number, cell, figure_ticks
 from dcs_bench.simulation_error import mse_variability, paired_mse_differences
 
 METRICS = ('tail_probability', 'mean_norm')
+X1_METRICS = ('mean_x1', 'x1_tail_probability')
+X23_METRICS = ('mean_x2', 'x2_left_tail_probability', 'mean_x3', 'x3_tail_probability')
 ALIASES = (('tail_probability', 'tail'), ('mean_norm', 'norm'))
 METHODS = ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', 'SCS')
 COLORS = {'DCS-RWM': '#FF8C00', 'DCS-BW': '#9370db', 'DCS-BW-reflect': '#159a8c', 'SCS': '#ff1493'}
@@ -124,8 +126,10 @@ def render_report(root, summary):
     figures.mkdir(exist_ok=True)
     cases, config = summary['cases'], summary['config']
     suite = config.get('protocol') in ('timed-sampler-comparison-v1', 'timed-numba-comparison-v1',
-                                      'timed-sampler-comparison-v2', 'timed-numba-comparison-v2')
-    optimized = config.get('protocol') in ('timed-numba-comparison-v1', 'timed-numba-comparison-v2')
+                                      'timed-sampler-comparison-v2', 'timed-numba-comparison-v2',
+                                      'timed-sampler-comparison-v3', 'timed-numba-comparison-v3')
+    optimized = config.get('protocol') in ('timed-numba-comparison-v1', 'timed-numba-comparison-v2',
+                                          'timed-numba-comparison-v3')
     vi_mode = config.get('vi', 'on')
     boundary = config.get('protocol') in ('timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2', 'timed-boundary-dcs-scs-v3')
     restored_controls = config.get('protocol') == 'timed-boundary-dcs-scs-v2'
@@ -139,15 +143,15 @@ def render_report(root, summary):
         raise ValueError('Configured methods must list every completed case exactly once')
     counts = {name: _counts(cases[name], config, timed) for name in names}
     metric_names = tuple(summary.get('functionals', METRICS))
-    if metric_names not in (METRICS, METRICS+('mean_x1', 'x1_tail_probability')):
-        raise ValueError('Expected radial functionals followed by the optional first-coordinate functionals')
+    if metric_names not in (METRICS, METRICS+X1_METRICS, METRICS+X1_METRICS+X23_METRICS):
+        raise ValueError('Expected radial functionals followed by the optional X1 or X1/X2/X3 functionals')
     truth = _metrics(summary['truth'], metric_names)
     means = {name: _means(cases[name], metric_names) for name in names}
     mses = {name: _metrics(cases[name]['mse'], metric_names) for name in names}
     biases = {name: _metrics(cases[name]['bias_squared'], metric_names) for name in names}
     variances = {name: _metrics(cases[name]['variance_ddof0'], metric_names) for name in names}
     reference = summary.get('reference', {})
-    if len(metric_names) == 4 and not all(key in reference for key in ('truth', 'reference_mcse', 'exact')):
+    if len(metric_names) > 2 and not all(key in reference for key in ('truth', 'reference_mcse', 'exact')):
         raise ValueError('Coordinate reports require recorded reference values, MCSE and exact flags')
     reference_mcse = _metrics(reference.get('reference_mcse', np.zeros(len(metric_names))), metric_names)
     reference_exact = reference.get('exact', [True]*len(metric_names))
@@ -340,12 +344,20 @@ def render_report(root, summary):
     save(fig, 'scs_100d_bias_variance')
 
     # These figures supplement the original radial figure family. They measure
-    # physical X[0], not a rotated or whitened coordinate chosen after sampling.
-    if len(metric_names) == 4:
+    # prespecified physical coordinates, not rotations chosen after sampling.
+    if len(metric_names) > 2:
         coordinate_threshold = float(config['coordinate_threshold'])
         coordinate_panels = ((2, 'Mean of the first coordinate: E[X₁]', 'coordinate_mean'),
                              (3, 'First-coordinate tail: P(X₁ > '+number(coordinate_threshold)+')',
                               'coordinate_tail_probability'))
+        if len(metric_names) == 8:
+            coordinate_panels += (
+                (4, 'Mean of the second coordinate: E[X₂]', 'coordinate_x2_mean'),
+                (5, 'Mirrored second-coordinate tail: P(X₂ < '+number(-coordinate_threshold)+')',
+                 'coordinate_x2_left_tail_probability'),
+                (6, 'Mean of the third coordinate: E[X₃]', 'coordinate_x3_mean'),
+                (7, 'Third-coordinate tail: P(X₃ > '+number(coordinate_threshold)+')',
+                 'coordinate_x3_tail_probability'))
         for metric, label, filename in coordinate_panels:
             fig, axes = plt.subplots(1, 2, figsize=(16, 6.5))
             ax = axes[0]
@@ -621,7 +633,7 @@ def render_report(root, summary):
                      'ball-movement pilot search uses up to eight rotating h/2, h, 2h rounds with no special bound of 2. '
                      'A finite noisy local search does not certify an optimal step or optimal radial MSE. '
                      'Every trial is recorded in reflected_tuning.csv; a final-round edge winner is reported explicitly.')
-        if len(metric_names) == 4:
+        if len(metric_names) > 2:
             notes[3] = ('Every post-burn-in iteration contributes to mean norm, radial tail probability, mean first '
                         'coordinate and first-coordinate tail probability, including repeated states after rejection. '
                         'The same four quantities are accumulated inside every sampling clock. Saved trace thinning '
@@ -633,12 +645,31 @@ def render_report(root, summary):
             notes.append('The coordinate threshold and reference seed are fixed before sampler results are examined. '
                          'The existing targets and physical initialization remain unchanged. '
                          'All methods use the same reference values.')
-            notes.append('Reference values marked exact use the analytic radial law of the original skewed t targets. '
+            notes.append('Reference values marked exact use analytic distribution identities of the original skewed t targets. '
                          'Other reference values are independently estimated and retain their Monte Carlo standard '
                          'errors (MCSE). Reported MSE uses those estimated reference values without pretending they '
                          'are exact; its uncertainty also depends on reference precision.')
             notes.append('The Student-t degrees of freedom are three. The usual third-moment skewness coefficient '
                          'is therefore not reported; the added mean and tail probability are well-defined.')
+            if len(metric_names) == 8:
+                notes[3] = ('Every post-burn-in iteration contributes to mean norm, radial tail probability and '
+                            'the mean and prespecified tail probability of each of X₁, X₂ and X₃, including '
+                            'repeated states after rejection. The same eight quantities are accumulated inside '
+                            'every sampling clock. Saved trace thinning does not change those estimates. '
+                            'Counts and full-precision errors are exported.')
+                notes[7] = ('Every method samples the same recorded target: '+target_title+'. The original radial '
+                            'measurements are supplemented by E[X₁], E[X₂], E[X₃], P(X₁ > '+
+                            number(config['coordinate_threshold'])+'), P(X₂ < '+
+                            number(-config['coordinate_threshold'])+') and P(X₃ > '+
+                            number(config['coordinate_threshold'])+'). These compare the skewed coordinates '
+                            'with an unskewed coordinate; no single set of functionals establishes overall '
+                            'mixing. The unmodified author SCS transition is retained.')
+                notes.append('For these targets, X₂ has exactly the same marginal distribution as −X₁. '
+                             'Its reference mean is the negative of the X₁ reference mean, and its mirrored '
+                             'left-tail reference equals the X₁ right-tail reference; their MCSE values are '
+                             'shared. Finite-chain estimates need not obey the symmetry. X₃ has an ordinary '
+                             'univariate Student-t marginal, so its mean zero and tail reference are analytic '
+                             'and marked exact. These relations do not assert independence of coordinates.')
     notes.append('Empirical MSE MCSE is the sample standard deviation of chain squared errors divided by the square root of the number of chains. Largest-chain error share measures how much one chain contributes to total squared error. Paired differences align methods by saved seed; negative differences favor the named method over SCS. These are descriptive, conditional on the fitted maps, not formal confidence intervals or convergence diagnostics. Heavy-tailed norm errors can make variance-based uncertainty unreliable; fresh seed batches are needed to assess repeatability.')
     notes += [summary[key] for key in ('target_note', 'mse_note', 'time_scope') if isinstance(summary.get(key), str)]
     warning = '<p class="warning">Quick execution check only — do not interpret sampler rankings.</p>' if smoke else ''
