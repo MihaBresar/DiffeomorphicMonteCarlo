@@ -127,7 +127,7 @@ class LauncherMoveTests(unittest.TestCase):
                     values = dict(attrs)
                     self.values[values.get('id')] = values
         parser = Inputs()
-        parser.feed((launcher.ROOT/'launcher/index.html').read_text())
+        parser.feed((launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8'))
         field = parser.values['dcs-fixed-move']
         self.assertEqual(field['type'], 'number')
         self.assertEqual(field['value'], '0.07')
