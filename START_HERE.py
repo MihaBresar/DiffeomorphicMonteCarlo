@@ -5,6 +5,7 @@ from collections import deque
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import math
 import mimetypes
 import os
 from pathlib import Path
@@ -75,7 +76,7 @@ def environment_ready():
         return False
 
 
-def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=0, comparison_target='skew-t-100d', vi='on'):
+def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=0, comparison_target='skew-t-100d', vi='on', dcs_fixed_move=None):
     if preset not in PRESETS or experiment not in EXPERIMENTS + LEGACY_SCS_COMPARISONS:
         raise ValueError('Choose a listed preset and experiment')
     if type(seed_batch) is not int or not 0 <= seed_batch <= 999:
@@ -83,6 +84,17 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
     if seed_batch and experiment not in SCS_COMPARISONS:
         raise ValueError('Seed batches are available only for the sampler comparisons')
     if not plot_only:
+        if dcs_fixed_move is not None:
+            if type(dcs_fixed_move) not in (int, float):
+                raise ValueError('Shared DCS move must be a positive finite number')
+            try:
+                valid_move = math.isfinite(dcs_fixed_move) and dcs_fixed_move > 0
+            except OverflowError:
+                valid_move = False
+            if not valid_move:
+                raise ValueError('Shared DCS move must be a positive finite number')
+            if experiment not in COMPARISONS + ('all',):
+                raise ValueError('Shared DCS move is available only for current sampler comparisons and All seven')
         validate_workers(workers)
         if vi != 'on':
             raise ValueError('New runs require VI; the VI-off option has been removed.')
@@ -93,7 +105,9 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
     if experiment in COMPARISONS:
         if comparison_target not in COMPARISON_TARGETS:
             raise ValueError('Choose a listed comparison target')
-        if resume or plot_only:
+        if plot_only:
+            return [[py, '-u', str(ROOT/'run_experiment.py'), '--plot-only', str(directory/experiment)]]
+        if resume:
             raise ValueError('Sampler comparisons start from scratch in a new results folder.')
         command = [py, '-u', str(ROOT/'scripts/reproduce_comparison.py'),
                    '--comparison', 'numba' if experiment.endswith('-numba') else 'jax',
@@ -101,6 +115,8 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
                    '--workers', str(workers), '--output-dir', str(directory/experiment)]
         if seed_batch:
             command += ['--seed-batch', str(seed_batch)]
+        if dcs_fixed_move is not None:
+            command += ['--dcs-fixed-move', str(dcs_fixed_move)]
         return [command]
     if experiment in LEGACY_SCS_COMPARISONS:
         if resume or plot_only:
@@ -119,6 +135,8 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
             command.append('--resume')
         if not plot_only:
             command += ['--workers', str(workers), '--ball-map-policy', ball_map_policy, '--vi', vi]
+            if dcs_fixed_move is not None:
+                command += ['--dcs-fixed-move', str(dcs_fixed_move)]
         return [command]
     result = directory/experiment
     if plot_only:
@@ -232,7 +250,7 @@ class Controller:
                 raise RuntimeError('Environment validation failed; see installation output above')
         self.start_job(work, 'Setting up the environment…')
 
-    def run(self, preset='quick', experiment='sampler-comparison', run_id=None, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=0, comparison_target='skew-t-100d', vi='on'):
+    def run(self, preset='quick', experiment='sampler-comparison', run_id=None, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=0, comparison_target='skew-t-100d', vi='on', dcs_fixed_move=None):
         if not self.ready:
             raise ValueError('Click Set up environment first')
         saved_run_requested = bool(run_id)
@@ -247,6 +265,7 @@ class Controller:
             seed_batch = saved.get('seed_batch', 0)
             comparison_target = saved.get('comparison_target', 'skew-t-100d')
             vi = saved.get('vi', 'on')
+            dcs_fixed_move = saved.get('dcs_fixed_move')
             if not plot_only and saved.get('ball_scale_policy', 'fit') != 'fit':
                 raise ValueError('The fixed R=sqrt(d) option has been removed. Start a new run with a fitted Möbius map.')
         else:
@@ -255,7 +274,8 @@ class Controller:
             directory = RUNS/run_id
         commands = commands_for_run(preset, experiment, directory, resume=saved_run_requested,
                                     plot_only=plot_only, workers=workers, ball_map_policy=ball_map_policy,
-                                    seed_batch=seed_batch, comparison_target=comparison_target, vi=vi)
+                                    seed_batch=seed_batch, comparison_target=comparison_target, vi=vi,
+                                    dcs_fixed_move=dcs_fixed_move)
         def work():
             nonlocal run_id, directory, commands
             if saved_run_requested:
@@ -273,10 +293,19 @@ class Controller:
                         directory = RUNS/run_id
                         commands = commands_for_run(preset, experiment, directory, resume=False,
                             plot_only=plot_only, workers=workers, ball_map_policy=ball_map_policy,
-                            seed_batch=seed_batch, comparison_target=comparison_target, vi=vi)
-            (directory/'launcher-run.json').write_text(json.dumps({'preset': preset, 'experiment': experiment,
+                            seed_batch=seed_batch, comparison_target=comparison_target, vi=vi,
+                            dcs_fixed_move=dcs_fixed_move)
+            request = {'preset': preset, 'experiment': experiment,
                 'workers': workers, 'ball_map_policy': ball_map_policy, 'seed_batch': seed_batch,
-                'comparison_target': comparison_target, 'vi': vi}, indent=2)+'\n')
+                'comparison_target': comparison_target, 'vi': vi}
+            if dcs_fixed_move is not None:
+                request['dcs_fixed_move'] = dcs_fixed_move
+            # A plot-only request reads saved data and must not rewrite its
+            # scientific settings or original launcher provenance.
+            if not plot_only:
+                (directory/'launcher-run.json').write_text(json.dumps(request, indent=2)+'\n')
+                if not saved_run_requested:
+                    (directory/'launcher_request.json').write_text(json.dumps(request, indent=2)+'\n')
             self.current_run = run_id
             with (directory/'launcher.log').open('a', encoding='utf-8') as logfile:
                 for command in commands:
@@ -359,7 +388,8 @@ def make_handler(controller, token):
                 elif self.path == '/run': controller.run(data.get('preset', 'quick'), data.get('experiment', 'sampler-comparison'),
                     workers=data.get('workers', 1), ball_map_policy=data.get('ball_map_policy', 'mobius'),
                     seed_batch=data.get('seed_batch', 0),
-                    comparison_target=data.get('comparison_target', 'skew-t-100d'), vi=data.get('vi', 'on'))
+                    comparison_target=data.get('comparison_target', 'skew-t-100d'), vi=data.get('vi', 'on'),
+                    dcs_fixed_move=data.get('dcs_fixed_move'))
                 elif self.path == '/resume': controller.run(run_id=data['id'])
                 elif self.path == '/replot': controller.run(run_id=data['id'], plot_only=True)
                 elif self.path == '/show':

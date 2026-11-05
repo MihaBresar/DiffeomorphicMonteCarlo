@@ -53,8 +53,9 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 1. Click **Set up environment** and wait for **Environment ready**. This installs
    the pinned packages inside this project and can take several minutes.
 2. Leave **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)** and
-   **Quick check** selected. Choose a **Target distribution** and whether to
-   use **Variational map fitting — both DCS and SCS**. Choose **CPU workers**
+   **Quick check** selected. Choose a **Target distribution**; both map families
+   are fitted by VI automatically. Leave **Shared DCS move h** at its default
+   0.07 for the initial check. Choose **CPU workers**
    (start with 2–4), then click **Start run**. Quick-check graphs verify
    execution; they are not publication results.
 3. After the quick check succeeds, choose **Smaller reproduction** or **Full
@@ -73,6 +74,18 @@ the Numba option uses optimized native DCS loops against the unchanged author
 SCS JAX transition. Both offer 100D/500D and always fit both maps by VI. Rotation mixtures
 are no longer active choices.
 
+To compare another fixed move without commands, change **Shared DCS move h**
+before clicking **Start run**. Enter **0.15** for the larger-move comparison;
+the field also accepts values such as **0.10** and **0.025**. Every DCS method
+receives the same chosen h: BW, reflected BW and billiard use that increment
+radius, while Gaussian RWM uses coordinate standard deviation h/√(d+2).
+SCS stays at h=0.1. These are sensitivity choices, not demonstrated optima.
+The chosen value is saved in `launcher_request.json` and the resolved run
+configuration. For **All seven**, it changes only the five-method comparison;
+the other six experiments retain their specified step rules. Changing this
+field starts a new experiment; rebuilding an older report uses its saved
+settings and cannot change its samples.
+
 For these two comparisons, **Full paper settings** selects the full benchmark
 budget: 50 chains per method, 20.00 seconds per chain and 1,500 separate
 discarded warmup transitions. The preset name does not imply an exact reproduction
@@ -87,7 +100,8 @@ Every new comparison fits both map families: SCS uses its authors' fixed-cloud V
 fixed-cloud fit. Both full fits use 1,000 updates on their own 2,000-point fixed clouds. Update counts, cloud size and evaluation counts match; reference distributions, parameterizations and clipping rules differ;
 the recorded fitting costs are outside production time. Billiards retain the fitted
 centre/R/β and use zero production deformation, as explained in
-[the construction](BILLIARD.md). All four DCS variants share fixed h=0.07:
+[the construction](BILLIARD.md). All four DCS variants share the selected h
+(default 0.07):
 BW/reflected-BW/billiard use a uniform-ball increment of that radius and
 RWM uses coordinate standard deviation h/√(d+2). Each uses its own kernel
 during discarded equilibration, without separate step adaptation.
@@ -121,9 +135,10 @@ Version 11 changes all four DCS step policies and requires new sampling
 of all five methods together at every preset. It keeps version 10's matched
 fixed-cloud VI budgets and fitted maps. Saved reports retain their original
 policy. Smaller runs use abbreviated VI; full fitting can change the performance
-ordering. For a command-line sensitivity check, `--dcs-fixed-move 0.15` selects
-the declared alternative shared DCS move; neither fixed setting is claimed
-optimal. Fresh-cloud fitting experiments do not change the public defaults.
+ordering. **Shared DCS move h** provides the same setting as the command-line
+`--dcs-fixed-move` option. A value of 0.15 is the declared larger-move
+comparison; neither it nor the default is claimed optimal. Fresh-cloud
+fitting experiments do not change the public defaults.
 
 ## Stop or finish
 
