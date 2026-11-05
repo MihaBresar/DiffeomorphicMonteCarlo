@@ -19,8 +19,9 @@ configuration and saved results used to produce them.
   0.0291914455 and the mean norm is 19.5196857147. The benchmark skew uses
   a normal CDF; it differs from the Student-t-CDF skew in the SCS paper.
 - The 200D random-walk example uses its stated dimension. The super-heavy-tail
-  example is symmetric with ν=0.5 and untuned zero-centred maps. Its mean norm
-  does not exist, so comparisons use functions with defined reference values.
+  example is symmetric with ν=0.5. Its mean norm does not exist, so
+  comparisons use functions with defined reference values. DCS retains its
+  symmetry-constrained fit and SCS uses the author fitting routine.
 - Eight Schools uses log τ with the corresponding Jacobian for both samplers.
   GARCH includes μ, a fixed initial variance, the stated physical prior and
   the pinned PosteriorDB model/data definition. Posterior DCS uses the
@@ -32,7 +33,9 @@ configuration and saved results used to produce them.
   families and must be read from their resolved configuration.
 - All VI-enabled SCS fits call the pinned authors' optimizer, including
   logistic and the ν=0.5 experiment. SCS uses its own fixed-cloud budget,
-  seed 0 and unit initialization; DCS fitting is unchanged. Generic SCS
+  seed 0 and unit initialization. Version 10 uses fixed clouds for both
+  families in paired DCS/SCS experiments and matches their fitting budgets;
+  DCS parameterization and clipping remain distinct. Generic SCS
   production remains the checked Numba implementation with acceptance-target
   0.234 step tuning, while the 100D/500D comparison retains author JAX
   production and the fixed-h=0.1 default.

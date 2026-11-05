@@ -84,13 +84,15 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
         raise ValueError('Seed batches are available only for the sampler comparisons')
     if not plot_only:
         validate_workers(workers)
-        if ball_map_policy not in ('mobius', 'vanilla'):
-            raise ValueError('Choose a listed DCS map policy')
+        if vi != 'on':
+            raise ValueError('New runs require VI; the VI-off option has been removed.')
+        if ball_map_policy != 'mobius':
+            raise ValueError('New launcher runs use fitted DCS maps; the vanilla option has been removed.')
     py = str(environment_python())
     directory = Path(directory)
     if experiment in COMPARISONS:
-        if comparison_target not in COMPARISON_TARGETS or vi not in ('on', 'off'):
-            raise ValueError('Choose a listed comparison target and VI policy')
+        if comparison_target not in COMPARISON_TARGETS:
+            raise ValueError('Choose a listed comparison target')
         if resume or plot_only:
             raise ValueError('Sampler comparisons start from scratch in a new results folder.')
         command = [py, '-u', str(ROOT/'scripts/reproduce_comparison.py'),
@@ -110,8 +112,6 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
             command += ['--seed-batch', str(seed_batch)]
         return [command]
     if experiment == 'all':
-        if vi not in ('on', 'off'):
-            raise ValueError('Choose a listed VI policy')
         command = [py, '-u', str(ROOT/'scripts/reproduce_all.py'), '--preset', preset, '--output-root', str(directory)]
         if plot_only:
             command.append('--plot-only')
@@ -248,7 +248,7 @@ class Controller:
             comparison_target = saved.get('comparison_target', 'skew-t-100d')
             vi = saved.get('vi', 'on')
             if not plot_only and saved.get('ball_scale_policy', 'fit') != 'fit':
-                raise ValueError('The fixed R=sqrt(d) option has been removed. Start a new run with a Möbius or vanilla map.')
+                raise ValueError('The fixed R=sqrt(d) option has been removed. Start a new run with a fitted Möbius map.')
         else:
             run_id = datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'-'+preset
             fresh_run_base = run_id

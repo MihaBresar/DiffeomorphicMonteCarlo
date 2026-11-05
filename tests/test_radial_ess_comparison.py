@@ -54,7 +54,7 @@ def radial_summary(backend='jax', vi='on', unavailable=False):
 class RadialEssComparisonTests(unittest.TestCase):
     def test_current_runner_skips_coordinate_reference_and_preserves_radial_contract(self):
         for backend in ('jax','numba'):
-            for vi in ('on','off'):
+            for vi in ('on',):
                 config = suite.configuration('paper', comparison=backend, vi=vi)
                 self.assertEqual(config['algorithms'], METHODS)
                 self.assertFalse(config['coordinate_metrics'])

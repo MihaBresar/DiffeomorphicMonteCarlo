@@ -2,7 +2,7 @@
 
 Research software accompanying *Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions*, by Miha Brešar and Aleksandar Mijatović.
 
-The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. It includes corrected manuscript experiments and subsequent sampler comparisons. **The current comparison is protocol version 9; it does not reproduce the original paper figures unchanged.** Billiards and reflected BW are later extensions. The documentation describes the current experiments so they can be independently run and inspected.
+The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. It includes corrected manuscript experiments and subsequent sampler comparisons. **The current comparison is protocol version 10; it does not reproduce the original paper figures unchanged.** Billiards and reflected BW are later extensions. The documentation describes the current experiments so they can be independently run and inspected.
 
 Start with the [reviewer guide](docs/REVIEW_GUIDE.md), [comparison protocol](docs/COMPARISONS.md), or [experiment catalogue](docs/EXPERIMENTS.md). No general performance ranking is assumed; comparisons must be assessed for the functions and budgets measured.
 
@@ -57,9 +57,9 @@ Both modes contain **DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard**.
 
 The second mode measures implementation efficiency, including different framework and output costs. It does not isolate transition geometry.
 
-Both support the normal-CDF-skewed Student-t target with ν=3, α=(100,−100,0,…), dimension **100 or 500**, and DCS exponent β=2. Select `--target skew-t-100d` or `--target skew-t-500d`, and `--vi on` or `--vi off`. The 500D target is an extension. These targets differ from the Student-t-CDF-skewed target in the SCS paper.
+Both support the normal-CDF-skewed Student-t target with ν=3, α=(100,−100,0,…), dimension **100 or 500**, and DCS exponent β=2. Select `--target skew-t-100d` or `--target skew-t-500d`. Both map families are fitted by VI in every new comparison. The 500D target is an extension. These targets differ from the Student-t-CDF-skewed target in the SCS paper.
 
-With VI on, SCS uses its authors' unchanged VI routine; DCS retains its own VI fit. Their fitting recipes and full budgets differ and are recorded. With VI off, both maps use unit scale, zero centre and zero deformation. Billiards retain the ball fit's centre, scale and β in post-Möbius coordinates, with zero effective deformation; the other DCS methods retain the original ball map.
+SCS uses its authors' unchanged VI routine; DCS retains its own VI fit. Their fitting recipes differ; both receive the same number of objective/gradient evaluations, with full budgets of 1,000 updates on 2,000 points per update. This compares the fitted sampling procedures; it does not isolate proposal geometry from map fitting. Billiards retain the ball fit's centre, scale and β in post-Möbius coordinates, with zero effective deformation; the other DCS methods retain the original ball map.
 
 DCS-RWM/BW adapt toward acceptance 0.234. Reflected BW uses a ball-movement pilot; billiards use their own production kernel in a bounded radial-movement pilot. SCS defaults to the authors' fixed **h=0.1**, with `--scs-step-rule acceptance` available for sensitivity analysis. Every method receives the same discarded pilot transition budget. All production steps are frozen, and the first third of generated production iterations is discarded.
 
@@ -71,17 +71,17 @@ The fixed SCS choice followed a documented 100D development study; it was frozen
 | `reproduce` | 20 | 2 | 1,000 |
 | `paper` | 50 | 20 | 1,500 |
 
-Smaller presets also reduce VI training. Full SCS VI uses 1,000 updates on 2,000 fixed reference draws; full DCS VI uses 1,500 updates with 2,000 fresh draws per update. The [protocol](docs/COMPARISONS.md) specifies the complete budgets and [reproducibility guide](docs/REPRODUCIBILITY.md) defines costs, seeds and diagnostics.
+Smaller presets also reduce VI training. Full VI uses 1,000 updates and 2,000 objective/gradient evaluation points per update for each family. Each family reuses its own fixed reference cloud throughout fitting. This matches update counts, cloud size and objective/gradient evaluation counts; the base distributions, parameterizations, seeds and clipping rules remain method-specific. Fitting time need not match. The [protocol](docs/COMPARISONS.md) specifies the complete budgets and [reproducibility guide](docs/REPRODUCIBILITY.md) defines costs, seeds and diagnostics.
 
 ```sh
 # Inspect the resolved configuration without sampling.
 python run_experiment.py sampler-comparison --preset paper --dry-run
 
-# Smaller 100D comparison with VI; repeat with --vi off for the untuned maps.
-python run_experiment.py sampler-comparison --target skew-t-100d --vi on --preset reproduce --workers 2 --output-dir results/jax-100d-vi
+# Smaller 100D comparison with fitted maps.
+python run_experiment.py sampler-comparison --target skew-t-100d --preset reproduce --workers 2 --output-dir results/jax-100d-vi
 
 # Full 500D comparison with the frozen default and a fresh sampling batch.
-python run_experiment.py sampler-comparison --target skew-t-500d --vi on --preset paper --workers 2 --seed-batch 8 --output-dir results/jax-500d-batch-8
+python run_experiment.py sampler-comparison --target skew-t-500d --preset paper --workers 2 --seed-batch 8 --output-dir results/jax-500d-batch-8
 
 # Regenerate a completed report without sampling.
 python run_experiment.py --plot-only results/jax-100d-vi
@@ -96,7 +96,7 @@ Current comparisons measure **radial-tail probability and mean norm**, with anal
 | Artifact | Contents |
 |---|---|
 | `configuration.json`, `manifest.json` | Resolved settings, source hashes, environment, CPU policy, run status and elapsed time |
-| `maps.json`, `method_maps.json` | Fitted/untuned maps, fitting history and method-specific effective maps |
+| `maps.json`, `method_maps.json` | Fitted maps, fitting history and method-specific effective maps |
 | `summary.json`, `paper_values.csv`, `paper_values.html` | Per-chain and aggregated results; machine-readable values retain full precision |
 | `functional_ess.csv`, tuning CSV files | Functional ESS, unavailable reasons, and recorded pilot choices |
 | `chains/`, `figures/` | Saved scalar traces and metadata, plus PNG/PDF figures |
@@ -109,9 +109,9 @@ Displayed estimates use two decimals or scientific notation, while integer sampl
 
 The repository also includes 200D skew-t comparisons with NUTS and random-walk baselines, a fixed-iteration 50D t(0.5) experiment, logistic regression, Eight Schools and GARCH. Only the two posterior examples use PosteriorDB. Empirical targets need not satisfy the manuscript's sufficient theorem assumptions. See [target definitions](docs/TARGETS.md) and the [figure-by-figure rerun guide](docs/RERUN.md).
 
-Every VI-enabled SCS fit uses the same pinned author routine, including logistic regression and the 50D t(0.5) experiment. Their SCS production kernels remain the checked Numba implementation with acceptance-target 0.234 step tuning. SCS fitting has its own recorded budget: 1,000 updates on 2,000 fixed draws for Full paper settings, 400 on 500 for Smaller reproduction, and 20 on 128 for Quick check. DCS fitting is unchanged. Rerun logistic and the 50D t(0.5) comparison together with their DCS controls to obtain results under this fitting policy; the current 100D/500D comparisons already used author VI.
+Every VI-enabled SCS fit uses the same pinned author routine, including logistic regression and the 50D t(0.5) experiment. Their SCS production kernels remain the checked Numba implementation with acceptance-target 0.234 step tuning. SCS fitting has its own recorded budget: 1,000 updates on 2,000 fixed draws for Full paper settings, 400 on 500 for Smaller reproduction, and 20 on 128 for Quick check. Experiments containing SCS use fixed clouds and matching per-family evaluation budgets. The full logistic DCS budget is now 1,000 updates too; experiments without SCS keep their recorded fitting policy. Rerun the 100D/500D comparisons with all five methods at every preset after this change: DCS now reuses a fixed cloud instead of fresh draws, so even Smaller results change.
 
-The all-experiments runner includes the JAX 100D comparison and those six experiments; it does not expand every target/VI/backend combination. The [manuscript relationship](docs/MANUSCRIPT_CHANGES.md) explains the corrections and scope of current experiments. The current billiard variant is distinct from the original paper's BW sampler. New results cannot retrospectively validate the original figures.
+The all-experiments runner includes the JAX 100D comparison and those six experiments; it does not expand every target/backend combination. The [manuscript relationship](docs/MANUSCRIPT_CHANGES.md) explains the corrections and scope of current experiments. The current billiard variant is distinct from the original paper's BW sampler. New results cannot retrospectively validate the original figures.
 
 ## Citation, attribution and contributions
 

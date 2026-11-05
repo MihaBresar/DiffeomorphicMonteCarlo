@@ -22,7 +22,7 @@ class BoundaryRoutingTests(unittest.TestCase):
         workers = min(2, cpu_info()['capacity'])
         for preset in ('quick', 'reproduce', 'paper'):
             command, = launcher.commands_for_run(preset, EXPERIMENT, Path('results/test'),
-                workers=workers, ball_map_policy='vanilla')
+                workers=workers, ball_map_policy='mobius')
             with self.subTest(preset=preset):
                 self.assertEqual(command[2], str(launcher.ROOT/'scripts/reproduce_boundary_100d.py'))
                 self.assertEqual(command[command.index('--preset')+1], preset)

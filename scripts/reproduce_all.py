@@ -20,9 +20,8 @@ def main():
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--plot-only', action='store_true')
     parser.add_argument('--workers', type=int, default=1)
-    parser.add_argument('--ball-map-policy', choices=['mobius', 'vanilla'], default='mobius')
-    parser.add_argument('--vi', choices=['on', 'off'], default='on',
-                        help='VI on/off for both map families in the five-method JAX comparison')
+    parser.add_argument('--ball-map-policy', choices=['mobius'], default='mobius', help=argparse.SUPPRESS)
+    parser.add_argument('--vi', choices=['on'], default='on', help=argparse.SUPPRESS)
     args = parser.parse_args()
     output = (args.output_root or ROOT/'results'/args.preset).resolve()
     reference = output/'logistic-reference'

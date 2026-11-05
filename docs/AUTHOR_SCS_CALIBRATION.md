@@ -1,5 +1,13 @@
 # Author SCS fitting and proposal-step sensitivity
 
+This development study predates the removal of the VI-off option. Its tables
+and saved settings remain unchanged. New public comparisons require VI for
+both map families; the earlier no-VI outcomes document the selection process,
+not a currently selectable experiment. Version 10 additionally uses matched
+fixed-cloud fitting budgets for both families. The version-9 table below
+retains its original fresh-draw DCS recipe and 1,500-update full DCS budget;
+its outcomes are not version-10 performance results.
+
 Version 9 uses the SCS authors' unchanged VI implementation and production
 transition, applied to the same target as DCS. DCS fitting, proposals and
 calibration remain unchanged. SCS has two explicit step policies: adaptation
@@ -201,14 +209,20 @@ No confidence claim or universal ordering follows from these tables.
 
 ## Reproduction
 
-Run both primary comparisons before their fixed-step controls:
+For a new fitted-map sensitivity check with the current entry points, run the
+primary comparison before its step-policy control:
 
 ```sh
-python run_experiment.py sampler-comparison --target skew-t-100d --vi on --preset reproduce --seed-batch 7 --workers 4 --scs-step-rule acceptance --output-dir results/author-scs-vi-on
-python run_experiment.py sampler-comparison --target skew-t-100d --vi off --preset reproduce --seed-batch 7 --workers 4 --scs-step-rule acceptance --output-dir results/author-scs-vi-off
-python scripts/reproduce_scs_step_control.py results/author-scs-vi-on --output-dir results/author-scs-fixed-step-vi-on
-python scripts/reproduce_scs_step_control.py results/author-scs-vi-off --output-dir results/author-scs-fixed-step-vi-off
+python run_experiment.py sampler-comparison --target skew-t-100d --preset reproduce --seed-batch 8 --workers 4 --scs-step-rule acceptance --output-dir results/author-scs-vi-on-new
+python scripts/reproduce_scs_step_control.py results/author-scs-vi-on-new --output-dir results/author-scs-fixed-step-vi-on-new
 ```
+
+To rerun the earlier study including its no-VI cases, use the
+[last VI-optional release](https://github.com/MihaBresar/DiffeomorphicMonteCarlo/tree/6b40f4e609a1b49a460e00f649e3e3479b102c20)
+and its [study instructions](https://github.com/MihaBresar/DiffeomorphicMonteCarlo/blob/6b40f4e609a1b49a460e00f649e3e3479b102c20/docs/AUTHOR_SCS_CALIBRATION.md#reproduction).
+That release preserves the main comparison's fitting recipe. The saved
+source hashes identify the actual generating sources of the original study;
+a new timed run can have different counts and MSE even with the same seeds.
 
 The explicit `--scs-step-rule acceptance` reproduces the study's primary
 policy despite the fixed-step global default. Use `--scs-step-rule fixed`
@@ -217,13 +231,13 @@ runs the **opposite** SCS policy: fixed h=0.1 after an acceptance-tuned primary,
 or acceptance tuning after a fixed-step primary. Thus either primary policy
 can supply the same fitted maps and resources for its sensitivity check.
 
-Use fresh output folders. The control requires a complete version-9 primary
+Use fresh output folders. The current control requires a complete version-10 primary
 and checks its scientific sources, maps and allocation before reuse. It
 records original fitting costs separately from zero new fitting work.
 These controls assess the step policy conditional on the primary fitted
 maps; they do not average over refitting uncertainty.
 
-To reproduce the additional full-author-VI check without running DCS
+To repeat the additional full-author-VI SCS check under the current protocol without running DCS
 production, save the following as `run_full_scs_vi_check.py` in the repository
 root, then run that file with the repository's configured Python environment.
 The main guard is required for Windows worker startup. It uses public
@@ -242,7 +256,7 @@ def main():
         'paper', workers=4,
         overrides=dict(runs=20, time_budget=2.0, warmup=1000, thin=10,
                        seed_batch=7, scs_step_rule='acceptance'),
-        comparison='jax', target='skew-t-100d', vi='on',
+        comparison='jax', target='skew-t-100d',
     )
     config['algorithms'] = ['SCS']
     root = Path(__file__).resolve().parent

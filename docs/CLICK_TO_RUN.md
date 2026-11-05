@@ -70,7 +70,7 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 The two current comparisons contain the same five methods: DCS-RWM, DCS-BW,
 SCS, DCS-BW-reflect and DCS-Billiard. The JAX option runs all five in the same framework;
 the Numba option uses optimized native DCS loops against the unchanged author
-SCS JAX transition. Both offer 100D/500D and VI on/off. Rotation mixtures
+SCS JAX transition. Both offer 100D/500D and always fit both maps by VI. Rotation mixtures
 are no longer active choices.
 
 For these two comparisons, **Full paper settings** selects the full benchmark
@@ -83,9 +83,8 @@ Coordinate measurements and their long reference simulation are omitted;
 radial references are analytic. The original radial figures remain, with a new
 ESS figure and `functional_ess.csv`. Displayed numbers use two decimals.
 
-VI off keeps unit scale, zero centre and zero deformation. VI on fits both
-map families: SCS uses its authors' fixed-cloud VI and DCS retains its
-fresh-batch fit. These are different fitting recipes and full fitting budgets;
+Every new comparison fits both map families: SCS uses its authors' fixed-cloud VI and DCS retains its
+fixed-cloud fit. Both full fits use 1,000 updates on their own 2,000-point fixed clouds. Update counts, cloud size and evaluation counts match; reference distributions, parameterizations and clipping rules differ;
 the recorded fitting costs are outside production time. Billiards retain the fitted
 centre/R/β and use zero production deformation, as explained in
 [the construction](BILLIARD.md). Billiards tune their own moves using a
@@ -114,8 +113,8 @@ it is not replaced by the iteration count. See [ESS interpretation](ESS.md).
 
 Use a fresh seed batch to check repeatability conditional on the fitted maps.
 The same batch reuses random streams, but time stopping can change counts.
-Run each target/VI combination separately and rerun all five methods together.
-New version-9 runs do not change historical saved reports. Smaller runs use
+Run each target separately and rerun all five methods together. VI fitting is mandatory.
+Version 10 matches fitting budgets and uses fixed clouds for both families. Rerun every method at every preset, including Smaller, because DCS's fitting draws are now reused; saved reports retain their original policy. Smaller runs use
 abbreviated VI; full VI fitting can change the performance ordering.
 
 ## Stop or finish

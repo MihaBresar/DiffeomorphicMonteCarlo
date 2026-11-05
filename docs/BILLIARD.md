@@ -3,7 +3,7 @@
 `DCS-Billiard` is available in both current five-method comparisons alongside
 DCS-RWM, DCS-BW, DCS-BW-reflect and author SCS. Choose JAX for a common-framework comparison,
 or optimized Numba DCS versus the author JAX SCS implementation. Both offer
-100D and 500D skewed Student-t(3), with and without VI. This is an experimental
+100D and 500D skewed Student-t(3), with VI fitted for both map families. This is an experimental
 geometric proposal, not a claim of universal dominance.
 
 ## Running the full comparison
@@ -12,9 +12,8 @@ Extract the latest repository ZIP and open **Start.bat** on Windows. Choose:
 
 1. **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)** or **Five samplers: optimized Numba DCS versus SCS**.
 2. **100D** or **500D** under Target distribution.
-3. **With VI** or **Without VI**.
-4. **Full paper settings**, a sampling seed batch, and CPU workers.
-5. **Start run**.
+3. **Full paper settings**, a sampling seed batch, and CPU workers.
+4. **Start run**. VI fitting is automatic for both map families.
 
 Full settings use 50 chains per method, 20.00 production seconds per chain,
 and 1,500 separate pilot transitions. The first third of production is discarded.
@@ -38,8 +37,8 @@ The billiard move runs directly in **w**, after Möbius. The effective productio
 map retains the jointly fitted μ, R and β and has δ=0. The fitted δ influenced
 the joint optimization of μ and R, but it has no direct production effect.
 This is not a new VI fit constrained to δ=0. Reports retain both the original
-fit and the effective method map so this difference is visible. With VI off,
-μ=0, R=1 and δ=0 for all ball methods; β remains 2.
+fit and the effective method map so this difference is visible. New comparison
+runs require VI; saved untuned-map reports retain their original parameters.
 
 The density in these active coordinates is
 
@@ -52,14 +51,14 @@ introduces a reverse/forward proposal ratio
 target ratio. No additional Möbius correction is applied when running in w.
 
 The pilot starts afresh at the w coordinate corresponding to the common
-physical all-ones point. Versions 8 and 9 calibrate **billiard moves themselves**,
+physical all-ones point. Versions 8–10 calibrate **billiard moves themselves**,
 using exactly the preset's warmup budget. The pilot scores bounded changes in
 physical log(1 + norm), with rejections contributing zero, then freezes the
 selected scale before production from its last pilot state. No production
 MSE or known reference value enters this per-chain calibration.
 
-Version 8 gave SCS the same radial-pilot policy and transition budget. Current
-version 9 instead uses the authors' SCS VI and defaults to fixed h=0.1 during
+Version 8 gave SCS the same radial-pilot policy and transition budget. Versions
+9 and 10 instead use the authors' SCS VI and default to fixed h=0.1 during
 its discarded pilot and production. Acceptance-target 0.234 adaptation remains
 an explicit SCS sensitivity option. Both SCS policies keep the same number of
 discarded pilot transitions as DCS. Their global default was selected in the

@@ -1,24 +1,51 @@
 # Validation
 
-## Current release
+## Version-10 scope
 
-The 5 November 2026 update routes every VI-enabled SCS fit through the pinned
+Current comparisons require VI for both map families and match fixed-cloud
+sizes and optimizer update counts. Full fits use 1,000 updates on 2,000 fixed
+points per family; smaller presets reduce both counts equally. DCS's cloud
+reuse policy changes at every preset, so previous comparison outcomes do not
+validate version-10 performance. Run all methods together with fresh sampling
+seeds under the frozen current protocol.
+
+The automated suite includes new-request policy enforcement, fitting-budget
+provenance and saved-report compatibility. Inspect GitHub Actions for the exact
+source revision's test results.
+
+Local validation on 5 November 2026 passed **371 regression tests**. Four Quick
+comparisons completed in JAX/Numba at 100D/500D, covering **40 production
+chains**, with reports, figures and matched fixed-cloud metadata checked.
+A further two-chain SCS step-policy control completed using the primary run's
+saved maps without refitting.
+
+Separate full-budget fits at both dimensions produced finite maps and all
+1,000 finite losses for each family. Each fit recorded 2,000 unique fixed draws
+and 2,000,000 objective-point evaluations. SCS's fitted parameters and every
+loss matched a direct call to the pinned author optimizer exactly. These
+checks validate execution and fitting provenance, not sampler rankings or
+convergence of a full sampling run.
+
+## Preceding author-fitting validation
+
+The preceding 5 November 2026 author-fitting update routed every VI-enabled SCS fit through the pinned
 author routine. **360 local regression tests passed** after this change.
 Checks compare logistic and symmetric Student-t fits directly with the author
 optimizer and prevent old configuration labels from selecting another fitter.
 The author source files and all production transition kernels are unchanged.
 
-The existing version-9 100D comparison's ball and sphere maps and complete VI
-loss histories reproduced exactly. Both logistic-prior scenarios and the 50D
+At that preceding release, the existing version-9 100D comparison's ball and
+sphere maps and complete VI loss histories reproduced exactly. This check
+does not imply that the new version-10 DCS fits are unchanged. Both logistic-prior scenarios and the 50D
 super-heavy-tail experiment completed their Quick runs and reports, covering
 14 production chains. Separate full-author-budget fits (1,000 updates on 2,000
 fixed draws) produced finite maps and losses for all three targets. These
 checks validate fitting and execution; they are not new performance rankings.
 
-The current version-9 comparisons use the SCS authors' VI implementation and
-fixed h=0.1, with an acceptance-tuned sensitivity control. Billiards calibrate
-their own production kernel. The associated development study completed
-**280 study chains** and **48 Quick-check chains**, covering VI on/off, both
+The preceding version-9 comparisons used the SCS authors' VI implementation and
+fixed h=0.1, with an acceptance-tuned sensitivity control. Billiards calibrated
+their own production kernel, as they continue to do in version 10. The associated development study completed
+**280 study chains** and **48 Quick-check chains**, historically covering VI on/off, both
 SCS step policies and a separate check with the full author VI budget. See the
 [protocol](COMPARISONS.md), [calibration study](AUTHOR_SCS_CALIBRATION.md) and
 [reviewer guide](REVIEW_GUIDE.md).
@@ -44,7 +71,8 @@ The regression suite checks:
   memory, figure generation and saved-report regeneration.
 
 The public experiment checks cover both comparison implementations,
-100D/500D targets and VI on/off. They also exercise the 200D NUTS comparison,
+100D/500D targets. New comparisons require VI; saved-report and lower-level
+checks retain coverage of earlier untuned maps. They also exercise the 200D NUTS comparison,
 200D random-walk baselines, the 50D super-heavy-tail target, Eight Schools,
 GARCH and both logistic-prior settings. Their distinct fitting, diagnostic
 and timing policies are documented in [the experiment guide](EXPERIMENTS.md)

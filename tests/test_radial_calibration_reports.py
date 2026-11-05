@@ -38,7 +38,7 @@ def own_kernel_summary(backend='jax', vi='on'):
 class OwnKernelCalibrationReportTests(unittest.TestCase):
     def test_current_policy_has_equal_budget_and_preserves_all_map_defaults(self):
         for backend in ('jax','numba'):
-            for vi in ('on','off'):
+            for vi in ('on',):
                 config = suite.configuration('paper', comparison=backend, vi=vi)
                 self.assertEqual(config['step_tuning_policies']['DCS-Billiard'], 'own_kernel_radial_pilot_v1')
                 self.assertEqual(config['step_tuning_policies']['SCS'], 'author_scs_fixed_01')

@@ -148,15 +148,20 @@ def render_report(root, summary):
                                       'timed-sampler-comparison-v5', 'timed-numba-comparison-v5',
                                       'timed-sampler-comparison-v6', 'timed-sampler-comparison-v7', 'timed-numba-comparison-v7',
                                       'timed-sampler-comparison-v8', 'timed-numba-comparison-v8',
-                                      'timed-sampler-comparison-v9', 'timed-numba-comparison-v9')
+                                      'timed-sampler-comparison-v9', 'timed-numba-comparison-v9',
+                                      'timed-sampler-comparison-v10', 'timed-numba-comparison-v10')
     optimized = config.get('protocol') in ('timed-numba-comparison-v1', 'timed-numba-comparison-v2',
-                                          'timed-numba-comparison-v3', 'timed-numba-comparison-v4', 'timed-numba-comparison-v5', 'timed-numba-comparison-v7', 'timed-numba-comparison-v8', 'timed-numba-comparison-v9')
+                                          'timed-numba-comparison-v3', 'timed-numba-comparison-v4', 'timed-numba-comparison-v5', 'timed-numba-comparison-v7', 'timed-numba-comparison-v8', 'timed-numba-comparison-v9', 'timed-numba-comparison-v10')
     radial_ess = config.get('protocol') in ('timed-sampler-comparison-v7', 'timed-numba-comparison-v7',
                                             'timed-sampler-comparison-v8', 'timed-numba-comparison-v8',
-                                      'timed-sampler-comparison-v9', 'timed-numba-comparison-v9')
+                                      'timed-sampler-comparison-v9', 'timed-numba-comparison-v9',
+                                      'timed-sampler-comparison-v10', 'timed-numba-comparison-v10')
     own_kernel = config.get('protocol') in ('timed-sampler-comparison-v8', 'timed-numba-comparison-v8',
-                                      'timed-sampler-comparison-v9', 'timed-numba-comparison-v9')
-    author_vi_protocol = config.get('protocol') in ('timed-sampler-comparison-v9', 'timed-numba-comparison-v9')
+                                      'timed-sampler-comparison-v9', 'timed-numba-comparison-v9',
+                                      'timed-sampler-comparison-v10', 'timed-numba-comparison-v10')
+    author_vi_protocol = config.get('protocol') in ('timed-sampler-comparison-v9', 'timed-numba-comparison-v9',
+                                      'timed-sampler-comparison-v10', 'timed-numba-comparison-v10')
+    matched_vi = config.get('protocol') in ('timed-sampler-comparison-v10', 'timed-numba-comparison-v10')
     author_fitting = (author_vi_protocol or config.get('sphere_map_policy') == 'author-paper-vi'
                       or config.get('scs_fitting_revision') == 'author-vi-v1'
                       or summary.get('fitting', {}).get('sphere', {}).get('map_policy') == 'SCS-paper-VI')
@@ -179,9 +184,24 @@ def render_report(root, summary):
         raise ValueError('Configured methods must list every completed case exactly once')
     if author_vi_protocol:
         if 'SCS' in names and tuning_policies.get('SCS') not in ('indicator_dual_averaging_0234', 'author_scs_fixed_01'):
-            raise ValueError('Version-9 SCS reports require the recorded acceptance or fixed-author step policy')
+            raise ValueError('Author-VI SCS reports require the recorded acceptance or fixed-author step policy')
         if 'DCS-Billiard' in names and tuning_policies.get('DCS-Billiard') != 'own_kernel_radial_pilot_v1':
-            raise ValueError('Version-9 billiard reports require own-kernel radial calibration')
+            raise ValueError('Author-VI billiard reports require own-kernel radial calibration')
+    if matched_vi:
+        steps, draws = config.get('optimizer_steps'), config.get('optimizer_samples')
+        if (config.get('vi') != 'on' or config.get('vi_batch_policy') != 'fixed'
+                or config.get('vi_budget_policy') != 'equal_updates_and_fixed_reference_clouds_v1'
+                or not isinstance(steps, int) or isinstance(steps, bool) or steps < 1
+                or not isinstance(draws, int) or isinstance(draws, bool) or draws < 1
+                or config.get('scs_vi') != dict(optimizer_steps=steps, optimizer_samples=draws)):
+            raise ValueError('Version-10 reports require matched fixed-cloud VI budgets')
+        for family in ('ball', 'sphere'):
+            fit = summary.get('fitting', {}).get(family, {})
+            if (fit.get('steps') != steps or fit.get('training_draws') != draws
+                    or fit.get('batch_policy') != 'fixed' or fit.get('total_training_draws') != draws
+                    or fit.get('gradient_updates') != steps or fit.get('unique_reference_draws') != draws
+                    or fit.get('objective_point_evaluations') != steps*draws):
+                raise ValueError('Version-10 reports require actual matched fixed-cloud fitting records')
     has_rotation = any(name in names for name in ROTATION_METHODS)
     has_rwm_rotation = 'DCS-RWM-rotate' in names
     has_billiard = 'DCS-Billiard' in names
@@ -282,6 +302,8 @@ def render_report(root, summary):
         tuning_note = ('VI '+str(vi_mode)+'. SCS uses author fixed h=0.1; '+
                        ('DCS proposal scales are pretuned. ' if any(name != 'SCS' for name in names) else '')+
                        'Equal discarded warmup; production steps stay fixed.')
+    if matched_vi:
+        tuning_note += ' Matched fixed-cloud VI budgets for both maps.'
     if author_fitting and not author_vi_protocol:
         tuning_note = tuning_note.replace('matched map fitting and step tuning', 'method-specific map fitting and step tuning')
         tuning_note += (' SCS uses the original author VI routine.' if vi_mode == 'on'
@@ -752,6 +774,12 @@ def render_report(root, summary):
                 gradient_norm_cap=fitting.get('gradient_norm_cap'),
                 gradient_clipping=fitting.get('gradient_clipping'), source_commit=fitting.get('source_commit'),
                 full_author_vi_budget=fitting.get('full_author_vi_budget'))
+        if matched_vi:
+            setup_rows[-1].update(gradient_updates=fitting['gradient_updates'],
+                unique_reference_draws=fitting['unique_reference_draws'],
+                objective_point_evaluations=fitting['objective_point_evaluations'],
+                map_reused_without_refitting=fitting.get('map_reused_without_refitting', False),
+                original_fit_seconds=fitting.get('original_fit_seconds'))
     count_rows = [{key: row[key] for key in ('method', 'chains', 'iterations_per_chain', 'mean_iterations',
                    'total_iterations', 'mean_estimation_iterations', 'total_estimation_iterations',
                    'total_discarded_iterations', 'warmup_iterations', 'thin', 'retained_per_chain',
@@ -1014,6 +1042,15 @@ def render_report(root, summary):
                              'shared. Finite-chain estimates need not obey the symmetry. X₃ has an ordinary '
                              'univariate Student-t marginal, so its mean zero and tail reference are analytic '
                              'and marked exact. These relations do not assert independence of coordinates.')
+    if matched_vi:
+        notes[2] = ('Each map family reuses its own fixed reference cloud with the same number of draws, '
+                    'optimizer updates and objective-point evaluations. SCS uses the unmodified authors’ '
+                    'VI routine with seed 0, Adam at 0.01 and physical-coordinate clipping at 1000. '
+                    'DCS uses recorded fit seed '+str(config.get('fit_seed', 42))+' and gradient-norm clipping at 10, '
+                    'without coordinate clipping. Equal budgets do not make the objectives or clipping rules identical, '
+                    'and fitting time is recorded separately. The production target is not clipped. '
+                    'Billiard retains the ball fit’s centre/R/beta and runs after Mobius with effective delta=0; '
+                    'other DCS methods retain the fitted ball map. All effective maps are recorded.')
     if author_fitting and not author_vi_protocol:
         if vi_mode == 'on':
             dcs_fit_seed = summary.get('fitting', {}).get('ball', {}).get('seed', config.get('fit_seed', 42))

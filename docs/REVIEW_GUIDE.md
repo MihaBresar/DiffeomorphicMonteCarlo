@@ -4,7 +4,7 @@ This repository supports inspection and independent reruns of the corrected expe
 
 ## Scope and evidence
 
-The current JAX and optimized-Numba comparisons use version 9. They compare DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard on 100D/500D normal-CDF-skewed t(3) targets, with VI on/off. Billiards and reflected BW are subsequent extensions. The current suite measures radial-tail probability and mean norm; it cannot establish coordinate or general sampler superiority.
+The current JAX and optimized-Numba comparisons use version 10. They compare DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard on 100D/500D normal-CDF-skewed t(3) targets, with VI fitted for both map families. Billiards and reflected BW are subsequent extensions. The current suite measures radial-tail probability and mean norm for fitted sampling procedures. It cannot separate proposal geometry from map-fitting effects or establish coordinate, no-VI or general sampler superiority.
 
 Current runs incorporate implementation and calibration corrections and do not reproduce or validate the original manuscript figures retrospectively. The [manuscript relationship](MANUSCRIPT_CHANGES.md) identifies their scope. The [version-9 SCS study](AUTHOR_SCS_CALIBRATION.md) documents the current step-policy choice and reports both fixed and acceptance-tuned outcomes.
 
@@ -18,7 +18,7 @@ python run_experiment.py sampler-comparison --preset quick --workers 1 --output-
 python run_experiment.py --plot-only results/reviewer-check
 ```
 
-Confirm a complete manifest and open `paper_values.html`. A quick result checks execution only. The smaller preset uses 20 chains × 2 seconds; full settings use 50 chains × 20 seconds. Use a fresh output directory each time. To evaluate a map ablation, change `--vi on` to `--vi off`; to examine the extension, select `--target skew-t-500d`.
+Confirm a complete manifest and open `paper_values.html`. A quick result checks execution only. The smaller preset uses 20 chains × 2 seconds; full settings use 50 chains × 20 seconds. Use a fresh output directory each time. VI is mandatory for new comparisons. To examine the dimensional extension, select `--target skew-t-500d`.
 
 ## Review checklist
 
@@ -26,9 +26,9 @@ Confirm a complete manifest and open `paper_values.html`. A quick result checks 
 |---|---|
 | Exact target and observables | `configuration.json`, [target definitions](TARGETS.md), and `dcs_bench/comparison_targets.py`. All methods share the same physical target, all-ones pilot start, fixed radial thresholds and analytic references. The target is normal-CDF-skewed t(3), distinct from the SCS paper's Student-t-CDF example. |
 | Source and execution provenance | `manifest.json`: protocol, source hashes, dependencies, CPU policy, worker allocation and complete/failed status. Do not pool results across incompatible source/runtime versions. |
-| Fitted and effective maps | `maps.json`, `method_maps.json`, `effective_maps.csv`. RWM/BW/reflected BW share the ball map; billiards retain its centre/R/β with zero effective deformation after Möbius. There is no constrained refit. VI-off maps are untuned for both families. |
+| Fitted and effective maps | `maps.json`, `method_maps.json`, `effective_maps.csv`. RWM/BW/reflected BW share the ball map; billiards retain its centre/R/β with zero effective deformation after Möbius. There is no constrained refit. Both map families are fitted in new comparisons. |
 | Author SCS implementation | Pinned files in `third_party/scs_paper`, their checksums, and `dcs_bench/scs_paper.py`. The author projection, VI routine and production transition are unchanged; adaptation/recording policies are disclosed separately. |
-| Fitting resources | SCS: seed 0, fixed cloud, Adam 0.01, ±1,000 physical-coordinate clipping inside VI, no gradient clipping. DCS: seed 42, fresh batches, Adam 0.01, gradient-norm cap 10, no coordinate clipping. Full budgets differ: 1,000×2,000 fixed versus 1,500×2,000 fresh. Production target densities are unclipped. |
+| Fitting resources | SCS: seed 0, fixed cloud, Adam 0.01, ±1,000 physical-coordinate clipping inside VI, no gradient clipping. DCS: seed 42, fixed cloud, Adam 0.01, gradient-norm cap 10, no coordinate clipping. Full evaluation budgets match: 1,000×2,000 per family. Each reuses its own 2,000-point cloud from its reference distribution. Equal evaluation counts do not imply equal fitting time or identical optimizers. Production target densities are unclipped. |
 | Pilot budgets and criteria | Same number of discarded transitions per chain, not necessarily equal pilot seconds or optimal tuning. DCS-RWM/BW target acceptance 0.234; reflected BW uses ball movement; billiards use their own radial-movement pilot. SCS defaults to fixed h=0.1. Inspect final steps, guard hits, candidate scores and pilot time. |
 | Frozen production and burn-in | Every scale freezes before production. The last pilot state starts production, then the first third of actual generated production iterations is discarded. Repeated rejection states remain in estimates and ESS. |
 | Timing boundary | Production includes sampling, projection/statistic work and scalar ESS capture/flush. It excludes fits, compilation, pilots, synchronization waits, diagnostic FFTs and report generation. Inspect actual seconds and final-batch overshoot. |
@@ -43,7 +43,7 @@ SCS's default h=0.1 is its authors' skew-t setting. The version-9 development st
 
 This is a development choice based on 100D evidence, not a proof of optimal tuning. The unchanged author VI routine at full settings uses its original 1,000-update/2,000-draw budget; quick and smaller presets deliberately abbreviate that budget. Using the same author routine and h=0.1 in 500D is an extension, not a reproduction of an author 500D experiment or a separately optimized 500D setting.
 
-The selected protocol is frozen before the planned fresh full-paper **sampling batch 8**. That batch is reserved for assessing the selected procedure, not for further choosing its default from the observed ranking. Development batch 7 and the full batch must be reported separately. A changed protocol after inspecting the full batch needs a new independent assessment and disclosure. This guide does not assert that the planned full batch has already completed.
+Version 10 changes the full DCS fitting budget from 1,500 to 1,000 updates and uses fixed clouds for both families, matching their update counts, cloud sizes and evaluation counts. DCS's draw-reuse policy changes at every preset, so all preset sizes require new comparisons. The version-9 study remains development evidence. Freeze the version-10 protocol before evaluating a fresh full-paper sampling batch; use batch 8 only if it has not already been inspected. Rerun all five methods together, and report the new full batch separately from development batch 7. A changed protocol after inspecting results needs a new independent assessment and disclosure. This guide does not assert that a new full batch has completed.
 
 To inspect SCS sensitivity conditional on a primary's saved maps, use:
 
@@ -63,7 +63,8 @@ families:
   checked Numba SCS production implementation, and acceptance calibration
   toward 0.234. Their SCS VI budget is recorded separately from DCS: full
   1,000 updates on 2,000 fixed draws, reduced to 400 × 500 or 20 × 128 in
-  Smaller or Quick presets. These production kernels are not represented as
+  Smaller or Quick presets. DCS matches those counts and also reuses a fixed
+  cloud in these paired experiments. These production kernels are not represented as
   the unchanged author JAX transition. Author VI retains its unit-scale
   initialization and unconstrained centre/observer fit even on symmetric
   targets; DCS-specific radial-median and symmetry choices do not alter it.
@@ -92,6 +93,6 @@ and the resolved configurations for details.
 
 ## Reproducing a claim or reporting a discrepancy
 
-Record the commit, command or launcher settings, preset, target, VI choice, SCS step rule, seed batch and worker count. Include the complete manifest, resolved configuration and relevant summary/CSV rows. State whether a comparison concerns generated samples, MSE, functional ESS, ESS/s or end-to-end cost; these need not rank methods identically.
+Record the commit, command or launcher settings, preset, target, fitting budgets, SCS step rule, seed batch and worker count. Include the complete manifest, resolved configuration and relevant summary/CSV rows. State whether a comparison concerns generated samples, MSE, functional ESS, ESS/s or end-to-end cost; these need not rank methods identically.
 
 For a proposed discrepancy, preserve both results and use fresh folders. Avoid selecting seeds, functions or tuning settings after observing which favors a method. Longer chains and independent batches can test repeatability; increasing replicate count alone does not fix biased or insufficiently mixed chains. See [contributing](../CONTRIBUTING.md) for validation and reporting guidance.

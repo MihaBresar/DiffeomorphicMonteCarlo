@@ -22,8 +22,12 @@ inside the fitting objective for both target and Jacobian evaluation. Full
 settings use 2,000 reference draws and 1,000 updates. Quick and Smaller presets
 use 20 × 128 and 400 × 500 update/draw budgets, recorded independently of DCS
 in `scs_vi`. DCS uses its own
-fresh-draw fitting routine; the two fitting recipes are intentionally distinct.
-With VI off, both map families use unit scale and zero centre/deformation.
+fitting parameterization and gradient clipping. Version 10 matches the full
+evaluation budget at 1,000 updates on each family's own fixed 2,000-point
+cloud. SCS's original cloud reuse is preserved; DCS now reuses a cloud too.
+The reference distributions, fitting seeds and clipping rules remain distinct.
+New public comparisons always fit both map families. Earlier VI-off reports
+retain their recorded unit scale and zero centre/deformation.
 SCS fitting keeps the author's initialization and parameterization; DCS-only
 radial-median initialization and exact symmetry constraints do not alter it.
 

@@ -2,14 +2,14 @@
 
 Both launcher comparisons use the same five methods: **DCS-RWM, DCS-BW,
 author SCS, DCS-BW-reflect and DCS-Billiard**. The two rotation mixtures are
-removed from new comparison runs. Their saved reports remain readable.
+removed from new comparison runs. New comparisons always fit both map families by VI; the VI-off option is removed. Previously saved reports remain readable.
 
 | Identifier | Production implementations |
 |---|---|
 | `sampler-comparison` | All five methods in JAX |
 | `sampler-comparison-numba` | DCS-RWM, DCS-BW, DCS-BW-reflect and DCS-Billiard in optimized Numba; unchanged author SCS in JAX |
 
-Both modes use protocol version 9. RWM means DCS-RWM in transformed ball
+Both modes use protocol version 10. RWM means DCS-RWM in transformed ball
 coordinates. Its isotropic Gaussian proposal rejects exterior endpoints;
 ordinary BW uses a uniform-ball increment and also rejects exterior endpoints.
 Reflected BW folds exterior endpoints along the proposal chord before its
@@ -46,28 +46,33 @@ of method, VI and pilot outcomes. CSV/JSON retain full precision.
   either execution mode. Numba production has an independent PCG64 stream;
   cross-backend trajectories are not bitwise copies.
 
-VI **off** uses R=1, centre zero and deformation zero for both map families.
-DCS β stays 2; SCS latitude stays 1.1. DCS steps are still pretuned; SCS
-defaults to fixed h=0.1, with acceptance adaptation available separately.
-VI **on** fits ball and sphere families once each. Billiards retain the joint
+Every new comparison fits ball and sphere families once each. DCS β stays 2;
+SCS latitude stays 1.1. Billiards retain the joint
 ball fit's centre/R/β but run in post-Möbius coordinates, with effective δ=0.
 This is not a new VI fit with δ constrained to zero. RWM/BW/reflected BW retain the original
 fitted ball map. `method_maps.json`, `effective_maps.csv`, summary and manifest
 record the distinction. Base-normalizing constants differ, so reported VI
 losses are not comparable normalized KL values across families.
 
-Version 9 uses the **pinned authors' VI routine for SCS**, while leaving DCS
-VI unchanged. SCS uses one fixed reference cloud, seed 0, Adam 0.01, and
+Version 10 uses the **pinned authors' VI routine for SCS** and matches the
+number of fitting objective/gradient evaluations across both families. DCS
+uses a fixed reference cloud and a full budget of 1,000 updates. SCS retains
+its original fixed-cloud routine, seed 0, Adam 0.01, and
 physical-coordinate clipping at ±1,000 inside its VI objective, including
-the Jacobian argument. It does not clip optimizer gradients. DCS uses fresh
-base draws at each update, seed 42, Adam 0.01, a gradient-norm cap of 10 and
+the Jacobian argument. It does not clip optimizer gradients. DCS reuses its
+own fixed cloud, with seed 42, Adam 0.01, a gradient-norm cap of 10 and
 no coordinate or CDF clipping. Both start at zero centre/deformation and
 unit scale. Production target densities are unclipped for every method.
 
-These are different fitting recipes, not identical optimizers or equal
-unique-draw budgets. Full settings use the authors' 1,000 updates on 2,000
-fixed reference draws for SCS; DCS retains 1,500 updates with 2,000 fresh
-draws per update. Fitting costs and parameters are recorded separately.
+Full settings give each family 1,000 updates with 2,000 objective/gradient
+evaluation points per update: 2,000,000 point evaluations per fit. SCS reuses
+one fixed cloud of 2,000 draws; DCS independently draws and reuses its own
+2,000-point cloud. Their reference distributions and actual draws differ.
+Matching cloud sizes and evaluation counts does not make the fitting
+parameterizations, clipping rules or preparation times identical. Fitting costs and parameters are recorded separately.
+The comparison therefore measures fitted sampling procedures and cannot
+isolate a proposal-geometry effect from the fitted transformations. Restricting
+the public suite to fitted maps does not establish performance without VI.
 The unchanged author VI and transition are applied to this repository's
 normal-CDF-skewed t target, not the authors' Student-t-CDF-skewed example.
 See [the author baseline and sensitivity study](AUTHOR_SCS_CALIBRATION.md).
@@ -106,11 +111,11 @@ benchmark modification, rather than the authors' fixed-step skew-t recipe.
 `--scs-step-rule acceptance` or `--scs-step-rule fixed` explicitly chooses
 the SCS policy for a new comparison. The [sensitivity runner](AUTHOR_SCS_CALIBRATION.md#reproduction)
 reuses a completed primary's exact maps and budgets and automatically runs
-the opposite policy. The smaller study's pre-result rule retains acceptance
-as the global default only if its MSE improves both radial functions in a
-full-author-VI on check and the no-VI check; otherwise it falls back globally
+the opposite policy. The earlier smaller study's pre-result rule retained acceptance
+as the global default only if its MSE improved both radial functions in a
+full-author-VI check and a no-VI check; otherwise it fell back globally
 to fixed h=0.1. Acceptance failed that rule, so the default is fixed h=0.1.
-Both checks use the small production budget. All results are reported, and
+Both historical checks used the small production budget. All results are reported, and
 a fresh full-paper batch evaluates that development choice.
 
 Reflected BW retains its ball-movement pilot: up to eight rounds of
@@ -159,18 +164,22 @@ than isolating geometric transition cost. The author SCS source is unchanged.
 
 ## Budgets and outputs
 
-| Preset | Chains/method | Seconds/chain | Separate pilot | DCS VI updates × fresh draws/update | SCS VI updates × fixed cloud size |
+| Preset | Chains/method | Seconds/chain | Separate pilot | DCS VI updates × fixed cloud size | SCS VI updates × fixed cloud size |
 |---|---:|---:|---:|---:|---:|
 | Quick check | 2 | 0.05 | 100 | 20 × 128 | 20 × 128 |
 | Smaller reproduction | 20 | 2 | 1,000 | 400 × 500 | 400 × 500 |
-| Full paper settings | 50 | 20 | 1,500 | 1,500 × 2,000 | 1,000 × 2,000 |
+| Full paper settings | 50 | 20 | 1,500 | 1,000 × 2,000 | 1,000 × 2,000 |
 
 The SCS cloud is reused at every update. Thus full settings evaluate 2,000
 reference states over 1,000 updates, not just 2,000 target evaluations in
 total. Smaller presets reduce the authors' fitting budget and do not claim
-to reproduce the paper's full VI fit.
+to reproduce the paper's full VI fit. Version 9 gave DCS 1,500 full fitting
+updates and fresh draws at every update. Version 10 uses 1,000 full updates
+and a fixed reference cloud at every preset. Rerun all methods together for
+new comparisons, including Quick and Smaller runs; their update counts are
+unchanged, but the DCS fitting draws are now reused.
 
-VI off uses no fitting updates. Compilation, fitting, pilots, synchronization,
+Compilation, fitting, pilots, synchronization,
 ESS computation and final file/report generation are outside production time.
 The first third of the actual generated iterations is discarded exactly.
 All states in each completed 300-step block count; elapsed time and overshoot

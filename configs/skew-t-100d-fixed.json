@@ -10,7 +10,7 @@
   "nuts_target_accept": 0.8,
   "nuts_max_depth": 10,
   "nuts_batch_size": 16,
-  "optimizer_steps": 1500,
+  "optimizer_steps": 1000,
   "optimizer_samples": 2000,
   "reference_samples": 1000000,
   "reference_batch_size": 10000,
@@ -59,5 +59,6 @@
   "scs_vi": {
     "optimizer_steps": 1000,
     "optimizer_samples": 2000
-  }
+  },
+  "vi_batch_policy": "fixed"
 }

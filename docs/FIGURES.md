@@ -6,17 +6,17 @@ the corresponding manuscript figure families; numerical values describe the
 recorded current experiment.
 
 The two current sampler-comparison reports identify their selected target,
-**VI on/off for both map families**, and JAX or optimized Numba execution.
+**VI-fitted maps for both families**, and JAX or optimized Numba execution.
 Both support 100D and 500D skewed Student-t targets with ν=3 and DCS β=2.
 See [the current comparison protocol](COMPARISONS.md). Both current reports
 include DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard. The Numba option runs the four
 DCS methods natively and keeps author SCS in JAX. Their figures describe the
 selected run; they do not imply a general sampler ranking.
 
-In the other experiments, DCS labels identify the selected map as **Möbius VI** or **vanilla**. Vanilla
-means R=1, centre=0 and Möbius=0, with the experiment's β unchanged. Exact-value
-tables record the policy and its parameter meaning. The two PosteriorDB targets
-keep their identity maps.
+New synthetic and logistic runs use the **Möbius VI** DCS map. Historical
+**vanilla** labels retain their recorded meaning: R=1, centre=0 and Möbius=0,
+with the experiment's β unchanged. Exact-value tables record the policy and
+its parameter meaning. The two PosteriorDB targets keep their identity maps.
 
 | Main paper file | Panels, in their original order |
 |---|---|
@@ -26,8 +26,8 @@ keep their identity maps.
 | `SuperInfiniteFirstTest` | Linear MSE bars for tail probability, mean log norm, then average runtime at equal iterations |
 | `QQ-regresssion` | Two-by-two marginal Q–Q plots for β₁, with ν=4 and ν=6 |
 
-Current reports identify `timed-sampler-comparison-v9` or
-`timed-numba-comparison-v9`. They retain `VsSCS`, `scs_100d_estimates`,
+Current reports identify `timed-sampler-comparison-v10` or
+`timed-numba-comparison-v10`. They retain `VsSCS`, `scs_100d_estimates`,
 `scs_100d_runtime` and `scs_100d_bias_variance`, and add `scs_100d_ess` for
 mean functional ESS per chain and ESS/s. The filenames remain the same in
 500D; titles identify the target. New comparisons report only radial-tail
@@ -119,8 +119,9 @@ Each experiment saves:
 The current comparison suites also save `tuned_parameters.csv`, `setup_times.csv`,
 `radial_tuning.csv` and `reflected_tuning.csv`, recording map parameters,
 excluded setup costs and pilot candidates. `reference_values.csv` records the
-two analytic radial references. With VI off, fitting costs and training counts
-are zero; the separate discarded pilots still run.
+two analytic radial references. New comparisons record the actual fitting costs
+and training counts for both families. Historical VI-off reports retain their
+recorded zero fitting costs and separate pilot costs.
 
 Generated iterations include repeated states after rejected proposals. Retained
 samples exclude the first-third sampling burn-in and reflect thinning; separate

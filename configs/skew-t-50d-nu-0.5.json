@@ -54,5 +54,6 @@
   "scs_vi": {
     "optimizer_steps": 1000,
     "optimizer_samples": 2000
-  }
+  },
+  "vi_batch_policy": "fixed"
 }

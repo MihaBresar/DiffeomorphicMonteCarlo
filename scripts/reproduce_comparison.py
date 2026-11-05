@@ -20,8 +20,8 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
                   target='skew-t-100d', vi='on'):
     if comparison not in COMPARISONS:
         raise ValueError('comparison must be jax or numba')
-    if vi not in ('on', 'off'):
-        raise ValueError('vi must be on or off')
+    if vi != 'on':
+        raise ValueError('New sampler comparisons require VI for both map families; VI-off runs are no longer offered.')
     selected = comparison_target(target)
     supplied = dict(overrides or {})
     scs_step_rule = supplied.pop('scs_step_rule', None) or 'fixed'
@@ -41,29 +41,28 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         raise ValueError('reference_seed must be an integer from 0 to 2**32-1')
     spec = selected['target']
     config.update(experiment='sampler-comparison' if comparison == 'jax' else 'sampler-comparison-numba',
-        protocol='timed-sampler-comparison-v9' if comparison == 'jax' else 'timed-numba-comparison-v9',
+        protocol='timed-sampler-comparison-v10' if comparison == 'jax' else 'timed-numba-comparison-v10',
         comparison=comparison, dcs_backend=comparison, target_id=target, target_title=selected['title'],
         target=spec, dimension=spec['dimension'], nu=spec.get('nu'), alpha=spec.get('alpha', {}),
         beta=selected['beta'],
         threshold=selected['threshold'], threshold_policy=selected['threshold_policy'],
         coordinate_metrics=False, ess_enabled=True,
         reference_samples=reference_samples, reference_seed=reference_seed, reference_batch_size=8192,
-        vi=vi, vi_enabled=vi == 'on', ball_map_policy='mobius' if vi == 'on' else 'vanilla',
-        sphere_map_policy='author-paper-vi' if vi == 'on' else 'vanilla',
-        scs_vi=dict(optimizer_steps=(supplied.get('optimizer_steps') or
-                    {'quick':20, 'reproduce':400, 'paper':1000}[preset]),
+        vi='on', vi_enabled=True, ball_map_policy='mobius',
+        sphere_map_policy='author-paper-vi',
+        scs_vi=dict(optimizer_steps=config['optimizer_steps'],
                     optimizer_samples=config['optimizer_samples']),
         algorithms=list(METHODS[comparison]),
-        implementation_revision='jax-author-scs-vi-v9' if comparison == 'jax' else 'numba-author-scs-vi-v9',
+        implementation_revision='jax-matched-fixed-vi-v10' if comparison == 'jax' else 'numba-matched-fixed-vi-v10',
         step_policy='separate_method_specific_pretuning_then_frozen',
         step_tuning_policies={'DCS-BW-reflect': 'ball_esjd_pilot_v1',
             'DCS-Billiard': 'own_kernel_radial_pilot_v1',
             'SCS': 'indicator_dual_averaging_0234' if scs_step_rule == 'acceptance' else 'author_scs_fixed_01'},
         scs_step_rule=scs_step_rule,
-        fitting_policy=(f'DCS: fresh-batch reverse KL, seed {config["fit_seed"]}, gradient-norm cap 10, no coordinate/CDF clipping. '
+        fitting_policy=(f'DCS: fixed-cloud reverse KL, seed {config["fit_seed"]}, gradient-norm cap 10, no coordinate/CDF clipping. '
                         'SCS: unchanged author VI, fixed base batch, seed 0, coordinate clip 1000, no gradient clipping. '
-                        'Both use Adam 0.01; fitting budgets and costs are recorded per family.'
-                        if vi == 'on' else 'No VI for either family: R=1, centre=0, deformation=0'),
+                        'Both use Adam 0.01, fixed reference clouds, equal update counts and equal cloud sizes; '
+                        'base distributions and parameterizations differ. Fitting costs are recorded per family.'),
         target_note=selected['reference_note'],
         tuning_note='Every method receives the same separate warmup-transition budget. DCS-RWM and '
             'DCS-BW use acceptance-target 0.234 dual averaging. Reflected BW retains its '
@@ -71,8 +70,7 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
             'production kernel using bounded squared changes of physical log(1+norm), including zero after rejection. '
             'SCS uses acceptance-target 0.234 dual averaging; this follows the paper\'s general acceptance guidance, '
             'not the fixed h=0.1 used in its skew-t experiment. '
-            'The final pilot state and selected step initialize production; all steps freeze before sampling. '
-            'VI off still calibrates proposal steps while keeping R=1, centre=0 and deformation=0.')
+            'The final pilot state and selected step initialize production; all steps freeze before sampling.')
     config['billiard_map_policy'] = 'post_mobius_retained_joint_fit_centre_scale_beta_delta_zero'
     if scs_step_rule == 'fixed':
         config['tuning_note'] = config['tuning_note'].replace(
@@ -94,7 +92,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--comparison', choices=COMPARISONS, default='jax')
     parser.add_argument('--target', choices=TARGET_IDS, default='skew-t-100d')
-    parser.add_argument('--vi', choices=('on', 'off'), default='on')
+    parser.add_argument('--vi', choices=('on',), default='on', help=argparse.SUPPRESS)
     parser.add_argument('--scs-step-rule', choices=('acceptance', 'fixed'))
     parser.add_argument('--preset', choices=runner.PRESETS, default='quick')
     parser.add_argument('--workers', type=int, default=1)

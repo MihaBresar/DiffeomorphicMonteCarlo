@@ -1,7 +1,8 @@
 # Running the experiments
 
-Current version-9 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
-in both JAX and optimized Numba modes, with VI on/off and 100D/500D targets.
+Current version-10 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
+in both JAX and optimized Numba modes, with fitted maps and 100D/500D targets.
+VI is mandatory for new comparisons; the launcher has no VI-off option.
 New reports contain only radial estimates/MSE/counts/time plus functional ESS
 and ESS/s. See [the current protocol](COMPARISONS.md).
 
@@ -17,29 +18,34 @@ the final measured iteration count; thinning keeps its original iteration grid.
 For 500,000 iterations, discard 166,667 and use the remaining 333,333 before
 thinning. At thinning 10 this stores 33,334 post-burn-in states.
 
-## SCS fitting update
+## Version-10 fitting update
 
-All VI-enabled SCS fits now use the authors' original routine. The current
-100D/500D comparisons already used it, so their fitting recipe is unchanged.
-For new figures under this update, rerun **Logistic regression: both priors**
-and **50D t: infinite first moment, equal samples** in fresh folders, including
-all their compared methods. Their production kernels and step-tuning rules
-are unchanged; the fitted SCS maps change.
+Rerun the **100D and 500D five-method comparisons**, in either implementation
+mode, in fresh folders. Version 10 makes VI mandatory and matches the map
+fitting resources: both families use 1,000 updates on their own fixed
+2,000-point cloud for Full paper settings, 400 × 500 for Smaller reproduction,
+and 20 × 128 for Quick check. DCS now reuses its cloud instead of drawing a
+fresh batch at each update, so **all preset sizes need new runs**. Run all five
+methods together under the same execution conditions.
 
-SCS has its own fitting budget: Full paper settings uses 1,000 updates on
-2,000 fixed reference draws, Smaller reproduction uses 400 × 500, and Quick
-check uses 20 × 128. The fit uses author seed 0 and the author's initialization;
-it does not inherit DCS's optimizer budget, radial-median initialization or
-symmetry constraints. Independent logistic reference draws need no new
-sampling solely because the SCS fit changed, provided they remain valid for
-the recorded target and reference protocol. Replotting old chains cannot
-apply the new SCS fit.
+SCS's original author fit is unchanged: seed 0, unit initialization and its
+recorded fitting-only clipping. DCS retains its own parameterization,
+initialization, seed and gradient clipping. Equal update and cloud counts do
+not imply identical fitting algorithms or equal preparation time.
+
+The paired logistic and 50D super-heavy-tail experiments follow the same
+fixed-cloud budget policy. Their production kernels and step-tuning rules
+are unchanged, but DCS fitting changes. Other experiments without SCS keep
+their recorded fitting policy. Independent logistic reference draws need no
+new sampling solely because map fitting changed, provided they remain valid
+for the recorded target and reference protocol. Replotting old chains cannot
+apply a new fit.
 
 ## Current sampler comparisons
 
 Choose **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)** or
-**Five samplers: optimized Numba DCS versus SCS**. Both version-9 suites
-contain the same methods, with 100D/500D and VI on/off. Numba production differs
+**Five samplers: optimized Numba DCS versus SCS**. Both version-10 suites
+contain the same methods, with 100D/500D and VI fitted for both map families. Numba production differs
 in implementation and recording costs; author SCS remains in JAX.
 
 Run every method together in a fresh folder. New runs contain radial-tail
@@ -75,8 +81,8 @@ integers, and CSV/JSON retain full precision.
 
 | Launcher experiment | Current comparison | Outputs |
 |---|---|---|
-| Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX) | Selected target and VI setting; equal time, JAX | `VsSCS`, radial estimates, counts, runtime, bias/variance, functional ESS |
-| Five samplers: optimized Numba DCS versus SCS | Selected target and VI setting; equal time, mixed implementations | Same comparison figure families and exact-value tables |
+| Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX) | Selected target, fitted maps; equal time, JAX | `VsSCS`, radial estimates, counts, runtime, bias/variance, functional ESS |
+| Five samplers: optimized Numba DCS versus SCS | Selected target, fitted maps; equal time, mixed implementations | Same comparison figure families and exact-value tables |
 | 50D t: infinite first moment, equal samples | 50 chains/method, 500,000 iterations/chain | `SuperInfiniteFirstTest`, tail/log-norm and quantiles |
 | 200D skew-t: DCS versus NUTS | Equal sampling time | `NUTS_PBW_vs` |
 | 200D skew-t: random-walk baselines | Equal sampling time | `VsRWM_NUTS` |
@@ -86,13 +92,12 @@ integers, and CSV/JSON retain full precision.
 
 Both current comparisons use 2 chains of 0.05 seconds for Quick check, 20 chains of
 2 seconds for Smaller reproduction, and 50 chains of 20 seconds for Full paper
-settings, for every target and VI choice. With VI, SCS uses the pinned
+settings, for either target. SCS uses the pinned
 authors' fixed-cloud optimizer, seed 0, and full budget of 1,000 updates on
-2,000 reference draws; DCS retains seed 42 and 1,500 updates with 2,000 fresh
-draws each. Their clipping rules also differ, as recorded in the
+2,000 reference draws; DCS uses seed 42 with the same 1,000 updates on
+its own fixed 2,000-point cloud. Their clipping rules also differ, as recorded in the
 [protocol](COMPARISONS.md). Quick and Smaller settings reduce both fitting
-budgets; full fitting may change rankings. Without VI, both maps use R=1
-with zero centre/deformation and no fitting draws. The same separate
+budgets; full fitting may change rankings. The same separate
 transition budget applies to every method and both SCS step policies.
 All steps freeze before timed sampling. Numba DCS starts from the same JAX
 pilot state and selected step as its JAX counterpart.
@@ -103,8 +108,8 @@ marginal quantiles. These plots cannot be reconstructed by rescaling timed MSE.
 
 **All seven experiments + posterior table** runs the five-method JAX comparison
 on the 100D skewed-t target and the other six experiments,
-and prepares independent logistic references. Its VI choice controls both maps
-in the comparison; the other experiments retain their existing map options.
+and prepares independent logistic references. It fits both comparison maps
+by VI and uses the specified maps for the other experiments.
 The optimized Numba and 500D comparisons are separate selections.
 Quick check only verifies that
 execution works. Use Smaller reproduction first to estimate resource needs;
@@ -114,20 +119,17 @@ other computer activity comparable across methods; concurrency is limited by
 the detected allocation, available chains and memory. See
 [parallel execution](PARALLEL.md).
 
-To compare fitted and untuned maps in other experiments, choose **Möbius map**
-or **Vanilla map** and start a fresh run for each. Vanilla fixes R=1, centre=0
-and Möbius=0 while preserving β and separate proposal tuning. This older
-DCS-only selector does not control SCS; use the new comparison's **With VI /
-Without VI** selector to switch both map families. Eight Schools and GARCH
-retain their identity maps.
+The launcher uses fitted maps for the synthetic and logistic experiments.
+Eight Schools and GARCH retain their specified identity maps. Previously saved
+untuned-map reports remain readable; they are not relabelled as fitted runs.
 
 ## Optional command-line equivalents
 
 ```bash
-python scripts/reproduce_all.py --preset paper --workers 2 --vi on --output-root results/paper-new
-python run_experiment.py sampler-comparison --target skew-t-100d --vi on --preset paper --workers 2 --output-dir results/comparison-100d-vi
-python run_experiment.py sampler-comparison-numba --target skew-t-100d --vi off --preset paper --workers 2 --output-dir results/numba-100d-no-vi
-python run_experiment.py sampler-comparison --target skew-t-500d --vi off --preset paper --workers 2 --output-dir results/comparison-500d-no-vi
+python scripts/reproduce_all.py --preset paper --workers 2 --output-root results/paper-new
+python run_experiment.py sampler-comparison --target skew-t-100d --preset paper --workers 2 --output-dir results/comparison-100d-vi
+python run_experiment.py sampler-comparison-numba --target skew-t-100d --preset paper --workers 2 --output-dir results/numba-100d-vi
+python run_experiment.py sampler-comparison --target skew-t-500d --preset paper --workers 2 --output-dir results/comparison-500d-vi
 python run_experiment.py skew-t-50d-nu-0.5 --preset paper --workers 2 --output-dir results/superheavy-new
 python run_experiment.py --plot-only results/comparison-100d-vi
 ```

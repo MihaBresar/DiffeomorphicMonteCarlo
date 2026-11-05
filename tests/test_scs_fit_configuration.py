@@ -13,16 +13,15 @@ class SCSFitConfigurationTests(unittest.TestCase):
                     config = load_config(name, preset)
                     self.assertEqual(config['scs_vi'], dict(optimizer_steps=steps, optimizer_samples=draws))
                     self.assertEqual(config['sphere_map_policy'], 'author-paper-vi')
-        # Preserve the target-specific DCS budget, rather than applying it to SCS.
-        self.assertEqual(load_config('logistic-regression', 'paper')['optimizer_steps'], 4000)
+        # Both families now share the author's full computation budget.
+        self.assertEqual(load_config('logistic-regression', 'paper')['optimizer_steps'], 1000)
 
     def test_explicit_budget_overrides_and_invalid_scs_settings(self):
         config = load_config('logistic-regression', 'quick', {'optimizer_steps': 7})
         self.assertEqual(config['scs_vi'], dict(optimizer_steps=7, optimizer_samples=128))
-        config = load_config('logistic-regression', 'quick', {
-            'optimizer_steps': 7, 'scs_vi': {'optimizer_steps': 3, 'optimizer_samples': 16}})
-        self.assertEqual(config['optimizer_steps'], 7)
-        self.assertEqual(config['scs_vi'], dict(optimizer_steps=3, optimizer_samples=16))
+        with self.assertRaisesRegex(ValueError, 'identical'):
+            load_config('logistic-regression', 'quick', {
+                'optimizer_steps': 7, 'scs_vi': {'optimizer_steps': 3, 'optimizer_samples': 16}})
         for invalid in (None, [], {'seed': 42}, {'optimizer_steps': 0}):
             if invalid is None:
                 continue  # None is the CLI's unspecified-value sentinel.

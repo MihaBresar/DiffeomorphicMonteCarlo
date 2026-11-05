@@ -39,7 +39,8 @@ def billiard_summary(vi='on'):
 class BilliardComparisonTests(unittest.TestCase):
     def test_effective_map_provenance_preserves_joint_fit_and_all_other_methods(self):
         for vi in ('on', 'off'):
-            config = suite.configuration('paper', target='skew-t-100d', vi=vi)
+            config = suite.configuration('paper', target='skew-t-100d')
+            config['vi'] = vi  # Saved-map fixture, not a new public run.
             if vi == 'on':
                 ball = BallMap(100, beta=2., scale=3., mu=np.arange(100)/100.,
                                delta=np.full(100, .01)).parameters()

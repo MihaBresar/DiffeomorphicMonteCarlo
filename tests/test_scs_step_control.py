@@ -20,12 +20,23 @@ def write(path, value):
     path.write_text(json.dumps(value))
 
 
-def primary_fixture(root, backend='jax', vi='on'):
+def primary_fixture(root, backend='jax', vi='on', version=None):
     with patch.object(runner, 'cpu_info', return_value=HARDWARE):
         config = suite.configuration('quick', workers=2, overrides={'scs_step_rule':'acceptance'}, comparison=backend, vi=vi)
+    if version == 9:
+        config['protocol'] = 'timed-sampler-comparison-v9' if backend == 'jax' else 'timed-numba-comparison-v9'
+        config['vi_batch_policy'] = 'fresh'
+        config.pop('vi_budget_policy', None)
     d = config['dimension']
     maps = {'ball': BallMap(d, scale=1.7).parameters(), 'sphere': SphereMap(d, scale=.8).parameters()}
-    fitting = {family: {'seconds': 1.25, 'steps': 20} for family in maps}
+    fitting = {family: {'seconds': 1.25, 'steps': config['optimizer_steps'],
+        'training_draws': config['optimizer_samples'], 'total_training_draws': config['optimizer_samples'],
+        'batch_policy': 'fixed', 'gradient_updates': config['optimizer_steps'],
+        'unique_reference_draws': config['optimizer_samples'],
+        'objective_point_evaluations': config['optimizer_steps']*config['optimizer_samples']} for family in maps}
+    if version == 9:
+        fitting['ball'].update(batch_policy='fresh',
+            total_training_draws=config['optimizer_steps']*config['optimizer_samples'])
     method_maps = runner.effective_method_maps(config, maps)
     cases = {}
     for method in control.METHODS:
@@ -66,7 +77,7 @@ class CalibrationControlTests(unittest.TestCase):
                             'target','vi','beta','ess_enabled','wave_cpu_ids'):
                     self.assertEqual(config[key],original[key])
                 self.assertEqual(config['algorithms'],control.METHODS)
-                self.assertTrue(config['protocol'].endswith('-v9'))
+                self.assertEqual(config['protocol'], original['protocol'])
                 self.assertEqual(config['dcs_backend'],backend)
                 self.assertEqual(config['step_tuning_policies'],{'SCS':'author_scs_fixed_01'})
                 self.assertEqual(maps,before['maps.json']['maps'])
@@ -75,6 +86,27 @@ class CalibrationControlTests(unittest.TestCase):
                 self.assertTrue(all(r['map_reused_without_refitting'] for r in fit.values()))
                 self.assertEqual(config['calibration_control_provenance']['presentation_source_differences'],{})
                 for name,value in before.items():self.assertEqual(json.loads((root/name).read_text()),value)
+
+    def test_v9_primary_keeps_its_original_protocol_and_fitting_policy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)/'primary'
+            before = primary_fixture(root, version=9)
+            config, maps, fit = control.prepare_control(root)
+            self.assertEqual(config['protocol'], 'timed-sampler-comparison-v9')
+            self.assertEqual(config['vi_batch_policy'], 'fresh')
+            self.assertEqual(fit['ball']['batch_policy'], 'fresh')
+            self.assertEqual(maps, before['maps.json']['maps'])
+
+    def test_v10_control_rejects_mismatched_fit_records(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)/'primary'
+            files = primary_fixture(root)
+            self.assertTrue(files['configuration.json']['protocol'].endswith('-v10'))
+            for name in ('maps.json', 'summary.json'):
+                files[name]['fitting']['ball']['objective_point_evaluations'] = 2561
+                write(root/name, files[name])
+            with self.assertRaisesRegex(ValueError, 'matched fixed-cloud fitting'):
+                control.prepare_control(root)
 
     def test_only_renderer_source_difference_is_allowed_and_recorded(self):
         with tempfile.TemporaryDirectory() as directory:

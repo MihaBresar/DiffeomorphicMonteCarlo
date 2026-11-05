@@ -1,5 +1,12 @@
 # Changes
 
+## 2026-11-05 — fixed-cloud, matched-budget comparisons, version 10
+
+- Require VI for both map families in every new 100D/500D five-method comparison. Remove the launcher VI-off choice and reject new off requests at public comparison entry points. Remove the generic untuned-map selection from the launcher and public command line; posterior identity maps remain unchanged.
+- Match optimizer update counts and fixed reference-cloud sizes for DCS and SCS: Full 1,000 × 2,000, Smaller 400 × 500, Quick 20 × 128. Preserve author SCS VI; DCS now reuses its own fixed cloud. Parameterizations, seeds and clipping remain method-specific. Apply the same fixed-cloud budget policy to generic paired DCS/SCS experiments; other DCS experiments retain their fitting policy.
+- Keep sampler kernels, proposal calibration and saved-result interpretation. Historical untuned-map reports and the version-9 development study remain labelled by their recorded settings. Rerun every method at all preset sizes because the DCS draw-reuse policy changes, including Smaller runs.
+- Define the current scope as a comparison of fitted sampling procedures; equal fitting resources do not isolate proposal geometry from fitting or establish general superiority.
+
 ## 2026-11-05 — original SCS fitting throughout the repository
 
 - Route every VI-enabled SCS fit through the pinned author's unchanged routine, including the generic experiments and audit entry points. Remove the in-house sphere optimizer and its fallback paths. Explicit VI-off maps remain untuned.

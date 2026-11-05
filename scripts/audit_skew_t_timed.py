@@ -45,7 +45,7 @@ PRESETS = {
                       optimizer_steps=400, optimizer_samples=500),
     'paper': dict(runs=20, time_budget=20., warmup=1500, thin=50,
                   pilot_chains=4, pilot_burn=2000, pilot_retained=8000,
-                  optimizer_steps=1500, optimizer_samples=2000)}
+                  optimizer_steps=1000, optimizer_samples=2000)}
 _ALLOCATION, _ALLOCATION_ERROR, _BARRIER = {}, None, None
 
 
@@ -358,7 +358,7 @@ def main(argv=None):
     workers = args.workers or min(hardware['capacity'], PRESETS[args.preset]['runs'])
     validate_workers(workers, hardware)
     config = {**PRESETS[args.preset], 'preset': args.preset, 'workers': workers}
-    config['scs_vi'] = dict(optimizer_steps=1000 if args.preset == 'paper' else config['optimizer_steps'],
+    config['scs_vi'] = dict(optimizer_steps=config['optimizer_steps'],
                             optimizer_samples=config['optimizer_samples'])
     root = args.output_dir.resolve()
     if root.exists() and (not root.is_dir() or any(root.iterdir())):

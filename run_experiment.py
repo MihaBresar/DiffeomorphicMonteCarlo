@@ -57,13 +57,12 @@ def parser():
                        help='For sampler comparisons: use sampling seed 901001 + 1000000 × batch (0–999); map-fitting seeds stay unchanged')
     p.add_argument('--target', choices=('skew-t-100d', 'skew-t-500d'),
                    help='Target for either sampler comparison')
-    p.add_argument('--vi', choices=('on', 'off'), help='Enable or disable VI fitting for both comparison map families')
+    p.add_argument('--vi', choices=('on',), help=argparse.SUPPRESS)
     p.add_argument('--scs-step-rule', choices=('acceptance', 'fixed'),
                    help='Sampler comparisons only: author fixed h=0.1 (default) or acceptance calibration')
     p.add_argument('--time-budget', type=float)
     p.add_argument('--nuts-target-accept', type=float)
-    p.add_argument('--ball-map-policy', choices=['mobius', 'vanilla'],
-                   help='Fit R, centre and Möbius parameters by VI, or use the untuned map R=1, centre=0, Möbius=0')
+    p.add_argument('--ball-map-policy', choices=['mobius'], help=argparse.SUPPRESS)
     p.add_argument('--ball-scale-policy', help=argparse.SUPPRESS)
     return p
 
@@ -86,7 +85,7 @@ def main(argv=None):
         summary_path = args.plot_only/'summary.json'
         if summary_path.exists():
             summary = json.loads(summary_path.read_text(encoding='utf-8'))
-            if summary.get('config', {}).get('protocol') in ('original-dcs-author-scs-v1', 'timed-dcs-author-scs-v2', 'timed-matched-dcs-scs-v3', 'timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2', 'timed-boundary-dcs-scs-v3', 'timed-sampler-comparison-v1', 'timed-numba-comparison-v1', 'timed-sampler-comparison-v2', 'timed-numba-comparison-v2', 'timed-sampler-comparison-v3', 'timed-numba-comparison-v3', 'timed-sampler-comparison-v4', 'timed-numba-comparison-v4', 'timed-sampler-comparison-v5', 'timed-numba-comparison-v5', 'timed-sampler-comparison-v6', 'timed-sampler-comparison-v7', 'timed-numba-comparison-v7', 'timed-sampler-comparison-v8', 'timed-numba-comparison-v8', 'timed-sampler-comparison-v9', 'timed-numba-comparison-v9'):
+            if summary.get('config', {}).get('protocol') in ('original-dcs-author-scs-v1', 'timed-dcs-author-scs-v2', 'timed-matched-dcs-scs-v3', 'timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2', 'timed-boundary-dcs-scs-v3', 'timed-sampler-comparison-v1', 'timed-numba-comparison-v1', 'timed-sampler-comparison-v2', 'timed-numba-comparison-v2', 'timed-sampler-comparison-v3', 'timed-numba-comparison-v3', 'timed-sampler-comparison-v4', 'timed-numba-comparison-v4', 'timed-sampler-comparison-v5', 'timed-numba-comparison-v5', 'timed-sampler-comparison-v6', 'timed-sampler-comparison-v7', 'timed-numba-comparison-v7', 'timed-sampler-comparison-v8', 'timed-numba-comparison-v8', 'timed-sampler-comparison-v9', 'timed-numba-comparison-v9', 'timed-sampler-comparison-v10', 'timed-numba-comparison-v10'):
                 from scripts.scs_100d_figures import render_report
                 render_report(args.plot_only, summary)
                 print(args.plot_only.resolve())

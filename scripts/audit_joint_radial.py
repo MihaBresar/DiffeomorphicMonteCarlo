@@ -44,7 +44,7 @@ PRESETS = {
         pilot_seconds=.5, pilot_burn=1000, optimizer_steps=400, optimizer_samples=500,
         probe_chains=2, probe_steps=2000),
     'paper': dict(runs=20, time_budget=20., warmup=1500, thin=50, pilot_chains=4,
-        pilot_seconds=.5, pilot_burn=2000, optimizer_steps=1500, optimizer_samples=2000,
+        pilot_seconds=.5, pilot_burn=2000, optimizer_steps=1000, optimizer_samples=2000,
         probe_chains=4, probe_steps=10000)}
 PROBE_COUNTS = ('iterations', 'initial_boundary_crossings', 'stepout_calls',
     'final_infeasible', 'nonfinite_density', 'density_rejections', 'accepted',
@@ -402,7 +402,7 @@ def main(argv=None):
     workers = args.workers or min(hardware['capacity'], PRESETS[args.preset]['runs'])
     validate_workers(workers, hardware)
     config = {**PRESETS[args.preset], 'preset': args.preset, 'workers': workers}
-    config['scs_vi'] = dict(optimizer_steps=1000 if args.preset == 'paper' else config['optimizer_steps'],
+    config['scs_vi'] = dict(optimizer_steps=config['optimizer_steps'],
                             optimizer_samples=config['optimizer_samples'])
     if args.pilot_seconds is not None:
         config['pilot_seconds'] = args.pilot_seconds
@@ -418,7 +418,7 @@ def main(argv=None):
         'At each R select the step maximizing the minimum summed per-chain bulk ESS for tail(||X||>=50) and log1p(||X||), divided by summed actual sampling wall time. Then select R by this profiled score.',
         'Timed pilot chain lengths can differ: ESS is computed on each full chain separately and summed. Rank R-hat is descriptive on common-length prefixes. A constant or nonfinite pilot function in any chain invalidates that cell.',
         'Eight R values include 0.5, 1, sqrt(nu), 2, 4, sqrt(d+1), 20 and the method-specific VI R. Exact duplicates are replaced by 40, then 80. Eight steps per R; all cells are retained. Endpoint winners are reported, not certified global optima.',
-        'SCS uses unchanged author VI with seed 0 and a fixed reference cloud; DCS retains fresh-draw VI with its recorded seed. Fitting budgets and costs are recorded separately. Centres and deformations remain fixed during the subsequent R/step search. Only DCS constrains symmetric-target centre and deformation exactly to zero.',
+        'SCS uses unchanged author VI with seed 0 and a fixed reference cloud; DCS uses fixed-cloud VI with its recorded seed. Fitting budgets and costs are recorded separately. Centres and deformations remain fixed during the subsequent R/step search. Only DCS constrains symmetric-target centre and deformation exactly to zero.',
         'All four controls per method have independently pretuned steps: joint R+step, R=1, VI R, and R=sqrt(d+1). These are fixed-R controls with the same fitted shape; R=1 alone need not give a fully untuned SCS map.',
         'Exact independent target draws initialize pilots and separate boundary probes: an oracle-assisted synthetic diagnostic. Production uses fresh seeds and physical ones(100). Pilot outcomes never use production errors.',
         'Maps and proposal steps are frozen throughout discarded production warmup and sampling. Existing adaptive audits remain available separately.',

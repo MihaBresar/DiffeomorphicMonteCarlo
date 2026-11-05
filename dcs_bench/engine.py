@@ -56,14 +56,18 @@ def load_config(name, preset='quick', overrides=None):
     config.update({k: v for k, v in (overrides or {}).items() if v is not None})
     if 'SCS' in config['algorithms']:
         from .scs_paper import author_vi_budget
-        # SCS has its own author budget; DCS's target-specific VI count must
-        # never silently determine SCS training. Explicit CLI budget overrides
-        # apply to both families, as in the selectable comparison runners.
+        # Both fitted families use equal work and fixed base clouds. Explicit
+        # CLI budget overrides apply to both; conflicting SCS-only overrides
+        # are rejected rather than silently creating an unmatched comparison.
         budget = author_vi_budget(config)
         for field in ('optimizer_steps', 'optimizer_samples'):
             if overrides.get(field) is not None and overrides.get('scs_vi') is None:
                 budget[field] = overrides[field]
         config['scs_vi'] = author_vi_budget({'scs_vi': budget})
+        from .tuning import validate_matched_vi
+        config['vi_batch_policy'] = config.get('vi_batch_policy', 'fixed')
+        config['vi_budget_policy'] = 'equal_updates_and_fixed_reference_clouds_v1'
+        validate_matched_vi(config)
         config['sphere_map_policy'] = ('vanilla' if config.get('vi') == 'off'
                                       or config.get('sphere_map_policy') == 'vanilla'
                                       else 'author-paper-vi')

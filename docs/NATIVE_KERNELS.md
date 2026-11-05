@@ -3,7 +3,7 @@
 All seven launcher experiments use compiled loops for their canonical sampling
 methods. `compiled_sampling.py` covers DCS-RWM, DCS-BW, DCS-HnR, ordinary Gaussian
 and stable random walks, and SCS. It supports the skew-t, logistic, Eight Schools
-(centered and noncentered), and GARCH densities. The current `sampler-comparison` runs DCS-RWM, DCS-BW, reflected BW, DCS-Billiard and author SCS in a shared compiled JAX scan framework. The separate `sampler-comparison-numba` runs the same four DCS methods in optimized native loops against unchanged author JAX SCS; both targets and both VI settings are available. Current reports accumulate radial quantities and functional ESS, caching unchanged values after rejection. See [the exact comparison scope](COMPARISONS.md).
+(centered and noncentered), and GARCH densities. The current `sampler-comparison` runs DCS-RWM, DCS-BW, reflected BW, DCS-Billiard and author SCS in a shared compiled JAX scan framework. The separate `sampler-comparison-numba` runs the same four DCS methods in optimized native loops against unchanged author JAX SCS; both targets are available and VI is mandatory for both map families. Current reports accumulate radial quantities and functional ESS, caching unchanged values after rejection. See [the exact comparison scope](COMPARISONS.md).
 NumPyro/BlackJAX NUTS retain their compiled implementations.
 
 Each worker compiles before the sampling start barrier. Warmup is separate;

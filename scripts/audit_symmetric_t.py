@@ -47,7 +47,7 @@ PRESETS = {
                       optimizer_steps=400, optimizer_samples=500),
     'paper': dict(runs=20, iterations=500000, warmup=1500, thin=50,
                   pilot_chains=4, pilot_burn=2000, pilot_retained=8000,
-                  optimizer_steps=1500, optimizer_samples=2000)}
+                  optimizer_steps=1000, optimizer_samples=2000)}
 _ALLOCATION, _ALLOCATION_ERROR = {}, None
 
 
@@ -315,7 +315,7 @@ def main(argv=None):
         lock.write(str(os.getpid()))
     config = {**PRESETS[args.preset], 'preset': args.preset, 'workers': workers,
               'production_seed_base': PRODUCTION_SEED_BASE}
-    config['scs_vi'] = dict(optimizer_steps=1000 if args.preset == 'paper' else config['optimizer_steps'],
+    config['scs_vi'] = dict(optimizer_steps=config['optimizer_steps'],
                             optimizer_samples=config['optimizer_samples'])
     hashes = source_hashes()
     fingerprint = digest({'source': hashes, 'config': config, 'target': TARGET})

@@ -2,9 +2,9 @@
 
 This page describes the current comparison and then the six other manuscript experiments. The resolved `configuration.json` and the source/runtime record in `manifest.json` define an individual run.
 
-## Current comparison: version 9
+## Current comparison: version 10
 
-`sampler-comparison` records `timed-sampler-comparison-v9`; `sampler-comparison-numba` records `timed-numba-comparison-v9`. Both contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard, with 100D/500D skewed t(3) targets and VI on/off. See the [complete protocol](COMPARISONS.md) and [reviewer checklist](REVIEW_GUIDE.md).
+`sampler-comparison` records `timed-sampler-comparison-v10`; `sampler-comparison-numba` records `timed-numba-comparison-v10`. Both contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard, with 100D/500D skewed t(3) targets and VI fitted for both map families. New comparison requests cannot disable VI. See the [complete protocol](COMPARISONS.md) and [reviewer checklist](REVIEW_GUIDE.md).
 
 The JAX mode uses the same full-state scan, projection and scalar recording framework for all methods. The Numba mode uses fused DCS production loops with density/radius caching, while SCS calls its unchanged author JAX transition. Each DCS method uses the same JAX pilot in either mode; Numba production uses a separate PCG64 stream. This preserves proposal laws, not bitwise trajectories across backends.
 
@@ -16,17 +16,16 @@ VI is fitted once per map family and reused across chains. Results therefore con
 
 | Setting | DCS | SCS |
 |---|---|---|
-| VI on | Fresh-batch reverse KL, seed 42, Adam 0.01, gradient-norm cap 10, no coordinate/CDF clipping | Unchanged pinned author VI, one fixed reference cloud, seed 0, Adam 0.01, coordinate clip ±1,000 in the target and Jacobian arguments, no gradient clipping |
-| Full VI budget | 1,500 updates × 2,000 fresh draws | 1,000 updates × 2,000 fixed reference draws |
-| VI off | R=1, zero centre and deformation, configured β retained | R=1, zero centre and observer, latitude 1.1 |
+| Fitting routine | Fixed-cloud reverse KL, seed 42, Adam 0.01, gradient-norm cap 10, no coordinate/CDF clipping | Unchanged pinned author VI, one fixed reference cloud, seed 0, Adam 0.01, coordinate clip ±1,000 in the target and Jacobian arguments, no gradient clipping |
+| Full VI budget | 1,000 updates × 2,000 fixed reference draws | 1,000 updates × 2,000 fixed reference draws |
 
-The SCS cloud is reused at every update: its full VI objective evaluates 2,000,000 reference states over the optimization, rather than 2,000 evaluations total. These are different fitting recipes and unique-draw budgets. Their actual fitting times, parameters and losses are recorded separately. The VI clipping is confined to the author's optimizer; production densities remain unclipped. Losses across map families are not normalized KL values that can be compared directly.
+Each family reuses its own fixed cloud at every update: 2,000 distinct reference draws and 2,000,000 objective/gradient point evaluations over the full optimization. The cloud sizes and update counts match; the reference distributions, actual draws, parameterizations, fitting seeds and clipping rules still differ. Their actual fitting times, parameters and losses are recorded separately. The VI clipping is confined to the author's optimizer; production densities remain unclipped. Losses across map families are not normalized KL values that can be compared directly.
 
 DCS-RWM/BW/reflected BW use the ball map. Billiards retain its jointly fitted centre/R/β in post-Möbius coordinates, with effective deformation zero. This is not a second VI fit constrained to zero deformation. `method_maps.json` and `effective_maps.csv` record the maps actually used.
 
 Every chain has a separate discarded pilot before production. RWM/BW use acceptance-target 0.234 adaptation; reflected BW uses squared movement in ball coordinates; billiards use their own kernel and bounded squared movement of physical log(1+norm). The SCS default is fixed h=0.1 throughout pilot and production. Acceptance-target 0.234 is available with `--scs-step-rule acceptance`. Equal pilot transition counts do not imply equal pilot seconds, equivalent search criteria or optimal tuning. All selected steps freeze before production; the final pilot state initializes it.
 
-The fixed SCS default was selected using the disclosed 100D seed-batch-7 development study and its full-author-VI sensitivity pair. Its rule did not select by DCS ranking. It is frozen for a fresh full-paper batch 8; that assessment must be reported separately from development evidence. The 500D setting extends the same choice without a separate tuning study. [Both SCS policies and their outcomes](AUTHOR_SCS_CALIBRATION.md) remain available.
+The fixed SCS default was selected using the disclosed 100D seed-batch-7 development study and its full-author-VI sensitivity pair. Its rule did not select by DCS ranking. That study used version 9. Evaluate version 10 with a fresh full-paper batch under the now-matched fitting budget, separately from development evidence; use batch 8 only if it has not already been inspected. The 500D setting extends the same choice without a separate tuning study. [Both SCS policies and their outcomes](AUTHOR_SCS_CALIBRATION.md) remain available.
 
 ### Sampling clock and CPU allocation
 
@@ -70,11 +69,11 @@ Generic workers stream draws through bounded buffers. Thinning, physical convers
 
 Posterior DCS receives the mean production time of fixed-count NUTS runs; setup is reported separately. The quick posterior preset alone imposes a one-second minimum DCS budget as an execution check, so its plots are not an equal-time performance result. Benchmark NUTS uses target acceptance 0.8 and maximum depth 10; reference runs use their independently recorded settings.
 
-The generic `ball_map_policy` selector changes DCS only: `mobius` fits the map, while `vanilla` keeps R=1, centre=0 and deformation=0 with β retained. This differs from the current comparison's `--vi off`, which disables fitting for both map families. PosteriorDB examples retain their specified identity maps.
+New public runs use the fitted DCS map (`ball_map_policy=mobius`) for synthetic and logistic targets; the untuned `vanilla` choice is no longer exposed by the launcher or public command line. Internal helpers and saved reports retain compatibility with those earlier parameters. PosteriorDB examples retain their specified identity maps.
 
 Every VI-enabled SCS fit, including logistic and the ν=0.5 experiment, calls the same pinned author routine: seed 0, a fixed reference cloud, Adam 0.01, physical-coordinate clipping at ±1,000 inside VI, and no gradient clipping. The separate `scs_vi` budget is 1,000 updates × 2,000 fixed draws for paper, 400 × 500 for reproduce, and 20 × 128 for quick. It does not inherit the DCS optimizer budget. SCS keeps the author's unit-scale initialization and unconstrained centre/observer fit; the DCS-only radial-median initialization and symmetry constraints do not apply to SCS.
 
-Generic SCS production still uses the checked Numba implementation with acceptance-target 0.234 step tuning. Changing its VI implementation does not turn it into the unchanged author JAX production implementation or the fixed-h=0.1 comparison. Rerun logistic and ν=0.5 comparisons in fresh folders after this fitting change, including their DCS controls under the same execution conditions. The version-9 100D/500D comparison already used author VI; its fitting recipe is unchanged.
+Generic SCS production still uses the checked Numba implementation with acceptance-target 0.234 step tuning. Changing its VI implementation does not turn it into the unchanged author JAX production implementation or the fixed-h=0.1 comparison. Rerun logistic and ν=0.5 comparisons in fresh folders after this fitting change, including their DCS controls under the same execution conditions. SCS's author routine is unchanged in version 10. DCS now receives the matching full budget of 1,000 updates and reuses a fixed cloud; version 9 used 1,500 full updates with fresh draws. All 100D/500D presets need new runs of all methods because DCS's draw-reuse policy changes at every preset. The full logistic DCS budget also changes to 1,000; the 50D update count already matched, but its DCS cloud is now fixed too. Experiments without SCS retain their earlier fitting policy.
 
 Generic ESS/MCSE describes the retained series used by the estimator; it is not multiplied by the thinning stride. Multichain diagnostics use a recorded common prefix of the shortest chain, while means and per-chain diagnostics use all retained draws. A constant functional has unavailable ESS/MCSE rather than an artificial zero; rank R-hat requires multiple chains. The compact 200D baseline report omits coordinate quantiles and cross-chain diagnostics. [Result processing](RESULT_PROCESSING.md) explains storage and progress reporting.
 

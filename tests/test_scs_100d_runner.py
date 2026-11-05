@@ -64,8 +64,8 @@ class SCS100DRunnerTests(unittest.TestCase):
         self.assertEqual(config['target']['alpha'], {'0': 100., '1': -100.})
         self.assertEqual(config['initial_scale'], .1)
         self.assertEqual(config['optimizer_samples'], 2000)
-        self.assertEqual(config['optimizer_steps'], 1500)
-        self.assertEqual(config['vi_batch_policy'], 'fresh')
+        self.assertEqual(config['optimizer_steps'], 1000)
+        self.assertEqual(config['vi_batch_policy'], 'fixed')
         self.assertNotIn('scs_step', config)
         for preset, warmup, seconds in [('quick', 100, .05), ('reproduce', 1000, 2.), ('paper', 1500, 20.)]:
             selected = experiment.configuration(preset, workers=1)
@@ -100,7 +100,7 @@ class SCS100DRunnerTests(unittest.TestCase):
         author.assert_called_once_with({'target': config['target'],
                                        'optimizer_steps': 1000, 'optimizer_samples': 2000})
         self.assertEqual(set(maps), {'ball', 'sphere'})
-        self.assertEqual(fitting['ball']['steps'], 1500)
+        self.assertEqual(fitting['ball']['steps'], 1000)
         self.assertEqual(fitting['sphere']['steps'], 1000)
         self.assertFalse(fitting['ball']['coordinate_clipping'])
         self.assertTrue(fitting['sphere']['coordinate_clipping'])

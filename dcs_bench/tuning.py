@@ -1,8 +1,9 @@
 """Pilot-only map fitting and proposal-scale adaptation.
 
-DCS map fitting uses the original reverse KL objective on independent base
-draws. SCS fitting calls the pinned author routine with its fixed reference
-cloud and independent budget. No fitted parameter changes after sampling starts.
+DCS map fitting uses its reverse KL objective on base draws. Current SCS
+comparisons reuse a fixed cloud for each family and match cloud sizes and
+update counts. SCS calls the pinned author routine. No fitted parameter
+changes after sampling starts.
 """
 import time
 import numpy as np
@@ -21,6 +22,18 @@ def uniform_cap(rng, n, d, latitude):
     v = rng.normal(size=(n, d))
     v *= np.sqrt(height*(2-height))[:, None]/np.linalg.norm(v, axis=1, keepdims=True)
     return np.column_stack([v, height-1])
+
+
+def validate_matched_vi(config):
+    """Check the recorded work budget and batch policy of current comparisons."""
+    from .scs_paper import author_vi_budget
+    budget = author_vi_budget(config)
+    if config.get('vi_batch_policy') != 'fixed':
+        raise ValueError('Matched VI requires a fixed reference cloud for both methods')
+    for field, value in budget.items():
+        if config.get(field) != value:
+            raise ValueError('Matched VI requires identical optimizer_steps and optimizer_samples for DCS and SCS')
+    return budget
 
 
 def fit_map(target, config, family, seed):
@@ -113,6 +126,9 @@ def fit_map(target, config, family, seed):
     mapping = BallMap(d, beta=beta, mu=np.asarray(mu), scale=float(scale), delta=np.asarray(shift))
     return mapping, {'seconds': time.perf_counter()-start, 'steps': config['optimizer_steps'],
                      'training_draws': n, 'seed': seed, 'loss': history,
+                     'gradient_updates': config['optimizer_steps'],
+                     'objective_point_evaluations': n*config['optimizer_steps'],
+                     'unique_reference_draws': n*max(1, config['optimizer_steps']) if batch_policy == 'fresh' else n,
                      'initial_scale': initial_scale, 'scale_initialization': config.get('map_scale_initialization', 'unit'),
                      'scale_policy': 'VI-fitted', 'map_policy': map_policy,
                      'objective': 'reverse KL on independent base draws', 'batch_policy': batch_policy,

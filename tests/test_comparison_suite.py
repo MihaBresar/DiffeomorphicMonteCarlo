@@ -17,7 +17,7 @@ class ComparisonSuiteTests(unittest.TestCase):
 
     def test_author_vi_presets_and_explicit_budget_overrides(self):
         for preset, scs_steps, dcs_steps, draws in (
-                ('quick',20,20,128),('reproduce',400,400,500),('paper',1000,1500,2000)):
+                ('quick',20,20,128),('reproduce',400,400,500),('paper',1000,1000,2000)):
             config = suite.configuration(preset)
             self.assertEqual(config['scs_vi'], dict(optimizer_steps=scs_steps,optimizer_samples=draws))
             self.assertEqual(config['optimizer_steps'],dcs_steps)
@@ -38,7 +38,7 @@ class ComparisonSuiteTests(unittest.TestCase):
 
     def test_fit_seed_override_matches_reported_and_executed_dcs_fit(self):
         config = suite.configuration('quick', overrides={'fit_seed': 73})
-        self.assertIn('DCS: fresh-batch reverse KL, seed 73,', config['fitting_policy'])
+        self.assertIn('DCS: fixed-cloud reverse KL, seed 73,', config['fitting_policy'])
         self.assertIn('SCS: unchanged author VI, fixed base batch, seed 0,', config['fitting_policy'])
         with patch.object(runner, 'fit_map', return_value=(
                 BallMap(100), {'seed': 73, 'steps': 20, 'training_draws': 128})) as dcs_fit, \
@@ -70,7 +70,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                         ('skew-t-500d', 'skew_t', 500, 2.))
         for backend, methods in expected_methods.items():
             for target_id, kind, dimension, beta in target_cases:
-                for vi in ('on', 'off'):
+                for vi in ('on',):
                     with self.subTest(backend=backend, target=target_id, vi=vi):
                         config = suite.configuration('paper', comparison=backend, target=target_id, vi=vi)
                         self.assertEqual(config['algorithms'], methods)
@@ -88,7 +88,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertEqual(config['warmup'], 1500)
                         self.assertEqual(config['time_budget'], 20.)
                         self.assertEqual(config['burnin_fraction'], 1/3)
-                        self.assertEqual(config['optimizer_steps'], 1500)
+                        self.assertEqual(config['optimizer_steps'], 1000)
                         self.assertEqual(config['optimizer_samples'], 2000)
                         self.assertEqual(config['target']['nu'], 3.)
                         self.assertEqual(config['target']['alpha'], {'0': 100., '1': -100.})
@@ -96,11 +96,13 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertNotIn('coordinate_threshold', config)
                         self.assertTrue(config['ess_enabled'])
                         self.assertEqual(config['reference_samples'], 5_000_000)
-                        self.assertTrue(config['protocol'].endswith('-v9'))
+                        self.assertTrue(config['protocol'].endswith('-v10'))
 
     def test_vi_off_bypasses_fitting_for_both_map_families_without_skipping_warmup(self):
         for target_id in ('skew-t-100d', 'skew-t-500d'):
-            config = suite.configuration('quick', comparison='numba', target=target_id, vi='off')
+            # An explicit historical fixture exercises the retained low-level geometry.
+            config = suite.configuration('quick', comparison='numba', target=target_id)
+            config.update(vi='off', vi_enabled=False, ball_map_policy='vanilla', sphere_map_policy='vanilla')
             with self.subTest(target=target_id), patch.object(runner, 'fit_map') as fit, \
                     redirect_stdout(StringIO()):
                 maps, metadata = runner.prepare(config)
@@ -140,7 +142,7 @@ class ComparisonSuiteTests(unittest.TestCase):
         self.assertEqual(calls[0][3], 42)
         author.assert_called_once_with({'target': config['target'], **config['scs_vi']})
         self.assertEqual(maps['ball']['beta'], 2.)
-        self.assertEqual([metadata[f]['steps'] for f in ('ball', 'sphere')], [1500, 1000])
+        self.assertEqual([metadata[f]['steps'] for f in ('ball', 'sphere')], [1000, 1000])
         self.assertEqual([metadata[f]['training_draws'] for f in ('ball', 'sphere')], [2000, 2000])
 
     def test_summarize_uses_selected_target_truth_instead_of_old_100d_constants(self):

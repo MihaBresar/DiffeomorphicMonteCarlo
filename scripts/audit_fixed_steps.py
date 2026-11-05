@@ -35,7 +35,7 @@ PRESETS = {
     'reproduce': dict(runs=8, iterations=25000, warmup=1000, thin=10,
                       optimizer_steps=400, optimizer_samples=500),
     'paper': dict(runs=20, iterations=500000, warmup=1500, thin=50,
-                  optimizer_steps=1500, optimizer_samples=2000),
+                  optimizer_steps=1000, optimizer_samples=2000),
 }
 FUNCTIONALS = ['tail_indicator_norm_ge_50', 'norm', 'log_one_plus_norm',
                'coordinate_1', 'coordinate_2', 'coordinate_3', 'coordinate_4']
@@ -68,13 +68,13 @@ def audit_config(preset, workers, production_seed_base=DEFAULT_PRODUCTION_SEED_B
     config = load_config('skew-t-100d-fixed', 'paper', {'workers': workers})
     config.update(PRESETS[preset])
     config.update(preset=preset, seed=20260911, production_seed_base=production_seed_base, ball_map_policy='mobius',
-                  ball_scale_policy='fit', vi_batch_policy='fresh',
+                  ball_scale_policy='fit', vi_batch_policy='fixed',
                   map_scale_initialization='radial_median')
     # Keep this bridge's target explicit even if the main experiment changes.
     config['targets'] = [{'kind': 'skew_t', 'dimension': 100, 'nu': 3,
                           'alpha': {'0': 100., '1': -100.}}]
     config.update(beta=2., latitude=1.1, threshold=50.)
-    config['scs_vi'] = dict(optimizer_steps=1000 if preset == 'paper' else config['optimizer_steps'],
+    config['scs_vi'] = dict(optimizer_steps=config['optimizer_steps'],
                             optimizer_samples=config['optimizer_samples'])
     config['sphere_map_policy'] = 'author-paper-vi'
     production_seeds(config)

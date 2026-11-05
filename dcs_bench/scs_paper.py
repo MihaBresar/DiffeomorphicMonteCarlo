@@ -127,6 +127,8 @@ def fit(config):
     metadata = {
         'seconds': elapsed, 'steps': steps, 'training_draws': ntrain,
         'total_training_draws': ntrain, 'seed': 0, 'learning_rate': .01,
+        'gradient_updates': steps, 'objective_point_evaluations': steps*ntrain,
+        'unique_reference_draws': ntrain,
         'batch_policy': 'fixed', 'initial_scale': 1., 'loss': loss.tolist(),
         'initial_centre': 'zero', 'initial_observer': 'zero',
         'objective': 'author reverse KL; target and Jacobian evaluated at clipped physical coordinates',

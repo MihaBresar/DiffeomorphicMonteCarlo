@@ -16,6 +16,8 @@ class AuthorVIComparisonTests(unittest.TestCase):
     def configuration(self):
         config = runner.configuration('quick', overrides={
             'optimizer_steps': 7, 'optimizer_samples': 19})
+        # Isolate the author adapter; v10 matching is checked separately.
+        config.pop('vi_budget_policy', None)
         config.update(sphere_map_policy='author-paper-vi',
                       scs_vi={'optimizer_steps': 3, 'optimizer_samples': 16})
         config['target'] = {'kind': 'skew_t', 'dimension': 5, 'nu': 3.,

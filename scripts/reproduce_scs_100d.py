@@ -34,7 +34,7 @@ TARGET = {'kind': 'skew_t', 'dimension': 100, 'nu': 3., 'alpha': {'0': 100., '1'
 PRESETS = {
     'quick': dict(runs=2, time_budget=.05, warmup=100, thin=1, optimizer_steps=20, optimizer_samples=128),
     'reproduce': dict(runs=20, time_budget=2., warmup=1000, thin=10, optimizer_steps=400, optimizer_samples=500),
-    'paper': dict(runs=50, time_budget=20., warmup=1500, thin=50, optimizer_steps=1500, optimizer_samples=2000),
+    'paper': dict(runs=50, time_budget=20., warmup=1500, thin=50, optimizer_steps=1000, optimizer_samples=2000),
 }
 TIME_SCOPE = ('Equal per-chain sampling time includes first-third burn-in and radial accumulation. '
               'Fitting, compilation and step tuning are outside the clock. All methods use the same '
@@ -52,10 +52,11 @@ def configuration(preset='quick', workers=1, overrides=None):
                   dimension=100, nu=3., alpha=TARGET['alpha'], target=TARGET,
                   beta=2., latitude=1.1, threshold=50., seed=901001, seed_batch=0, algorithms=list(METHODS),
                   step_policy='shared_indicator_dual_averaging_0.234_then_frozen', initial_scale=.1,
-                  vi_batch_policy='fresh', ball_map_policy='mobius', map_scale_initialization='unit',
+                  vi_batch_policy='fixed', ball_map_policy='mobius', map_scale_initialization='unit',
+                  vi_budget_policy='equal_updates_and_fixed_reference_clouds_v1',
                   fit_seed=42, sphere_map_policy='author-paper-vi',
                   scs_fitting_revision='author-vi-v1',
-                  fitting_policy='DCS fresh-batch reverse KL with gradient-norm cap 10; '
+                  fitting_policy='DCS fixed-cloud reverse KL with gradient-norm cap 10; '
                                  'SCS original author VI, fixed base draws with seed 0, '
                                  'Adam 0.01, physical-coordinate clip 1000; no gradient clipping')
     supplied = {key: value for key, value in (overrides or {}).items() if value is not None}
@@ -89,9 +90,7 @@ def configuration(preset='quick', workers=1, overrides=None):
         raise ValueError('time_budget must be finite and positive')
     if 100 % config['thin']:
         raise ValueError('thin must divide 100 for exact timed burn-in boundaries')
-    config['scs_vi'] = dict(
-        optimizer_steps=supplied.get('optimizer_steps', {'quick': 20, 'reproduce': 400, 'paper': 1000}[preset]),
-        optimizer_samples=supplied.get('optimizer_samples', config['optimizer_samples']))
+    config['scs_vi'] = {field: config[field] for field in ('optimizer_steps', 'optimizer_samples')}
     hardware = cpu_info()
     validate_workers(config['workers'], hardware)
     config['execution_revision'] = EXECUTION_REVISION
@@ -129,6 +128,9 @@ def prepare(config):
     if author_vi:
         from dcs_bench.scs_paper import author_vi_budget
         budget = author_vi_budget(config)
+        if config.get('vi_budget_policy') == 'equal_updates_and_fixed_reference_clouds_v1':
+            from dcs_bench.tuning import validate_matched_vi
+            validate_matched_vi(config)
         author_config = {'target': config['target'], **budget}
     for family in ('ball', 'sphere'):
         if config.get('vi', 'on') == 'off':
@@ -381,6 +383,14 @@ def summarize(config, maps, fitting, records, reference=None):
 
 
 def run(config, output):
+    if config.get('experiment') in ('sampler-comparison', 'sampler-comparison-numba'):
+        if (config.get('vi') != 'on' or config.get('vi_enabled') is not True
+                or config.get('ball_map_policy') != 'mobius'
+                or config.get('sphere_map_policy') != 'author-paper-vi'):
+            raise ValueError('New sampler comparisons require VI for both map families.')
+        if config.get('protocol') in ('timed-sampler-comparison-v10', 'timed-numba-comparison-v10'):
+            from dcs_bench.tuning import validate_matched_vi
+            validate_matched_vi(config)
     output = Path(output).resolve()
     if output.exists() and any(output.iterdir()):
         raise FileExistsError(f'Choose a fresh output folder: {output}')
