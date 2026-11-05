@@ -1,8 +1,8 @@
 """Pilot-only map fitting and proposal-scale adaptation.
 
-Map fitting minimizes a Monte Carlo reverse KL objective on fresh independent
-base draws at every step, as in the original experiments. No fitted parameter
-changes after retained sampling starts.
+DCS map fitting uses the original reverse KL objective on independent base
+draws. SCS fitting calls the pinned author routine with its fixed reference
+cloud and independent budget. No fitted parameter changes after sampling starts.
 """
 import time
 import numpy as np
@@ -25,8 +25,21 @@ def uniform_cap(rng, n, d, latitude):
 
 def fit_map(target, config, family, seed):
     start = time.perf_counter()
+    if family not in ('ball', 'sphere'):
+        raise ValueError('Map family must be ball or sphere')
+    if family == 'sphere':
+        if config.get('vi', 'on') == 'off' or config.get('sphere_map_policy') == 'vanilla':
+            mapping = SphereMap(target.d, latitude=config.get('latitude', 1.1))
+            return mapping, {'seconds': time.perf_counter()-start, 'steps': 0,
+                'training_draws': 0, 'total_training_draws': 0, 'loss': [], 'seed': None,
+                'vi_enabled': False, 'initial_scale': 1., 'scale_policy': 'unit',
+                'map_policy': 'untuned', 'coordinate_clipping': False, 'cdf_clipping': False,
+                'fitting_policy': 'No VI: R=1, centre=0, deformation=0'}
+        from .scs_paper import author_vi_budget, fit as author_fit
+        parameters, metadata = author_fit({'target': target.spec,
+            'latitude': config.get('latitude', 1.1), **author_vi_budget(config)})
+        return SphereMap(**parameters), metadata
     d, beta = target.d, config['beta']
-    latitude = config.get('latitude', 1.1)
     map_policy = validate_ball_map_policy(config)
     batch_policy = config.get('vi_batch_policy', 'fresh')
     if batch_policy not in ('fresh', 'fixed'):
@@ -36,7 +49,7 @@ def fit_map(target, config, family, seed):
     if target.kind in ('garch', 'eight_schools'):
         mapping = BallMap(d, beta)
         return mapping, {'seconds': time.perf_counter()-start, 'steps': 0, 'loss': [], 'map_policy': 'posterior-identity'}
-    if family == 'ball' and map_policy == 'vanilla':
+    if map_policy == 'vanilla':
         # This ablation bypasses VI and radial-median initialization entirely.
         # Proposal-scale warmup is unchanged and is handled by the sampler.
         mapping = BallMap(d, beta)
@@ -49,24 +62,21 @@ def fit_map(target, config, family, seed):
     jax.config.update('jax_enable_x64', True)
     rng = np.random.default_rng(seed)
     n = config['optimizer_samples']
-    base = uniform_ball(rng, n, d) if family == 'ball' else uniform_cap(rng, n, d, latitude)
+    base = uniform_ball(rng, n, d)
     initial_scale = 1.
     if config.get('map_scale_initialization') == 'radial_median':
         if target.kind != 'skew_t':
             raise ValueError('Radial-median initialization requires the synthetic t target')
-        # Both projection families get the same known-target scale information.
-        # This avoids spending all Adam iterations traversing tens of log-scale
-        # units when beta is very small (e.g. beta=.2 in d=50).
+        # DCS avoids spending all Adam iterations traversing tens of log-scale
+        # units when beta is very small (e.g. beta=.2 in d=50). SCS always uses
+        # its author's unit initialization, in the separate branch above.
         radial_median = np.sqrt(d*f_distribution.ppf(.5, d, target.nu))
-        if family == 'ball':
-            radius = np.linalg.norm(base, axis=1)
-            mapped_radius = radius/(-np.expm1(beta*np.log(radius)))**(1/beta)
-        else:
-            mapped_radius = np.linalg.norm(base[:, :-1], axis=1)*latitude/(latitude-1-base[:, -1])
+        radius = np.linalg.norm(base, axis=1)
+        mapped_radius = radius/(-np.expm1(beta*np.log(radius)))**(1/beta)
         initial_scale = radial_median/np.median(mapped_radius)
     base = jnp.asarray(base)
     symmetric = target.kind == 'skew_t' and not np.any(target.alpha)
-    limit = .999 if family == 'ball' else .999*np.sqrt(1-(latitude-1)**2)
+    limit = .999
 
     def unpack(p):
         mu = jnp.zeros(d) if symmetric else p[:d]
@@ -77,19 +87,10 @@ def fit_map(target, config, family, seed):
 
     def objective(p, base):
         mu, shift, scale = unpack(p)
-        if family == 'ball':
-            w, lj = mobius(base, shift, jnp)
-            logeps = jnp.log(-jnp.expm1(beta*jnp.log(jnp.linalg.norm(w, axis=1))))
-            x = mu+scale*w/jnp.exp(logeps/beta)[:, None]
-            lj = lj+d*jnp.log(scale)-(1+d/beta)*logeps
-        else:
-            ell = base[:, -1]+1
-            m = (latitude-ell)/latitude
-            yhat = (base[:, :-1]-(ell/latitude)[:, None]*shift)/m[:, None]
-            v = yhat-shift
-            num = m*jnp.sum(v*v, axis=1)+v@shift+latitude-latitude**2*(1-m)
-            lj = d*p[-1]+jnp.log(num)-d*jnp.log(m)-jnp.log(latitude)
-            x = mu+scale*yhat
+        w, lj = mobius(base, shift, jnp)
+        logeps = jnp.log(-jnp.expm1(beta*jnp.log(jnp.linalg.norm(w, axis=1))))
+        x = mu+scale*w/jnp.exp(logeps/beta)[:, None]
+        lj = lj+d*jnp.log(scale)-(1+d/beta)*logeps
         return -jnp.mean(target.log_prob(x, 'jax')+lj)
 
     value_grad = jax.jit(jax.value_and_grad(objective))
@@ -98,7 +99,7 @@ def fit_map(target, config, family, seed):
     history = []
     for i in range(1, config['optimizer_steps']+1):
         if i > 1 and batch_policy == 'fresh':
-            base = jnp.asarray(uniform_ball(rng, n, d) if family == 'ball' else uniform_cap(rng, n, d, latitude))
+            base = jnp.asarray(uniform_ball(rng, n, d))
         loss, grad = value_grad(p, base)
         loss = float(loss)
         if not np.isfinite(loss) or not np.all(np.isfinite(grad)):
@@ -109,13 +110,11 @@ def fit_map(target, config, family, seed):
         p = p-.01*(m/(1-.9**i))/(jnp.sqrt(v/(1-.999**i))+1e-8)
         history.append(loss)
     mu, shift, scale = unpack(p)
-    cls = BallMap if family == 'ball' else SphereMap
-    kwargs = {'beta': beta, 'delta': np.asarray(shift)} if family == 'ball' else {'observer': np.asarray(shift), 'latitude': latitude}
-    mapping = cls(d, mu=np.asarray(mu), scale=float(scale), **kwargs)
+    mapping = BallMap(d, beta=beta, mu=np.asarray(mu), scale=float(scale), delta=np.asarray(shift))
     return mapping, {'seconds': time.perf_counter()-start, 'steps': config['optimizer_steps'],
                      'training_draws': n, 'seed': seed, 'loss': history,
                      'initial_scale': initial_scale, 'scale_initialization': config.get('map_scale_initialization', 'unit'),
-                     'scale_policy': 'VI-fitted', 'map_policy': map_policy if family == 'ball' else 'sphere-vi',
+                     'scale_policy': 'VI-fitted', 'map_policy': map_policy,
                      'objective': 'reverse KL on independent base draws', 'batch_policy': batch_policy,
                      'total_training_draws': n*max(1, config['optimizer_steps']) if batch_policy == 'fresh' else n,
                      'symmetric_constraints': symmetric}

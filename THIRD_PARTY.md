@@ -27,10 +27,12 @@ these comparisons do not reproduce the SCS paper's figures. JAX is the common
 framework comparison. Optimized Numba DCS versus author JAX SCS is separately
 labelled as an implementation comparison.
 
-The generic experiments also retain independently checked NumPy/Numba SCS
-implementations, derived from the supplied experiments and inspected against
+Every VI-enabled SCS map fit calls the pinned author optimizer, including
+logistic and the ν=0.5 experiment. The generic experiments retain independently
+checked NumPy/Numba SCS production implementations, derived from the supplied experiments and inspected against
 upstream revision `25ea5ee21ae93a1737bbc34bd18a763f191f85de`. They are not
-represented as unmodified author performance implementations. Historical
-results retain the source revisions and tuning recipes that generated them.
+represented as unmodified author performance implementations. Their
+acceptance-target 0.234 step calibration is unchanged. Existing saved results
+retain the source revisions and fitting recipes that generated them.
 
 NumPy, SciPy, JAX, NumPyro, BlackJAX, ArviZ and Matplotlib are installed as dependencies and retain their own licenses. Cite relevant computational libraries when reporting the experiments.

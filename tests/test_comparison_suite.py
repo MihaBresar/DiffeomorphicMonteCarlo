@@ -120,27 +120,27 @@ class ComparisonSuiteTests(unittest.TestCase):
                 self.assertEqual(maps['ball']['beta'], config['beta'])
                 self.assertEqual(maps['sphere']['latitude'], config['latitude'])
 
-    def test_historical_shared_vi_preserves_both_fits(self):
+    def test_old_sphere_policy_still_dispatches_to_author_vi(self):
         config = suite.configuration('paper', comparison='jax', target='skew-t-500d', vi='on')
-        config['sphere_map_policy'] = 'vi'  # Historical v8 fitting remains reproducible.
+        config['sphere_map_policy'] = 'vi'
         calls = []
 
         def fake_fit(target, settings, family, seed):
             calls.append((target, dict(settings), family, seed))
-            mapping = BallMap(target.d, beta=settings['beta']) if family == 'ball' else SphereMap(target.d)
-            return mapping, {'steps': settings['optimizer_steps'], 'training_draws': settings['optimizer_samples']}
+            return BallMap(target.d, beta=settings['beta']), {
+                'steps': settings['optimizer_steps'], 'training_draws': settings['optimizer_samples']}
 
-        with patch.object(runner, 'fit_map', side_effect=fake_fit), redirect_stdout(StringIO()):
+        author_result = (SphereMap(500).parameters(), {'steps': 1000, 'training_draws': 2000, 'seed': 0})
+        with patch.object(runner, 'fit_map', side_effect=fake_fit), \
+                patch('dcs_bench.scs_paper.fit', return_value=author_result) as author, \
+                redirect_stdout(StringIO()):
             maps, metadata = runner.prepare(config)
-        self.assertEqual([call[2] for call in calls], ['ball', 'sphere'])
-        self.assertIs(calls[0][0], calls[1][0])
-        self.assertEqual(calls[0][0].kind, 'skew_t')
+        self.assertEqual([call[2] for call in calls], ['ball'])
         self.assertEqual(calls[0][0].d, 500)
-        self.assertEqual(calls[0][0].nu, 3.)
-        self.assertEqual(calls[0][1], calls[1][1])
-        self.assertEqual([call[3] for call in calls], [42, 42])
+        self.assertEqual(calls[0][3], 42)
+        author.assert_called_once_with({'target': config['target'], **config['scs_vi']})
         self.assertEqual(maps['ball']['beta'], 2.)
-        self.assertEqual([metadata[f]['steps'] for f in ('ball', 'sphere')], [1500, 1500])
+        self.assertEqual([metadata[f]['steps'] for f in ('ball', 'sphere')], [1500, 1000])
         self.assertEqual([metadata[f]['training_draws'] for f in ('ball', 'sphere')], [2000, 2000])
 
     def test_summarize_uses_selected_target_truth_instead_of_old_100d_constants(self):

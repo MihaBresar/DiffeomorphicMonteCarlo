@@ -1,7 +1,7 @@
 """Symmetric 100D Student-t: separate map fitting from proposal-step tuning.
 
-Both untuned maps use R=1 and zero centre/shift. Symmetric VI controls fit R
-only. Every method receives the same independent fixed-grid pilot budget.
+Both untuned maps use R=1 and zero centre/shift. DCS symmetric VI fits R
+only; SCS uses the authors' unconstrained VI. Every method receives the same independent fixed-grid pilot budget.
 Production uses fresh common seeds and the same physical starting point.
 """
 from __future__ import annotations
@@ -68,7 +68,7 @@ def source_hashes():
 
 def group_definitions():
     return [{'group': kind+'-'+algorithm, 'map_kind': kind, 'algorithm': algorithm}
-            for kind in ('untuned', 'vi_scale') for algorithm in ('DCS-BW', 'SCS')]
+            for kind in ('untuned', 'vi_fit') for algorithm in ('DCS-BW', 'SCS')]
 
 
 def case_definitions():
@@ -271,18 +271,18 @@ def paired_contrasts(cases, truth, error_key='squared_errors'):
     pairs = [(f'untuned-DCS-BW-{p}', f'untuned-SCS-{p}')
              for p in ('warmup_frozen', 'pilot_selected')]
     for algorithm in ('DCS-BW', 'SCS'):
-        for kind in ('untuned', 'vi_scale'):
+        for kind in ('untuned', 'vi_fit'):
             pairs.append((f'{kind}-{algorithm}-pilot_selected', f'{kind}-{algorithm}-warmup_frozen'))
         for policy in ('warmup_frozen', 'pilot_selected'):
-            pairs.append((f'vi_scale-{algorithm}-{policy}', f'untuned-{algorithm}-{policy}'))
-    pairs.append(('vi_scale-DCS-BW-pilot_selected', 'vi_scale-SCS-pilot_selected'))
+            pairs.append((f'vi_fit-{algorithm}-{policy}', f'untuned-{algorithm}-{policy}'))
+    pairs.append(('vi_fit-DCS-BW-pilot_selected', 'vi_fit-SCS-pilot_selected'))
     for group in group_definitions():
         for alternative in ('pilot_selected', 'warmup_frozen'):
             pairs.append((group['group']+'-pilot_radial', group['group']+'-'+alternative))
-    for kind in ('untuned', 'vi_scale'):
+    for kind in ('untuned', 'vi_fit'):
         pairs.append((f'{kind}-DCS-BW-pilot_radial', f'{kind}-SCS-pilot_radial'))
     for algorithm in ('DCS-BW', 'SCS'):
-        pairs.append((f'vi_scale-{algorithm}-pilot_radial', f'untuned-{algorithm}-pilot_radial'))
+        pairs.append((f'vi_fit-{algorithm}-pilot_radial', f'untuned-{algorithm}-pilot_radial'))
     count = next(iter(cases.values()))['chains']
     rng = np.random.default_rng(771231)
     indices = rng.integers(0, count, (20000, count))
@@ -315,6 +315,8 @@ def main(argv=None):
         lock.write(str(os.getpid()))
     config = {**PRESETS[args.preset], 'preset': args.preset, 'workers': workers,
               'production_seed_base': PRODUCTION_SEED_BASE}
+    config['scs_vi'] = dict(optimizer_steps=1000 if args.preset == 'paper' else config['optimizer_steps'],
+                            optimizer_samples=config['optimizer_samples'])
     hashes = source_hashes()
     fingerprint = digest({'source': hashes, 'config': config, 'target': TARGET})
     truth = reference()
@@ -333,7 +335,7 @@ def main(argv=None):
         'truth': truth,
         'notes': ['Untuned means R=1 and every centre/shift is zero for BOTH algorithms.',
                   'Every production step is pretuned by warmup or independent pilot chains, then frozen. Fixed grid values are calibration candidates only.',
-                  'Symmetric VI fits only R, followed by fresh proposal-scale tuning.',
+                  'DCS symmetric VI fits only R. SCS uses unchanged author VI, including unconstrained centre and observer; both receive fresh proposal-scale tuning.',
                   'All pilot starts are shared exact Student-t draws; this is an oracle-assisted synthetic diagnostic.',
                   'Production starts at the same physical ones(100), with equal discarded warmup and retained iteration rules.',
                   'Equal numeric h is not equal geometric step: BW uses total ball radius; SCS uses per-coordinate tangent SD.',
@@ -352,19 +354,19 @@ def main(argv=None):
         maps, fit_metadata = {}, {}
         vi_config = load_config('skew-t-100d-fixed', 'paper', {'workers': workers})
         vi_config.update(optimizer_steps=config['optimizer_steps'], optimizer_samples=config['optimizer_samples'],
-                         ball_map_policy='mobius')
+                         ball_map_policy='mobius', scs_vi=config['scs_vi'], sphere_map_policy='author-paper-vi')
         for group in group_definitions():
             family = 'ball' if group['algorithm'] == 'DCS-BW' else 'sphere'
             if group['map_kind'] == 'untuned':
                 mapping = BallMap(100, beta=2.) if family == 'ball' else SphereMap(100, latitude=1.1)
                 metadata = {'steps': 0, 'training_draws': 0, 'policy': 'fully untuned'}
             else:
-                print(f'Fitting symmetric scale only: {group["algorithm"]}', flush=True)
+                print(f'Fitting {"symmetric DCS scale" if family == "ball" else "SCS author VI"}: {group["algorithm"]}', flush=True)
                 mapping, metadata = fit_map(target, vi_config, family, 5600001)
             parameters = mapping.parameters()
             shift = parameters.get('delta', parameters.get('observer'))
-            if np.any(parameters['mu']) or np.any(shift):
-                raise ValueError('Symmetric audit requires exact zero centre and shift')
+            if (group['map_kind'] == 'untuned' or family == 'ball') and (np.any(parameters['mu']) or np.any(shift)):
+                raise ValueError('Untuned and symmetric DCS maps require exact zero centre and shift')
             maps[group['group']], fit_metadata[group['group']] = parameters, metadata
         write_json(root/'maps.json', {'maps': maps, 'fit_metadata': fit_metadata})
         pilot_jobs = []

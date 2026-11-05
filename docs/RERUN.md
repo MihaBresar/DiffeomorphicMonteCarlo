@@ -17,6 +17,24 @@ the final measured iteration count; thinning keeps its original iteration grid.
 For 500,000 iterations, discard 166,667 and use the remaining 333,333 before
 thinning. At thinning 10 this stores 33,334 post-burn-in states.
 
+## SCS fitting update
+
+All VI-enabled SCS fits now use the authors' original routine. The current
+100D/500D comparisons already used it, so their fitting recipe is unchanged.
+For new figures under this update, rerun **Logistic regression: both priors**
+and **50D t: infinite first moment, equal samples** in fresh folders, including
+all their compared methods. Their production kernels and step-tuning rules
+are unchanged; the fitted SCS maps change.
+
+SCS has its own fitting budget: Full paper settings uses 1,000 updates on
+2,000 fixed reference draws, Smaller reproduction uses 400 × 500, and Quick
+check uses 20 × 128. The fit uses author seed 0 and the author's initialization;
+it does not inherit DCS's optimizer budget, radial-median initialization or
+symmetry constraints. Independent logistic reference draws need no new
+sampling solely because the SCS fit changed, provided they remain valid for
+the recorded target and reference protocol. Replotting old chains cannot
+apply the new SCS fit.
+
 ## Current sampler comparisons
 
 Choose **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)** or

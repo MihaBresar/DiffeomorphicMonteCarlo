@@ -54,6 +54,22 @@ def load_config(name, preset='quick', overrides=None):
     if unused:
         raise ValueError(f'Overrides not used by {name}: {unused}')
     config.update({k: v for k, v in (overrides or {}).items() if v is not None})
+    if 'SCS' in config['algorithms']:
+        from .scs_paper import author_vi_budget
+        # SCS has its own author budget; DCS's target-specific VI count must
+        # never silently determine SCS training. Explicit CLI budget overrides
+        # apply to both families, as in the selectable comparison runners.
+        budget = author_vi_budget(config)
+        for field in ('optimizer_steps', 'optimizer_samples'):
+            if overrides.get(field) is not None and overrides.get('scs_vi') is None:
+                budget[field] = overrides[field]
+        config['scs_vi'] = author_vi_budget({'scs_vi': budget})
+        config['sphere_map_policy'] = ('vanilla' if config.get('vi') == 'off'
+                                      or config.get('sphere_map_policy') == 'vanilla'
+                                      else 'author-paper-vi')
+        config['scs_fitting_revision'] = 'author-vi-v1'
+    else:
+        config.pop('scs_vi', None)
     config['ball_map_policy'] = validate_ball_map_policy(config)
     for field in ('runs', 'warmup', 'thin', 'iterations', 'nuts_samples', 'nuts_batch_size', 'reference_samples', 'reference_batch_size', 'optimizer_samples'):
         if config[field] <= 0:
@@ -73,6 +89,8 @@ def write_json(path, value):
 
 def source_hashes():
     paths = list((ROOT/'dcs_bench').glob('*.py'))+list((ROOT/'configs').glob('*.json'))
+    paths += list((ROOT/'third_party/scs_paper').rglob('*.py'))
+    paths += [ROOT/'third_party/scs_paper/manifest.json']
     paths += [ROOT/'run_experiment.py', ROOT/'prepare_reference.py', ROOT/'requirements-cpu.txt', ROOT/'data/posteriordb/manifest.json']
     return {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
 

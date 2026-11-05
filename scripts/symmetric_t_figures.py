@@ -16,7 +16,7 @@ from dcs_bench.display import number, cell, figure_ticks
 FUNCTIONS = ['tail_probability', 'mean_norm', 'radial_95',
              'asinh_x1', 'asinh_x2', 'asinh_x3', 'asinh_x4']
 COLORS = {'DCS-BW': '#7852b4', 'SCS': '#dc367a'}
-MAP_LABELS = {'untuned': 'Untuned map', 'vi_scale': 'VI scale only'}
+MAP_LABELS = {'untuned': 'Untuned map', 'vi_scale': 'VI scale only', 'vi_fit': 'VI map'}
 POLICY_LABELS = {'warmup_frozen': 'step warmup, then frozen',
                  'pilot_selected': 'five-function pilot step',
                  'pilot_radial': 'radial-focused pilot step'}
@@ -116,7 +116,7 @@ def render_report(root, summary):
         for index, value in enumerate(values):
             if value is not None and value > 0:
                 bar = ax.barh(index, value, color=colors[index], height=.7)[0]
-                if cases[names[index]]['map_kind'] == 'vi_scale':
+                if cases[names[index]]['map_kind'] in ('vi_scale', 'vi_fit'):
                     bar.set_hatch('//')
                     bar.set_edgecolor('#ffffff')
                 ax.text(value, index, ' '+number(value, scientific='mse' in metric), va='center', fontsize=8)
@@ -220,7 +220,7 @@ def render_report(root, summary):
             data = sorted([row for row in grid if row['group'] == group], key=lambda row: row['scale'])
             algorithm, map_kind = data[0]['algorithm'], data[0]['map_kind']
             label = MAP_LABELS.get(map_kind, map_kind)+' · '+algorithm
-            style = '--' if map_kind == 'vi_scale' else '-'
+            style = '--' if map_kind in ('vi_scale', 'vi_fit') else '-'
             color = COLORS.get(algorithm, '#596a79')
             for ax, key in zip(axes, keys):
                 values = [row.get(key) for row in data]
@@ -314,8 +314,11 @@ def render_report(root, summary):
     page += '<h1>'+html.escape(title)+'</h1><p>'+html.escape(budget)+'</p>'
     if smoke:
         page += '<p class="warning">QUICK CHECK: these short runs check execution only and cannot support sampler rankings.</p>'
+    fit_note = ('DCS VI fixes its centre and shift to zero and fits R only; SCS uses the authors’ unconstrained VI. '
+                if config.get('scs_vi') else
+                'For this saved symmetric-target protocol, VI fixes centres and shifts to zero and fits R only. ')
     page += ('<p>Both untuned maps use R = 1 and zero centres and shifts. DCS uses β = 2; SCS uses cap latitude 1.1. '
-             'For this symmetric target, VI fixes centres and shifts to zero and fits R only. '
+             + fit_note +
              'Every production step size is pretuned after the map is chosen, using either warmup or independent pilot traces, and then frozen. '
              'Proposal scales mean a whole-ball increment radius for DCS-BW and a per-coordinate tangent standard deviation for SCS; '
              'these are different proposal geometries.</p>')

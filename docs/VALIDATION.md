@@ -2,10 +2,18 @@
 
 ## Current release
 
-The 5 November 2026 public-release review covered the active five-method
-comparison and all six other experiments. **348 local regression tests
-passed** after correcting custom fitting-seed metadata. The review did not
-change sampler, target, transformation, reference or diagnostic implementations.
+The 5 November 2026 update routes every VI-enabled SCS fit through the pinned
+author routine. **360 local regression tests passed** after this change.
+Checks compare logistic and symmetric Student-t fits directly with the author
+optimizer and prevent old configuration labels from selecting another fitter.
+The author source files and all production transition kernels are unchanged.
+
+The existing version-9 100D comparison's ball and sphere maps and complete VI
+loss histories reproduced exactly. Both logistic-prior scenarios and the 50D
+super-heavy-tail experiment completed their Quick runs and reports, covering
+14 production chains. Separate full-author-budget fits (1,000 updates on 2,000
+fixed draws) produced finite maps and losses for all three targets. These
+checks validate fitting and execution; they are not new performance rankings.
 
 The current version-9 comparisons use the SCS authors' VI implementation and
 fixed h=0.1, with an acceptance-tuned sensitivity control. Billiards calibrate

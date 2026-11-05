@@ -15,12 +15,13 @@ Directional checks use the unit skewness direction (e₁ if α=0): `1{uᵀX>0}` 
 The [current comparison suite](COMPARISONS.md) offers the original 100D skewed
 t(3) and a 500D version with the same skew coefficients. Both use DCS β=2. Their
 radial thresholds remain 50 and 50√5. In addition to mean norm and radial tail
-probability, the suite estimates `E[X₁]`, `E[X₂]`, `E[X₃]`, `P(X₁ > 3)`,
-`P(X₂ < −3)` and `P(X₃ > 3)` in physical coordinates.
-The target densities, thresholds for the radial quantities and all-ones
-physical initialization remain unchanged.
+probability, reports include MSE, counts, time and functional ESS. The current
+suite does not estimate coordinate means or tails. The target densities,
+thresholds for the radial quantities and all-ones physical initialization
+remain unchanged.
 
-The original analytic F-law radial references remain exact. X₁ references
+The analytic F-law radial references remain exact. Optional coordinate
+reference utilities support diagnostic and saved-report checks. X₁ references
 are independent estimates with recorded MCSE, using conditional sign
 expectations and fixed known-mean controls. With α=(100,−100,0,…), X₂ has
 the same law as −X₁, so its mean reference is negated and its left-tail
@@ -32,8 +33,9 @@ fixed before benchmarking. Ordinary third-moment skewness is not defined at
 ν=3 and is not an estimand.
 
 The VI switch applies to both map families, and their maps initialize at unit
-scale. Other experiment configurations may use the radial-median initialization
-described below.
+scale. Other DCS experiment configurations may use the radial-median
+initialization described below; author SCS fitting always retains its own
+initialization.
 
 ## Logistic regression
 
@@ -59,10 +61,10 @@ With the supplied fixed initial variance and finite dataset, approaching α₁+�
 
 DCS maps z to `μ + R Tδ(z)/(1-||Tδ(z)||^β)^(1/β)`. The inverse and full Jacobian are in `transforms.py`. For t targets an algebraically equivalent log density cancels large radial factors before evaluation. DCS-BW proposes a uniform displacement in a ball; DCS-RWM uses Gaussian displacements; DCS-HnR performs a slice transition on a random feasible chord. The last is a slice kernel, not an exact independent conditional draw.
 
-SCS uses a spherical-cap projection with latitude 1.1 and the authors' great-circle step-out proposal. Its map and surface Jacobian are independently tested. In the current version-9 comparison, both its production transition and VI routine call the pinned author implementation. SCS VI uses seed 0, one fixed reference cloud, Adam 0.01 and coordinate clipping at ±1,000 inside the fitting objective, including its Jacobian argument; it does not clip gradients. Full SCS fitting uses 1,000 updates and 2,000 reference draws. Production target evaluation is unclipped. SCS defaults to fixed h=0.1, with acceptance-target 0.234 adaptation available as a sensitivity option. See [the current protocol](COMPARISONS.md) and [author-source and calibration details](AUTHOR_SCS_CALIBRATION.md).
+SCS uses a spherical-cap projection with latitude 1.1 and the authors' great-circle step-out proposal. Its map and surface Jacobian are independently tested. Every VI-enabled SCS fit calls the pinned author implementation, including logistic and ν=0.5 targets. SCS VI uses seed 0, one fixed reference cloud, Adam 0.01 and coordinate clipping at ±1,000 inside the fitting objective, including its Jacobian argument; it does not clip gradients. Full SCS fitting uses 1,000 updates and 2,000 reference draws, with separate reduced budgets of 400 × 500 and 20 × 128 for Smaller and Quick presets. Production target evaluation is unclipped. In the version-9 100D/500D comparisons, production also calls the pinned author transition and defaults to fixed h=0.1, with acceptance-target 0.234 adaptation available as a sensitivity option. Generic logistic and ν=0.5 experiments retain their checked Numba SCS production kernel and acceptance-target 0.234 adaptation. See [the current protocol](COMPARISONS.md) and [author-source and calibration details](AUTHOR_SCS_CALIBRATION.md).
 
-DCS retains fresh independent base draws at each reverse-KL update, smooth bounded shift parameters, Adam 0.01 and optimization-only gradient clipping, without clipping target coordinates or CDF arguments. Its full fitting budget is 1,500 updates with 2,000 fresh draws each; the default fit seed is 42. The generic fitting routine also remains in use for the other six experiments and historical shared-VI comparisons. For symmetric t targets that routine fixes location and observer/Möbius shifts at zero and fits only scale. These common-fit settings must not be attributed to the current author SCS VI routine.
+DCS retains fresh independent base draws at each reverse-KL update, smooth bounded shift parameters, Adam 0.01 and optimization-only gradient clipping, without clipping target coordinates or CDF arguments. In the 100D/500D comparison its full fitting budget is 1,500 updates with 2,000 fresh draws each and the default fit seed is 42; other DCS experiments retain their recorded budgets and seeds. For symmetric t targets DCS fixes location and Möbius shift at zero and fits only scale. SCS uses the author's unconstrained centre/observer fit, even for a symmetric target. These are distinct fitting choices, recorded separately.
 
 The default DCS `ball_map_policy=mobius` fits R, centre and Möbius shift, subject to those symmetry constraints. The optional `vanilla` policy skips all map training and initialization, with R=1, centre=0 and Möbius shift=0, while keeping the configured β. In the other six experiments this DCS-only selector leaves SCS fitting unchanged. In the current comparison suite, the VI switch controls both map families; turning it off leaves the separate proposal-step policies unchanged. Billiards use post-Möbius coordinates with the joint fit's centre/R/β and effective δ=0, as detailed in [the construction](BILLIARD.md). The identity maps for Eight Schools and GARCH are unaffected. Fixed R=√d is retained only as a historical plotting label. Sharing the physical target and production budget does not make these fitting and proposal rules identical.
 
-Synthetic t configurations with `map_scale_initialization=radial_median` initialize fitted DCS and SCS scales by matching the median norm of their independent base sample to the known F-law radial median. The current comparison suite instead initializes at unit scale; vanilla DCS skips this initialization. It prevents the small-β fit from exhausting its iterations while moving from R=1 across many log-scale units. It uses the same analytic target-scale information for both projection families; logistic fits start at unit scale.
+Synthetic t configurations with `map_scale_initialization=radial_median` initialize the fitted DCS scale by matching the median norm of its independent base sample to the known F-law radial median. This helps the small-β DCS fit traverse a large change in log scale within its optimization budget. The current 100D/500D comparison instead initializes at unit scale; vanilla DCS skips this initialization. SCS always uses the author's unit-scale initialization and receives no radial-median adjustment. Logistic fits also start at unit scale.

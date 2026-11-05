@@ -104,23 +104,22 @@ class AuthorVIComparisonTests(unittest.TestCase):
             self.assertEqual(fitting[family]['steps'], 0)
             self.assertFalse(fitting[family]['vi_enabled'])
 
-    def test_author_budget_does_not_change_historical_shared_fit_dispatch(self):
-        config = self.configuration()
-        del config['sphere_map_policy']
-
-        def shared_fit(target, settings, family, seed):
-            mapping = BallMap(target.d) if family == 'ball' else SphereMap(target.d)
-            return mapping, {'seconds': 1., 'steps': settings['optimizer_steps']}
-
-        with patch.object(runner, 'fit_map', side_effect=shared_fit) as old_fit, \
-                patch.object(scs_paper, 'fit') as author_fit, redirect_stdout(StringIO()):
-            _, fitting = runner.prepare(config)
-        self.assertEqual([call.args[2] for call in old_fit.call_args_list], ['ball', 'sphere'])
-        self.assertTrue(all(call.args[1] is config for call in old_fit.call_args_list))
-        author_fit.assert_not_called()
-        for details in fitting.values():
-            self.assertEqual(details['steps'], 7)
-            self.assertEqual(details['fitting_policy'], config['fitting_policy'])
+    def test_missing_or_old_policy_cannot_restore_in_house_scs_fit(self):
+        for policy in (None, 'vi', 'sphere-vi'):
+            config = self.configuration()
+            if policy is None:
+                config.pop('sphere_map_policy')
+            else:
+                config['sphere_map_policy'] = policy
+            with self.subTest(policy=policy), \
+                    patch.object(runner, 'fit_map', side_effect=self.ball_fit) as dcs_fit, \
+                    patch.object(scs_paper, 'fit', return_value=self.author_result()) as author_fit, \
+                    redirect_stdout(StringIO()):
+                _, fitting = runner.prepare(config)
+            self.assertEqual([call.args[2] for call in dcs_fit.call_args_list], ['ball'])
+            author_fit.assert_called_once_with({'target': config['target'], **config['scs_vi']})
+            self.assertEqual(fitting['sphere']['seed'], 0)
+            self.assertEqual(fitting['sphere']['map_policy'], 'SCS-paper-VI')
 
     def test_small_real_author_fit_matches_adapter_and_preserves_fit_cost(self):
         config = self.configuration()

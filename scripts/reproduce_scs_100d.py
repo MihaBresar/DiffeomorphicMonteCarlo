@@ -53,8 +53,11 @@ def configuration(preset='quick', workers=1, overrides=None):
                   beta=2., latitude=1.1, threshold=50., seed=901001, seed_batch=0, algorithms=list(METHODS),
                   step_policy='shared_indicator_dual_averaging_0.234_then_frozen', initial_scale=.1,
                   vi_batch_policy='fresh', ball_map_policy='mobius', map_scale_initialization='unit',
-                  fit_seed=42,
-                  fitting_policy='Shared fresh-batch reverse KL, Adam 0.01, gradient-norm cap 10; no coordinate/CDF clipping')
+                  fit_seed=42, sphere_map_policy='author-paper-vi',
+                  scs_fitting_revision='author-vi-v1',
+                  fitting_policy='DCS fresh-batch reverse KL with gradient-norm cap 10; '
+                                 'SCS original author VI, fixed base draws with seed 0, '
+                                 'Adam 0.01, physical-coordinate clip 1000; no gradient clipping')
     supplied = {key: value for key, value in (overrides or {}).items() if value is not None}
     batch = supplied.pop('seed_batch', None)
     if batch is not None:
@@ -86,6 +89,9 @@ def configuration(preset='quick', workers=1, overrides=None):
         raise ValueError('time_budget must be finite and positive')
     if 100 % config['thin']:
         raise ValueError('thin must divide 100 for exact timed burn-in boundaries')
+    config['scs_vi'] = dict(
+        optimizer_steps=supplied.get('optimizer_steps', {'quick': 20, 'reproduce': 400, 'paper': 1000}[preset]),
+        optimizer_samples=supplied.get('optimizer_samples', config['optimizer_samples']))
     hardware = cpu_info()
     validate_workers(config['workers'], hardware)
     config['execution_revision'] = EXECUTION_REVISION
@@ -119,19 +125,10 @@ def source_hashes():
 def prepare(config):
     target = Target(config['target'])
     maps, fitting = {}, {}
-    author_vi = (config.get('vi', 'on') != 'off'
-                 and config.get('sphere_map_policy') == 'author-paper-vi')
+    author_vi = config.get('vi', 'on') != 'off'
     if author_vi:
-        # The historical DCS budget is not the author's SCS budget. Smaller
-        # presets must opt into their reduced author budget explicitly.
-        budget = {'optimizer_steps': 1000, 'optimizer_samples': 2000}
-        supplied = config.get('scs_vi', {})
-        if not isinstance(supplied, dict) or set(supplied) - set(budget):
-            raise ValueError('scs_vi accepts only optimizer_steps and optimizer_samples')
-        budget.update(supplied)
-        for name, value in budget.items():
-            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-                raise ValueError(f'scs_vi.{name} must be a positive integer')
+        from dcs_bench.scs_paper import author_vi_budget
+        budget = author_vi_budget(config)
         author_config = {'target': config['target'], **budget}
     for family in ('ball', 'sphere'):
         if config.get('vi', 'on') == 'off':
@@ -153,11 +150,11 @@ def prepare(config):
                 fitting_policy=('Original SCS author reverse KL, fixed base draws with seed 0, '
                                 'Adam 0.01, physical-coordinate clip 1000; no gradient clipping'))
             continue
-        print(f'Fitting {family} map with the {"DCS" if author_vi else "shared"} VI protocol', flush=True)
+        print(f'Fitting {family} map with the DCS VI protocol', flush=True)
         mapping, metadata = fit_map(target, config, family, config['fit_seed'])
         maps[family] = mapping.parameters()
         policy = (f'DCS {config.get("vi_batch_policy", "fresh")}-batch reverse KL, Adam 0.01, '
-                  'gradient-norm cap 10; no coordinate/CDF clipping') if author_vi else config['fitting_policy']
+                  'gradient-norm cap 10; no coordinate/CDF clipping')
         fitting[family] = dict(metadata, learning_rate=.01, gradient_norm_cap=10.,
             coordinate_clipping=False, cdf_clipping=False,
             fitting_policy=policy)

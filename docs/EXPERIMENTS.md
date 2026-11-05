@@ -12,6 +12,16 @@ their own-kernel radial pilot runs in those coordinates and freezes before
 production. SCS uses the original author VI and fixed h=0.1, with an optional acceptance-tuned control. All methods receive the same discarded warmup-transition count; fitting recipes differ and their costs are recorded. The Numba implementation shares its JAX pilot, then uses fused
 native production. See [billiards](BILLIARD.md) and [ESS](ESS.md).
 
+Every new VI-enabled SCS fit uses the pinned author optimizer, including
+logistic regression, the symmetric 50D ν=0.5 example and diagnostic scripts.
+SCS has a separate `scs_vi` budget: 1,000 updates on 2,000 fixed reference draws
+for paper, 400 × 500 for reproduce, and 20 × 128 for quick. Its fit seed is 0,
+with the author's unit initialization, Adam 0.01 and fitting-only coordinate
+clip of ±1,000. DCS fitting budgets and initialization are unchanged. Generic
+SCS production remains Numba with acceptance-target 0.234 step tuning; the
+100D/500D comparison retains its existing JAX transition and fixed-h=0.1
+default. An explicit VI-off setting still skips fitting.
+
 Historical protocol records retain their original methods and measurements.
 New measurements require fresh runs; old thinned traces cannot recover
 unthinned functional ESS. The other experiment targets and original figures

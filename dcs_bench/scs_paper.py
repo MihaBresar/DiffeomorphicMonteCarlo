@@ -1,4 +1,4 @@
-"""Paper-date SCS code applied to this repository's normal-CDF skew-t target.
+"""Pinned author SCS fitting for all targets and skew-t comparison adapter.
 
 The vendored SCS projection, VI optimizer and transitions are unchanged. This
 adapter removes progress callbacks, bounds memory with short scan blocks, and
@@ -10,6 +10,7 @@ import builtins
 from functools import lru_cache
 import hashlib
 import json
+from numbers import Real
 from pathlib import Path
 import time
 import types
@@ -78,6 +79,19 @@ def target_spec(config):
     return spec
 
 
+def author_vi_budget(config):
+    """Resolve the independent SCS budget, never inheriting DCS fit settings."""
+    budget = {'optimizer_steps': 1000, 'optimizer_samples': 2000}
+    supplied = config.get('scs_vi', {})
+    if not isinstance(supplied, dict) or set(supplied) - set(budget):
+        raise ValueError('scs_vi accepts only optimizer_steps and optimizer_samples')
+    budget.update(supplied)
+    for name, value in budget.items():
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ValueError(f'scs_vi.{name} must be a positive integer')
+    return budget
+
+
 def fit(config):
     """Return ``(mapping_parameters, metadata)`` using the author VI routine.
 
@@ -85,27 +99,32 @@ def fit(config):
     learning rate .01 and fit seed 0. Small presets may override only the first
     two quantities through ``optimizer_samples`` and ``optimizer_steps``.
     """
+    budget = author_vi_budget({'scs_vi': {
+        name: config[name] for name in ('optimizer_steps', 'optimizer_samples') if name in config}})
+    latitude = config.get('latitude', LATITUDE)
+    if (isinstance(latitude, bool) or not isinstance(latitude, Real)
+            or not np.isfinite(latitude) or not 1 <= latitude < 2):
+        raise ValueError('SCS VI latitude must be finite and in [1, 2)')
     started = time.perf_counter()
     import jax
     core = _author()
-    target = Target(target_spec(config))
-    model = core.SCP(target.d, LATITUDE)
-    ntrain = int(config.get('optimizer_samples', 2000))
-    steps = int(config.get('optimizer_steps', 1000))
-    if min(ntrain, steps) < 1:
-        raise ValueError('SCS VI training counts must be positive')
+    # The author's objective accepts any log density. The production adapter's
+    # skew-t-only contract must not restrict fitting for the generic experiments.
+    target = Target(config['target'] if 'target' in config else target_spec(config))
+    model = core.SCP(target.d, float(latitude))
+    ntrain, steps = budget['optimizer_samples'], budget['optimizer_steps']
     params, losses = model.minimize_reverse_kl(
         lambda x: target.log_prob(x, 'jax'), seed=0, ntrain=ntrain,
         learning_rate=.01, max_iter=steps, clip_value=1000.)
     jax.block_until_ready(params)
     observer, centre, radius = model.transform_params(params)
     loss = np.asarray(losses, dtype=float)
-    if not np.all(np.isfinite(loss)):
-        raise FloatingPointError('The original SCS VI optimizer produced a nonfinite loss')
+    if not all(np.all(np.isfinite(value)) for value in (loss, observer, centre, radius)):
+        raise FloatingPointError('The original SCS VI optimizer produced nonfinite output')
     mapping = SphereMap(target.d, mu=np.asarray(centre), scale=float(radius),
-                        observer=np.asarray(observer), latitude=LATITUDE)
+                        observer=np.asarray(observer), latitude=float(latitude))
     elapsed = time.perf_counter() - started
-    return mapping.parameters(), {
+    metadata = {
         'seconds': elapsed, 'steps': steps, 'training_draws': ntrain,
         'total_training_draws': ntrain, 'seed': 0, 'learning_rate': .01,
         'batch_policy': 'fixed', 'initial_scale': 1., 'loss': loss.tolist(),
@@ -114,11 +133,20 @@ def fit(config):
         'vi_coordinate_clip': 1000., 'gradient_clipping': False,
         'source_commit': UPSTREAM_COMMIT,
         'source': 'third_party/scs_paper/src/scp_core.py',
-        'target_skew_cdf': 'normal',
-        'target_note': 'Original DCS target; differs from the SCS paper Student-t-CDF skew target',
+        'source_sha256': {path: details['sha256'] for path, details in verify_vendor()['files'].items()},
+        'target_kind': target.kind,
+        'target_note': 'Author VI applied to the experiment target without changing its density',
         'scale_policy': 'VI-fitted', 'map_policy': 'SCS-paper-VI',
+        'scale_initialization': 'unit', 'symmetric_constraints': False,
+        'vi_enabled': True, 'coordinate_clipping': True, 'cdf_clipping': False,
+        'fitting_policy': ('Original SCS author reverse KL, fixed base draws with seed 0, '
+                          'Adam 0.01, physical-coordinate clip 1000; no gradient clipping'),
         'full_author_vi_budget': ntrain == 2000 and steps == 1000,
     }
+    if target.kind == 'skew_t':
+        metadata.update(target_skew_cdf='normal',
+            target_note='Original DCS target; differs from the SCS paper Student-t-CDF skew target')
+    return mapping.parameters(), metadata
 
 
 def _parameters(model, mapping):

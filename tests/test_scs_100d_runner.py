@@ -77,7 +77,7 @@ class SCS100DRunnerTests(unittest.TestCase):
             with self.subTest(overrides=overrides), self.assertRaises(ValueError):
                 experiment.configuration('quick', workers=1, overrides=overrides)
 
-    def test_both_maps_receive_identical_fitting_resources(self):
+    def test_separate_fitting_resources_use_original_author_scs_budget(self):
         config = experiment.configuration('paper', workers=1)
         calls = []
 
@@ -89,18 +89,22 @@ class SCS100DRunnerTests(unittest.TestCase):
             return Mapping(), {'steps': settings['optimizer_steps'],
                 'training_draws': settings['optimizer_samples'], 'seconds': 1.}
 
-        with patch.object(experiment, 'fit_map', side_effect=fake_fit), redirect_stdout(StringIO()):
+        author_result = ({'family': 'sphere'}, {'steps': 1000, 'training_draws': 2000,
+                         'seed': 0, 'batch_policy': 'fixed', 'seconds': 1.})
+        with patch.object(experiment, 'fit_map', side_effect=fake_fit), \
+                patch('dcs_bench.scs_paper.fit', return_value=author_result) as author, \
+                redirect_stdout(StringIO()):
             maps, fitting = experiment.prepare(config)
-        self.assertEqual([call[2] for call in calls], ['ball', 'sphere'])
-        self.assertIs(calls[0][0], calls[1][0])
-        self.assertEqual(calls[0][1], calls[1][1])
-        self.assertEqual([call[3] for call in calls], [42, 42])
+        self.assertEqual([call[2] for call in calls], ['ball'])
+        self.assertEqual(calls[0][3], 42)
+        author.assert_called_once_with({'target': config['target'],
+                                       'optimizer_steps': 1000, 'optimizer_samples': 2000})
         self.assertEqual(set(maps), {'ball', 'sphere'})
-        for family in maps:
-            self.assertEqual(fitting[family]['steps'], 1500)
-            self.assertEqual(fitting[family]['training_draws'], 2000)
-            self.assertFalse(fitting[family]['coordinate_clipping'])
-            self.assertFalse(fitting[family]['cdf_clipping'])
+        self.assertEqual(fitting['ball']['steps'], 1500)
+        self.assertEqual(fitting['sphere']['steps'], 1000)
+        self.assertFalse(fitting['ball']['coordinate_clipping'])
+        self.assertTrue(fitting['sphere']['coordinate_clipping'])
+        self.assertFalse(fitting['sphere']['cdf_clipping'])
 
     def test_summary_uses_postburn_means_and_variable_actual_iteration_counts(self):
         config = experiment.configuration('quick', workers=1, overrides={'runs': 3, 'time_budget': 1.})

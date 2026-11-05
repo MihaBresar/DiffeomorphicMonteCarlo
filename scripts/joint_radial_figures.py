@@ -370,7 +370,7 @@ def render_report(root, summary):
         _csv(root/name, rows, fallback)
     notes = [
         'Both samplers receive equal pilot grid sizes and sampling-time budgets. The score is the minimum rank-based bulk ESS per second for the bounded tail indicator and log norm. This is a finite-variance radial proxy, not direct optimization of raw-norm MSE.',
-        'Every control receives proposal pretuning at its own R. Symmetric centres and deformations are zero. Skewed centres and deformations are fitted once, then held fixed while R and step size are calibrated.',
+        'Every control receives proposal pretuning at its own R. Each recorded fitted centre and deformation is held fixed while R and step size are calibrated; inspect the fit metadata for symmetry constraints and the SCS fitting recipe.',
         'R and proposal steps remain fixed during held-out production. Production seeds are separate from pilot seeds. The production comparison uses fresh equal-time runs, not rescaling an iteration-budget experiment.',
         'Only valid candidates can contribute to the profile. The profile is a display of declared pilot scores, not a new selection. Boundary and endpoint selections must be interpreted against the complete tested grid.',
         'At ν = 2, the raw norm has infinite variance. Its observed average squared error is descriptive; no ordinary finite-variance norm-MSE confidence interval is claimed.',

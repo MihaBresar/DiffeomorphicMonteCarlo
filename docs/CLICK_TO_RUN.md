@@ -99,6 +99,13 @@ default-selection rule and sensitivity results. All production steps are
 frozen. Billiard trials and scores are saved in `radial_tuning.csv`.
 The first third of production is discarded in every case.
 
+SCS uses its authors' original map-fitting routine in the other experiments
+too, including logistic regression and the 50D infinite-first-moment example.
+Their SCS sampling implementation and acceptance-target 0.234 step tuning
+remain unchanged. Run those experiments again in fresh folders to obtain
+figures with the updated SCS fits. The current 100D/500D comparisons already
+used author fitting. See [the rerun guide](RERUN.md#scs-fitting-update).
+
 ESS is computed after sampling from unthinned scalar histories, including
 rejections. The log reports this stage. FFT work is limited to one chain at a
 time to keep memory bounded; diagnostic time is separate. Temporary unthinned

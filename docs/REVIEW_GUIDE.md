@@ -55,13 +55,18 @@ The helper runs the opposite SCS step policy and validates saved source/configur
 
 ## Other six experiments
 
-The version-9 author-SCS claims above apply to the two selectable 100D/500D
-comparison modes. The other experiment families have their own recorded
-implementation and calibration policies:
+All VI-enabled SCS fits call the pinned author optimizer. Production
+implementations and proposal calibration still differ across experiment
+families:
 
-- Logistic and the ν=0.5 comparison use the independently checked Numba SCS
-  implementation, generic map fitting and acceptance calibration toward 0.234.
-  They do not call the pinned author VI/transition used in version 9.
+- Logistic and the ν=0.5 comparison use author SCS VI, the independently
+  checked Numba SCS production implementation, and acceptance calibration
+  toward 0.234. Their SCS VI budget is recorded separately from DCS: full
+  1,000 updates on 2,000 fixed draws, reduced to 400 × 500 or 20 × 128 in
+  Smaller or Quick presets. These production kernels are not represented as
+  the unchanged author JAX transition. Author VI retains its unit-scale
+  initialization and unconstrained centre/observer fit even on symmetric
+  targets; DCS-specific radial-median and symmetry choices do not alter it.
 - Generic DCS/random-walk/SCS kernels use Numba; NUTS uses BlackJAX or NumPyro.
   Different production block sizes and their actual time overshoot are recorded.
   These are implementation comparisons, not equal-framework measurements.

@@ -12,6 +12,8 @@ from unittest.mock import patch
 import run_experiment
 from scripts.scs_100d_figures import render_report
 from tests.test_radial_ess_comparison import radial_summary
+from tests.test_scs_100d_figures import example_summary
+from tests.test_boundary_v3_reports import boundary_summary
 
 
 def author_vi_summary(backend='jax', vi='on'):
@@ -36,6 +38,47 @@ def author_vi_summary(backend='jax', vi='on'):
 
 
 class AuthorViReportTests(unittest.TestCase):
+    def test_legacy_entry_points_report_recorded_author_fitting_without_changing_step_rules(self):
+        matched = example_summary()
+        matched['config'].update(protocol='timed-matched-dcs-scs-v3', mode='time', time_budget=1.,
+                                 implementation_revision='jax-dcs-exact-ball-v1')
+        for case in matched['cases'].values():
+            for row in case['records']:
+                row.update(discarded_iterations=334, estimation_iterations=666,
+                           retained_draws=67, warmup_iterations=100, target_acceptance=.234)
+                row.pop('checkpoints', None)
+        for historical in (matched, boundary_summary()):
+            data = deepcopy(historical)
+            data['config'].update(sphere_map_policy='author-paper-vi', scs_fitting_revision='author-vi-v1',
+                                  scs_vi={'optimizer_steps': 1000, 'optimizer_samples': 2000})
+            data['fitting']['sphere'].update(seed=0, map_policy='SCS-paper-VI',
+                vi_coordinate_clip=1000., gradient_clipping=False, source_commit='author-revision')
+            before = deepcopy(data)
+            with self.subTest(protocol=data['config']['protocol']), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                render_report(root, data)
+                page = (root/'paper_values.html').read_text(encoding='utf-8')
+                self.assertIn('SCS uses the unmodified authors', page)
+                self.assertIn('one fixed training batch, seed 0', page)
+                self.assertIn('independently recorded budgets', page)
+                self.assertNotIn('same fresh-batch reverse-KL fitting framework', page)
+                self.assertNotIn('Map fitting, recording and time budgets are matched', page)
+                self.assertNotIn('matched map fitting', page)
+                self.assertIn('0.234', page)
+                with (root/'setup_times.csv').open(newline='', encoding='utf-8') as stream:
+                    setup = {row['map']: row for row in csv.DictReader(stream)}
+                self.assertEqual(setup['sphere']['seed'], '0')
+                self.assertEqual(setup['sphere']['source_commit'], 'author-revision')
+                self.assertEqual(setup['sphere']['training_batch_policy'], 'fixed')
+                self.assertEqual(int(setup['sphere']['total_training_draws']), 2000)
+                self.assertEqual(int(setup['ball']['total_training_draws']), 2002000)
+                self.assertEqual(data, before)
+        with tempfile.TemporaryDirectory() as directory:
+            render_report(Path(directory), matched)
+            page = (Path(directory)/'paper_values.html').read_text(encoding='utf-8')
+            self.assertIn('same fresh-batch reverse-KL fitting framework', page)
+            self.assertNotIn('SCS uses the unmodified authors', page)
+
     def test_scs_acceptance_and_billiard_radial_pilots_are_reported_separately(self):
         for backend, vi in (('jax', 'on'), ('numba', 'off')):
             data = author_vi_summary(backend, vi)

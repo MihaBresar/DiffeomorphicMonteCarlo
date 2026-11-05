@@ -58,5 +58,10 @@
   "figure": "QQ-regresssion",
   "experiment": "logistic-regression",
   "preset": "paper",
-  "map_scale_initialization": "unit"
+  "map_scale_initialization": "unit",
+  "sphere_map_policy": "author-paper-vi",
+  "scs_vi": {
+    "optimizer_steps": 1000,
+    "optimizer_samples": 2000
+  }
 }

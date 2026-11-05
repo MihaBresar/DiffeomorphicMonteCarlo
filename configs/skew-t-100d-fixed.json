@@ -54,5 +54,10 @@
   "preset": "paper",
   "map_scale_initialization": "radial_median",
   "entrypoint": "scripts/reproduce_scs_100d.py",
-  "configuration_note": "CLI and launcher use the dedicated timed-matched-dcs-scs-v3 protocol and presets, with shared VI, step calibration and CPU implementation. Remaining fields preserve the previous engine configuration for archived audits."
+  "configuration_note": "CLI and launcher use the dedicated timed-matched-dcs-scs-v3 protocol and presets, with shared VI, step calibration and CPU implementation. Remaining fields preserve the previous engine configuration for archived audits.",
+  "sphere_map_policy": "author-paper-vi",
+  "scs_vi": {
+    "optimizer_steps": 1000,
+    "optimizer_samples": 2000
+  }
 }

@@ -30,6 +30,12 @@ configuration and saved results used to produce them.
   baseline has a fixed step; other proposal-calibration policies are recorded
   per method. Fitting recipes and initialization differ across experiment
   families and must be read from their resolved configuration.
+- All VI-enabled SCS fits call the pinned authors' optimizer, including
+  logistic and the ν=0.5 experiment. SCS uses its own fixed-cloud budget,
+  seed 0 and unit initialization; DCS fitting is unchanged. Generic SCS
+  production remains the checked Numba implementation with acceptance-target
+  0.234 step tuning, while the 100D/500D comparison retains author JAX
+  production and the fixed-h=0.1 default.
 - NUTS comparison settings include target acceptance 0.8 and maximum depth 10.
   Reference chains have separate settings. Timing distinguishes preparation,
   production, diagnostics and total elapsed execution. Parallel timing is

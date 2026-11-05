@@ -2,6 +2,9 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
+from unittest.mock import patch
 import numpy as np
 from scripts import audit_symmetric_t as audit
 from dcs_bench.samplers import MetropolisKernel, run_numpy_metropolis
@@ -10,6 +13,37 @@ from dcs_bench.targets import Target
 
 
 class SymmetricAuditTests(unittest.TestCase):
+    def test_scs_author_fit_is_unconstrained_and_uses_reduced_quick_budget(self):
+        class MapsCaptured(Exception):
+            pass
+
+        captured = {}
+
+        def fit(target, config, family, seed):
+            self.assertEqual(config['scs_vi'], {'optimizer_steps': 20, 'optimizer_samples': 128})
+            mapping = (BallMap(target.d, scale=1.4) if family == 'ball' else
+                       SphereMap(target.d, scale=1.2, mu=np.full(target.d, .01),
+                                 observer=np.full(target.d, .001)))
+            return mapping, {'seconds': 0., 'seed': seed if family == 'ball' else 0}
+
+        def save(path, payload):
+            if path.name == 'maps.json':
+                captured.update(payload)
+                raise MapsCaptured
+
+        with tempfile.TemporaryDirectory() as directory, redirect_stdout(StringIO()), \
+                patch.object(audit, 'environment', return_value={}), \
+                patch.object(audit, 'source_hashes', return_value={}), \
+                patch.object(audit, 'fit_map', side_effect=fit), \
+                patch.object(audit, 'write_json', side_effect=save):
+            with self.assertRaises(MapsCaptured):
+                audit.main(['--preset', 'quick', '--workers', '1', '--output-dir', directory])
+        self.assertTrue(np.any(captured['maps']['vi_fit-SCS']['mu']))
+        self.assertTrue(np.any(captured['maps']['vi_fit-SCS']['observer']))
+        self.assertFalse(np.any(captured['maps']['vi_fit-DCS-BW']['mu']))
+        for method in ('DCS-BW', 'SCS'):
+            self.assertFalse(np.any(captured['maps']['untuned-'+method]['mu']))
+
     def job(self, output, algorithm, policy):
         mapping = BallMap(100) if algorithm == 'DCS-BW' else SphereMap(100)
         return {'case': 'untuned-'+algorithm+'-'+policy, 'algorithm': algorithm,

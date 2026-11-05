@@ -358,6 +358,8 @@ def main(argv=None):
     workers = args.workers or min(hardware['capacity'], PRESETS[args.preset]['runs'])
     validate_workers(workers, hardware)
     config = {**PRESETS[args.preset], 'preset': args.preset, 'workers': workers}
+    config['scs_vi'] = dict(optimizer_steps=1000 if args.preset == 'paper' else config['optimizer_steps'],
+                            optimizer_samples=config['optimizer_samples'])
     root = args.output_dir.resolve()
     if root.exists() and (not root.is_dir() or any(root.iterdir())):
         raise FileExistsError(f'Use a fresh output directory: {root}')
@@ -368,6 +370,7 @@ def main(argv=None):
     notes = [
         'Fresh actual equal production wall time, not retrospective MSE rescaling from fixed-iteration runs.',
         'Four map groups each have frozen and adaptive production cases. All eight start from independently pretuned proposal sizes; map fitting precedes proposal pilots and maps remain fixed.',
+        'SCS uses the original author VI with seed 0 and fixed reference draws. DCS retains its own VI; separate fitting budgets and costs are recorded.',
         'The adaptive arms apply the historical DCS smoothed dual-averaging update to BOTH methods, target acceptance 0.234, starting at the pilot-selected step and continuing through discarded warmup and timed production. Update cost is included in the time budget.',
         'The same seed pairs frozen/adaptive cases, but their warmup paths can differ because adaptation begins during warmup. This comparison evaluates the complete adaptation policy, not production adaptation in isolation.',
         'Adaptive transitions depend on sampling history; fixed-kernel convergence results do not automatically justify this empirical adaptive comparison. Initial/final scales and ceiling fractions are recorded.',
@@ -387,7 +390,7 @@ def main(argv=None):
         beta=2., latitude=1.1, threshold=50., cases=case_definitions(), grids=GRIDS,
         selection_functions=PILOT_FUNCTIONS, source_hashes=hashes, fingerprint=fingerprint,
         environment=environment(), hardware=hardware, truth=truth, production_schedule=schedule,
-        map_seed=6100001, pilot_initial_seed=6200001,
+        map_seeds={'DCS-BW': 6100001, 'SCS': 0}, pilot_initial_seed=6200001,
         pilot_seed_rule='6210001 + case_index*10000 + candidate_index*100 + chain',
         production_seeds=list(range(6300001, 6300001+config['runs'])), notes=notes, status='fitting')
     write_json(root/'protocol.json', protocol)
@@ -396,7 +399,8 @@ def main(argv=None):
         target = Target(TARGET)
         vi_config = load_config('skew-t-100d-fixed', 'paper', {'workers': workers})
         vi_config.update(optimizer_steps=config['optimizer_steps'], optimizer_samples=config['optimizer_samples'],
-                         ball_map_policy='mobius', beta=2., targets=[TARGET])
+                         ball_map_policy='mobius', beta=2., targets=[TARGET],
+                         scs_vi=config['scs_vi'], sphere_map_policy='author-paper-vi')
         maps, fit_metadata = {}, {}
         for case in map_definitions():
             family = 'ball' if case['algorithm'] == 'DCS-BW' else 'sphere'

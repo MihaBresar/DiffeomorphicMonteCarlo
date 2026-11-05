@@ -157,6 +157,9 @@ def render_report(root, summary):
     own_kernel = config.get('protocol') in ('timed-sampler-comparison-v8', 'timed-numba-comparison-v8',
                                       'timed-sampler-comparison-v9', 'timed-numba-comparison-v9')
     author_vi_protocol = config.get('protocol') in ('timed-sampler-comparison-v9', 'timed-numba-comparison-v9')
+    author_fitting = (author_vi_protocol or config.get('sphere_map_policy') == 'author-paper-vi'
+                      or config.get('scs_fitting_revision') == 'author-vi-v1'
+                      or summary.get('fitting', {}).get('sphere', {}).get('map_policy') == 'SCS-paper-VI')
     tuning_policies = config.get('step_tuning_policies', {}) if own_kernel else {}
     scs_fixed = tuning_policies.get('SCS') == 'author_scs_fixed_01'
     matched_step_control = bool(config.get('calibration_control_provenance', {}).get('maps_reused_without_refitting'))
@@ -279,6 +282,10 @@ def render_report(root, summary):
         tuning_note = ('VI '+str(vi_mode)+'. SCS uses author fixed h=0.1; '+
                        ('DCS proposal scales are pretuned. ' if any(name != 'SCS' for name in names) else '')+
                        'Equal discarded warmup; production steps stay fixed.')
+    if author_fitting and not author_vi_protocol:
+        tuning_note = tuning_note.replace('matched map fitting and step tuning', 'method-specific map fitting and step tuning')
+        tuning_note += (' SCS uses the original author VI routine.' if vi_mode == 'on'
+                        else ' Both maps are untuned; VI is disabled.')
     x = np.arange(1, len(names)+1)
     colors = [COLORS[name] for name in names]
     figure_names = []
@@ -738,7 +745,7 @@ def render_report(root, summary):
                            'samples_per_step': fitting.get('samples_per_step'),
                            'total_training_draws': total_draws, 'training_count_source': count_source,
                            'training_batch_policy': fitting.get('training_batch_policy', fitting.get('batch_policy'))})
-        if author_vi_protocol:
+        if author_fitting:
             setup_rows[-1].update(map_policy=fitting.get('map_policy'), seed=fitting.get('seed'),
                 learning_rate=fitting.get('learning_rate'), objective=fitting.get('objective'),
                 vi_coordinate_clip=fitting.get('vi_coordinate_clip'),
@@ -1007,6 +1014,22 @@ def render_report(root, summary):
                              'shared. Finite-chain estimates need not obey the symmetry. X₃ has an ordinary '
                              'univariate Student-t marginal, so its mean zero and tail reference are analytic '
                              'and marked exact. These relations do not assert independence of coordinates.')
+    if author_fitting and not author_vi_protocol:
+        if vi_mode == 'on':
+            dcs_fit_seed = summary.get('fitting', {}).get('ball', {}).get('seed', config.get('fit_seed', 42))
+            notes[2] = ('SCS uses the unmodified authors’ VI routine: one fixed training batch, seed 0, '
+                        'Adam at 0.01 and physical-coordinate clipping at 1000 within the VI objective, '
+                        'without gradient clipping. DCS retains its own VI with recorded fit seed '
+                        +str(dcs_fit_seed)+'. These are distinct fitting protocols with independently '
+                        'recorded budgets and fitting costs. The production target is not clipped. '
+                        'DCS methods share the fitted ball map; SCS uses the author-fitted sphere map.')
+        else:
+            notes[2] = ('VI is disabled for both map families: unit scale, zero centre and zero deformation. '
+                        'No fitting draws or optimization are used; the recorded proposal-step policy is unchanged.')
+        notes = [note.replace('common benchmark fitting and tuning protocol',
+                              'recorded author fitting and benchmark tuning protocol')
+                      .replace('shared fitting and tuning budgets', 'separately recorded fitting and tuning budgets')
+                 for note in notes]
     if radial_ess:
         notes.append('Functional ESS is computed for the unthinned post-burn-in radial-tail indicator and norm, '
                      'including repeated states after rejection. It uses raw mean ESS with split-chain '

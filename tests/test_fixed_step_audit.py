@@ -19,6 +19,28 @@ from dcs_bench.transforms import BallMap, SphereMap
 
 
 class FixedStepAuditTests(unittest.TestCase):
+    def test_every_scs_control_uses_author_fit_and_never_legacy_scs_optimizer(self):
+        config = audit.audit_config('quick', 1)
+        legacy = {
+            'optimize_prwm_hyperparameters': lambda: (np.zeros(100), np.zeros(100), 1.),
+            'optimize_scs_hyperparameters': lambda: self.fail('Legacy SCS fitting must not run'),
+        }
+
+        def fit(target, settings, family, seed):
+            if family == 'sphere':
+                self.assertEqual(settings['scs_vi'], {'optimizer_steps': 20, 'optimizer_samples': 128})
+                return SphereMap(100, scale=1.7), {'seconds': 0., 'seed': 0, 'map_policy': 'SCS-paper-VI'}
+            return BallMap(100), {'seconds': 0., 'seed': seed}
+
+        with tempfile.TemporaryDirectory() as directory, redirect_stdout(io.StringIO()), \
+                patch.object(audit, 'load_legacy', return_value=legacy), \
+                patch.object(audit, 'fit_map', side_effect=fit) as fitting:
+            result = audit.prepare(Path(directory), config, 'test')
+        self.assertEqual([call.args[2] for call in fitting.call_args_list], ['sphere', 'ball', 'sphere'])
+        self.assertEqual(result['maps']['original']['sphere'], result['maps']['current']['sphere'])
+        for source in ('original', 'current'):
+            self.assertEqual(result['fit_metadata'][source]['sphere']['map_policy'], 'SCS-paper-VI')
+
     def test_main_prints_original_vi_banner_with_cp1252_redirected_streams(self):
         class StopBeforeOptimization(Exception):
             pass

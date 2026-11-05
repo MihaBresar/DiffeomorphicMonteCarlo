@@ -49,5 +49,10 @@
   "figure": "SuperInfiniteFirstTest",
   "experiment": "skew-t-50d-nu-0.5",
   "preset": "paper",
-  "map_scale_initialization": "radial_median"
+  "map_scale_initialization": "radial_median",
+  "sphere_map_policy": "author-paper-vi",
+  "scs_vi": {
+    "optimizer_steps": 1000,
+    "optimizer_samples": 2000
+  }
 }

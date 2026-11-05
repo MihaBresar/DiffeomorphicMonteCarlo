@@ -74,6 +74,9 @@ def audit_config(preset, workers, production_seed_base=DEFAULT_PRODUCTION_SEED_B
     config['targets'] = [{'kind': 'skew_t', 'dimension': 100, 'nu': 3,
                           'alpha': {'0': 100., '1': -100.}}]
     config.update(beta=2., latitude=1.1, threshold=50.)
+    config['scs_vi'] = dict(optimizer_steps=1000 if preset == 'paper' else config['optimizer_steps'],
+                            optimizer_samples=config['optimizer_samples'])
+    config['sphere_map_policy'] = 'author-paper-vi'
     production_seeds(config)
     return config
 
@@ -106,15 +109,13 @@ def prepare(root, config, fingerprint):
         for family in ('ball', 'sphere'):
             print(f'Fitting {source} {family} map', flush=True)
             started = time.perf_counter()
-            if source == 'current':
+            if family == 'sphere' or source == 'current':
                 mapping, metadata = fit_map(target, config, family, 20260911+811)
+                if family == 'sphere':
+                    metadata = dict(metadata, audit_fit_note='Original author SCS VI in both DCS fitting-control groups')
             else:
-                if family == 'ball':
-                    mu, delta, scale = old['optimize_prwm_hyperparameters']()
-                    mapping = BallMap(100, beta=2., mu=mu, delta=delta, scale=scale)
-                else:
-                    mu, observer, scale, latitude = old['optimize_scs_hyperparameters']()
-                    mapping = SphereMap(100, mu=mu, observer=observer, scale=scale, latitude=latitude)
+                mu, delta, scale = old['optimize_prwm_hyperparameters']()
+                mapping = BallMap(100, beta=2., mu=mu, delta=delta, scale=scale)
                 metadata = {'seed': 42, 'steps': config['optimizer_steps']+1,
                             'training_draws': config['optimizer_samples'],
                             'total_training_draws': (config['optimizer_steps']+1)*config['optimizer_samples'],
@@ -278,7 +279,8 @@ def summarize(root):
             'numerical_errors': errors, 'method': 'Analytic radial Student-t expectations'},
         'config': config, 'cases': {}, 'pilot_selection': fits.get('pilot_selection'),
         'scope': 'Common nu=3 target, physical initial state ones, equal warmup and production iterations, '
-                 'paired seeds, current exact transition evaluators; fitting/tuning ablation, not archived PNG reproduction.',
+                 'paired seeds, current exact transition evaluators; fitting/tuning ablation, not archived PNG reproduction. '
+                 'The original/current source labels distinguish DCS fits; both corresponding SCS control groups use the same author fitting routine.',
         'time_scope': TIME_SCOPE, 'preset_warning': 'Quick is a pipeline check only.' if config['preset'] == 'quick' else None}
     for case in case_definitions():
         records, arrays = [], []
@@ -372,12 +374,13 @@ def main(argv=None):
         'cases': case_definitions(), 'production_seed_base': config['production_seed_base'],
         'chain_seeds': production_seeds(config),
         'initial_physical_state': 'ones(100), current exact inverse for all cases',
-        'common_transition_evaluator': 'Current MetropolisKernel; historical VI and adaptation policies are isolated factors.',
+        'common_transition_evaluator': 'Current MetropolisKernel; historical DCS VI and adaptation policies are isolated factors. All SCS fits use author VI.',
         'historical_source': {'path': 'validation/legacy_fixed_step.py',
             'sha256': hashlib.sha256(LEGACY.read_bytes()).hexdigest(),
-            'use': 'Historical input only, not a current sampler; only its named VI functions execute.'},
-        'fit_note': 'Original VI includes CDF-argument clipping, tanh shift, unit initialization and steps+1 updates; '
-                    'current VI uses unclipped target density, gradient-norm clipping, radial-median initialization and steps updates.',
+            'use': 'Historical input only, not a current sampler; only its DCS VI function executes.'},
+        'fit_note': 'Original DCS VI includes CDF-argument clipping, tanh shift, unit initialization and steps+1 updates; '
+                    'current DCS VI uses unclipped target density, gradient-norm clipping, radial-median initialization and steps updates. '
+                    'SCS uses the unchanged author VI routine in both groups, with its separately recorded budget and seed 0.',
         'timing_scope': TIME_SCOPE, 'workers': workers, 'hardware': hardware,
         'threads_per_worker': 1, 'schedule': 'Spawned process pool, mixed diagnostic cases',
         'status': 'fitting'}

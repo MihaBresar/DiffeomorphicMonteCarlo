@@ -46,7 +46,9 @@ class JointRadialCliTests(unittest.TestCase):
                     patch.object(audit, 'run_waves') as sampling:
                 with self.assertRaises(SetupCaptured):
                     audit.main(['--preset', preset, '--workers', '1', '--output-dir', temporary])
-                self.assertEqual(captured['config'], {**original[preset], 'preset': preset, 'workers': 1})
+                self.assertEqual(captured['config'], {**original[preset], 'preset': preset, 'workers': 1,
+                    'scs_vi': {'optimizer_steps': 1000 if preset == 'paper' else original[preset]['optimizer_steps'],
+                               'optimizer_samples': original[preset]['optimizer_samples']}})
                 fit.assert_not_called()
                 sampling.assert_not_called()
         self.assertEqual(audit.PRESETS, original)
@@ -56,6 +58,7 @@ class JointRadialCliTests(unittest.TestCase):
         saved = {}
 
         def fake_fit(target, config, family, seed):
+            self.assertEqual(config['scs_vi'], {'optimizer_steps': 20, 'optimizer_samples': 128})
             cls = BallMap if family == 'ball' else SphereMap
             return cls(target.d, scale=1.463), {'seconds': 0.}
 
@@ -75,7 +78,8 @@ class JointRadialCliTests(unittest.TestCase):
                             '--output-dir', temporary])
             sampling.assert_not_called()
 
-        expected_config = {**original['quick'], 'preset': 'quick', 'workers': 1, 'pilot_seconds': 1.}
+        expected_config = {**original['quick'], 'preset': 'quick', 'workers': 1, 'pilot_seconds': 1.,
+                           'scs_vi': {'optimizer_steps': 20, 'optimizer_samples': 128}}
         self.assertEqual(saved['protocol.json']['config'], expected_config)
         jobs = saved['pilot_jobs.json']
         self.assertEqual({job['target_id'] for job in jobs}, set(audit.TARGETS))

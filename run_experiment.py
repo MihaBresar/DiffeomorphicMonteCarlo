@@ -138,7 +138,7 @@ def main(argv=None):
             if value is not None:
                 command += ['--'+name.replace('_', '-'), str(value)]
         if args.ball_map_policy == 'vanilla' or args.ball_scale_policy is not None or args.iterations is not None:
-            p.error('This comparison uses matched map fitting and equal sampling time; map variants and fixed iteration counts are not supported.')
+            p.error('This comparison uses fitted maps and equal sampling time; map variants and fixed iteration counts are not supported.')
         unused = [name for name in ('nuts_samples', 'nuts_max_depth', 'nuts_batch_size', 'nuts_target_accept',
                                      'reference_samples', 'reference_batch_size') if getattr(args, name) is not None]
         if unused:

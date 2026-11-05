@@ -109,6 +109,8 @@ Displayed estimates use two decimals or scientific notation, while integer sampl
 
 The repository also includes 200D skew-t comparisons with NUTS and random-walk baselines, a fixed-iteration 50D t(0.5) experiment, logistic regression, Eight Schools and GARCH. Only the two posterior examples use PosteriorDB. Empirical targets need not satisfy the manuscript's sufficient theorem assumptions. See [target definitions](docs/TARGETS.md) and the [figure-by-figure rerun guide](docs/RERUN.md).
 
+Every VI-enabled SCS fit uses the same pinned author routine, including logistic regression and the 50D t(0.5) experiment. Their SCS production kernels remain the checked Numba implementation with acceptance-target 0.234 step tuning. SCS fitting has its own recorded budget: 1,000 updates on 2,000 fixed draws for Full paper settings, 400 on 500 for Smaller reproduction, and 20 on 128 for Quick check. DCS fitting is unchanged. Rerun logistic and the 50D t(0.5) comparison together with their DCS controls to obtain results under this fitting policy; the current 100D/500D comparisons already used author VI.
+
 The all-experiments runner includes the JAX 100D comparison and those six experiments; it does not expand every target/VI/backend combination. The [manuscript relationship](docs/MANUSCRIPT_CHANGES.md) explains the corrections and scope of current experiments. The current billiard variant is distinct from the original paper's BW sampler. New results cannot retrospectively validate the original figures.
 
 ## Citation, attribution and contributions

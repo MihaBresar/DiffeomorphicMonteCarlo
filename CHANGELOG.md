@@ -1,5 +1,12 @@
 # Changes
 
+## 2026-11-05 — original SCS fitting throughout the repository
+
+- Route every VI-enabled SCS fit through the pinned author's unchanged routine, including the generic experiments and audit entry points. Remove the in-house sphere optimizer and its fallback paths. Explicit VI-off maps remain untuned.
+- Record SCS's separate fitting budget: 1,000 updates on 2,000 fixed draws for full runs, with reduced Quick/Smaller budgets. Preserve author seed 0, unit initialization, Adam 0.01 and fitting-only coordinate clipping. Include the executed author files in generic run fingerprints.
+- The main version-9 100D/500D comparisons already used this routine. Their fitted maps and loss histories reproduce exactly; DCS fitting, production proposals and step rules are unchanged.
+- Rerun the logistic and 50D super-heavy-tail comparisons for results using the revised fitting policy. Saved results retain their original provenance.
+
 ## 2026-11-05 — author SCS fitting and step-size sensitivity, version 9
 
 - Use the pinned authors' unchanged VI routine for SCS with a fixed reference cloud, seed 0, coordinate clipping in the fitting objective, and their full 1,000-update/2,000-draw budget. Preserve DCS fitting and all production kernels.

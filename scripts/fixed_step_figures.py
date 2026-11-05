@@ -7,11 +7,13 @@ import numpy as np
 from dcs_bench.display import number, cell, figure_ticks
 
 
-def case_label(name):
+def case_label(name, author_scs=False):
     source, rest = name.split('-', 1)
     algorithm = 'DCS-BW' if rest.startswith('DCS-BW-') else 'SCS'
     policy = rest[len(algorithm)+1:]
     fit = {'current': 'Current fit', 'original': 'Original fit', 'vanilla': 'Vanilla'}[source]
+    if algorithm == 'SCS' and author_scs:
+        fit = 'Author SCS fit'
     tuning = {'raw_frozen': 'warmup, frozen', 'smoothed_frozen': 'smoothed warmup, frozen',
               'smoothed_continuing': 'continued adaptation', 'fixed_0.1': 'fixed h = 0.1',
               'fixed_pilot': 'independent pilot'}[policy]
@@ -43,7 +45,7 @@ def render_report(root, summary):
     for i, ax in enumerate(axes):
         values = [cases[name]['mse'][i] for name in selected]
         bars = ax.bar(range(len(selected)), values, color=[color(name) for name in selected])
-        ax.set_xticks(range(len(selected)), [case_label(name) for name in selected], fontsize=8)
+        ax.set_xticks(range(len(selected)), [case_label(name, bool(config.get('scs_vi'))) for name in selected], fontsize=8)
         ax.set_title(['Tail-probability MSE', 'Mean-norm MSE'][i]); ax.set_ylabel('MSE')
         ax.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
         ax.bar_label(bars, labels=[number(value, scientific=True) for value in values], fontsize=8, padding=5, rotation=8)
@@ -55,7 +57,7 @@ def render_report(root, summary):
     for i, ax in enumerate(axes):
         values = [cases[name]['mse'][i] for name in names]
         bars = ax.barh(range(len(names)), values, color=[color(name) for name in names])
-        ax.set_yticks(range(len(names)), [case_label(name) for name in names], fontsize=8)
+        ax.set_yticks(range(len(names)), [case_label(name, bool(config.get('scs_vi'))) for name in names], fontsize=8)
         ax.invert_yaxis(); ax.set_xscale('log'); ax.set_title(['Tail-probability MSE', 'Mean-norm MSE'][i])
         for bar, value in zip(bars, values):
             ax.text(value, bar.get_y()+bar.get_height()/2, ' '+number(value, scientific=True), va='center', fontsize=7)
