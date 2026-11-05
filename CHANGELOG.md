@@ -1,5 +1,11 @@
 # Changes
 
+## 2026-11-05 — identity-map optimization and explicit fixed SCS control
+
+- Remove identity Möbius calculations from the JAX ball transform when the supplied deformation is exactly zero. Keep the complete nonzero-deformation path, radial map and Jacobian, proposal draws, domain checks and all-state recording. This also applies to billiards in their existing post-Möbius coordinates; it does not alter fitted maps or coordinate policies.
+- Add the low-level `fixed_scs_move_v1` policy with a positive finite `scs_fixed_move`. It runs the unchanged author SCS transition at the supplied scale throughout discarded warmup and production, without adaptation. Keep the public author `h=0.1` default and its original execution path unchanged.
+- Validate analytic densities/Jacobians, near-boundary behavior, original-author parity and fixed-step provenance. A serial paired throughput check found no universal speed gain; fresh complete comparison runs are required to assess timed performance on a given computer.
+
 ## 2026-11-05 — shared fixed DCS moves, version 11
 
 - Share h=0.07 across all four DCS variants: BW, reflected BW and billiard use that uniform-ball increment radius; Gaussian RWM uses coordinate standard deviation h/√(d+2). Every variant runs its own kernel during discarded warmup without separate step optimization.

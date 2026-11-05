@@ -27,6 +27,7 @@ PREFIX_STRIDE = 100
 STEP_POLICY = 'common raw dual averaging of observed acceptance to 0.234 during separate warmup; smoothed final scale frozen'
 ACCEPTANCE_TUNING = 'indicator_dual_averaging_0234'
 SCS_FIXED_TUNING = 'author_scs_fixed_01'
+FIXED_SCS_TUNING = 'fixed_scs_move_v1'
 FIXED_DCS_TUNING = 'fixed_dcs_move_v1'
 BALL_TUNING = 'ball_esjd_pilot_v1'
 RADIAL_TUNING = 'own_kernel_radial_pilot_v1'
@@ -65,12 +66,14 @@ def resolve_step_tuning(config):
     for method, policy in policies.items():
         if method not in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, RWM_ROTATION_METHOD, BILLIARD_METHOD, 'SCS'):
             raise ValueError(f'Unknown tuning method: {method}')
-        if policy not in (ACCEPTANCE_TUNING, SCS_FIXED_TUNING, FIXED_DCS_TUNING, BALL_TUNING, RADIAL_TUNING, ROTATION_TUNING):
+        if policy not in (ACCEPTANCE_TUNING, SCS_FIXED_TUNING, FIXED_SCS_TUNING, FIXED_DCS_TUNING, BALL_TUNING, RADIAL_TUNING, ROTATION_TUNING):
             raise ValueError(f'Unknown step tuning policy: {policy}')
         if policy == FIXED_DCS_TUNING and method not in FIXED_DCS_METHODS:
             raise ValueError('Fixed DCS moves are defined for RWM, BW, reflected BW and billiards only')
         if policy == SCS_FIXED_TUNING and method != 'SCS':
             raise ValueError('The author fixed h=0.1 control is defined for SCS only')
+        if policy == FIXED_SCS_TUNING and method != 'SCS':
+            raise ValueError('Supplied fixed SCS moves are defined for SCS only')
         if policy == BALL_TUNING and method not in ('DCS-BW-reflect', BILLIARD_METHOD):
             raise ValueError('Ball ESJD calibration is defined for reflected BW and billiards only')
         if policy == RADIAL_TUNING and method not in (BILLIARD_METHOD, 'SCS'):
@@ -84,6 +87,10 @@ def resolve_step_tuning(config):
                             BALL_TUNING if config['algorithm'] == BILLIARD_METHOD else ACCEPTANCE_TUNING)
     if selected == SCS_FIXED_TUNING and config.get('initial_scale', .1) != .1:
         raise ValueError('The author fixed-step control requires initial_scale=0.1')
+    if selected == FIXED_SCS_TUNING:
+        _fixed_scs_move(config)
+        if isinstance(config['warmup'], bool) or not isinstance(config['warmup'], int) or config['warmup'] < 1:
+            raise ValueError('Fixed SCS moves require a positive integer discarded warmup')
     if selected == FIXED_DCS_TUNING:
         _fixed_dcs_move(config)
         if isinstance(config['warmup'], bool) or not isinstance(config['warmup'], int) or config['warmup'] < 1:
@@ -104,6 +111,16 @@ def resolve_step_tuning(config):
     return selected
 
 
+def _fixed_scs_move(config):
+    """Validate an explicitly supplied author-kernel tangent proposal scale."""
+    if config['algorithm'] != 'SCS':
+        raise ValueError('Supplied fixed SCS moves are defined for SCS only')
+    step = config.get('scs_fixed_move')
+    if isinstance(step, bool) or not isinstance(step, Real) or not np.isfinite(step) or step <= 0.:
+        raise ValueError('scs_fixed_move must be positive and finite')
+    return float(step)
+
+
 def _fixed_dcs_move(config):
     """Validate the prespecified BW radius used to normalize fixed DCS moves."""
     if config['algorithm'] not in FIXED_DCS_METHODS:
@@ -117,6 +134,8 @@ def _fixed_dcs_move(config):
 def _initial_proposal_scale(config):
     """Resolve the actual BW radius or Gaussian coordinate standard deviation."""
     policies = config.get('step_tuning_policies', {})
+    if isinstance(policies, dict) and policies.get(config['algorithm']) == FIXED_SCS_TUNING:
+        return _fixed_scs_move(config)
     if isinstance(policies, dict) and policies.get(config['algorithm']) == FIXED_DCS_TUNING:
         radius = _fixed_dcs_move(config)
         if config['algorithm'] == 'DCS-RWM':
@@ -151,7 +170,7 @@ def resolve_step_scale_ceiling(config):
         policies = config.get('step_tuning_policies', {})
         minimum = (_initial_proposal_scale(dict(config, algorithm=name))
                    if name == RWM_ROTATION_METHOD or
-                   (isinstance(policies, dict) and policies.get(name) == FIXED_DCS_TUNING)
+                   (isinstance(policies, dict) and policies.get(name) in (FIXED_DCS_TUNING, FIXED_SCS_TUNING))
                    else initial_scale)
         if isinstance(value, bool) or not isinstance(value, Real) or \
                 not np.isfinite(value) or value < minimum:
@@ -185,8 +204,24 @@ def _dcs_components(mapping_dict, target, algorithm):
     mapping = BallMap(**mapping_dict)
     mu, delta = jnp.asarray(mapping.mu), jnp.asarray(mapping.delta)
     beta, scale, dimension = mapping.beta, mapping.scale, mapping.d
+    # Exact parameter test: never approximate a small nonzero deformation.
+    identity_mobius = not np.any(mapping.delta)
 
     def transform(z):
+        if identity_mobius:
+            # M_0(z)=z and log|J_M_0|=0. Keep the existing radial arithmetic
+            # and domain checks; remove only the identity Mobius algebra.
+            if beta == 2.:
+                eps = 1. - jnp.sum(z * z, axis=-1)
+                logeps = jnp.log(eps)
+                radial_denominator = jnp.sqrt(eps)
+            else:
+                radius = jnp.linalg.norm(z, axis=-1)
+                logeps = jnp.log(-jnp.expm1(beta * jnp.log(radius)))
+                radial_denominator = jnp.exp(logeps / beta)
+            physical = mu + scale * z / radial_denominator[..., None]
+            logjac = dimension * jnp.log(scale) - (1 + dimension / beta) * logeps
+            return physical, logjac
         if beta == 2.:
             r2 = jnp.sum(z * z, axis=-1)
             delta2 = jnp.sum(delta * delta)
@@ -317,6 +352,13 @@ def _fixed_dcs_warmup(block, initial, key, warmup, scale):
     return states[-1], jnp.asarray(scale), jnp.sum(accepts)
 
 
+def _fixed_scs_move_warmup(block, initial, key, warmup, scale):
+    """Run the unchanged author kernel at the supplied fixed scale."""
+    import jax.numpy as jnp
+    states, accepts = block(initial, key, warmup, jnp.asarray(scale))
+    return states[-1], jnp.asarray(scale), jnp.sum(accepts)
+
+
 def _radial_batch(block, projection, state, key, scale, thin, threshold, coordinate_threshold=None):
     """The same full-state projection and statistic work, including rejections."""
     import jax.numpy as jnp
@@ -366,6 +408,10 @@ def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initi
         if algorithm != 'SCS' or initial_scale != .1 or warmup < 1:
             raise ValueError('Fixed h=0.1 requires SCS and a positive discarded warmup')
         burn = lambda state, key: _fixed_scs_warmup(block, state, key, warmup)
+    elif tuning_policy == FIXED_SCS_TUNING:
+        if algorithm != 'SCS' or warmup < 1 or not np.isfinite(initial_scale) or initial_scale <= 0.:
+            raise ValueError('Supplied fixed SCS moves require SCS, a positive step and discarded warmup')
+        burn = lambda state, key: _fixed_scs_move_warmup(block, state, key, warmup, initial_scale)
     elif tuning_policy == FIXED_DCS_TUNING:
         if algorithm not in FIXED_DCS_METHODS or warmup < 1 or \
                 not np.isfinite(initial_scale) or initial_scale <= 0.:
@@ -454,7 +500,7 @@ class _Matched:
             config['algorithm'], config['warmup'], config['thin'],
             float(config.get('threshold', 50.)), self.initial_scale, scale_ceiling)
         # Preserve the original compiled-program key and RNG path for controls.
-        if self.tuning_policy in (BALL_TUNING, RADIAL_TUNING, SCS_FIXED_TUNING, FIXED_DCS_TUNING):
+        if self.tuning_policy in (BALL_TUNING, RADIAL_TUNING, SCS_FIXED_TUNING, FIXED_SCS_TUNING, FIXED_DCS_TUNING):
             arguments += (self.tuning_policy,)
         extra = ({'coordinate_threshold': float(config['coordinate_threshold'])}
                  if config.get('coordinate_metrics', False) else {})
@@ -508,6 +554,14 @@ class _Matched:
             self.tuning_metadata.update(calibration_algorithm='SCS',
                 tuning_note='Author skew-t fixed h=0.1; same discarded warmup transition budget, no step adaptation',
                 step_size_adapted=False, fixed_step=.1)
+        elif self.tuning_policy == FIXED_SCS_TUNING:
+            self.tuning_metadata.update(calibration_algorithm='SCS',
+                tuning_note='Supplied fixed SCS proposal scale; the unchanged author kernel runs '
+                    'for the full discarded warmup and production without adaptation. '
+                    'This policy does not claim the author paper fixed h=0.1 setting.',
+                step_size_adapted=False, fixed_step=self.scale, scs_fixed_move=self.scale,
+                scale_parameter='Gaussian ambient standard deviation before tangent projection',
+                tuning_pilot_iterations=config['warmup'])
         elif self.tuning_policy == FIXED_DCS_TUNING:
             radius = _fixed_dcs_move(config)
             self.tuning_metadata.update(calibration_algorithm=config['algorithm'],
@@ -834,9 +888,10 @@ def _run_timed(mapping_dict, config, seed, before_sampling, after_sampling,
                         BALL_STEP_POLICY if tuning_policy == BALL_TUNING else
                         'Prespecified DCS move: BW/reflected BW/billiard increment radius h, RWM coordinate sigma=h/sqrt(d+2); '
                         'same fixed step throughout discarded warmup and sampling' if tuning_policy == FIXED_DCS_TUNING else
+                        'Supplied fixed SCS scale; unchanged author transition throughout discarded warmup and sampling' if tuning_policy == FIXED_SCS_TUNING else
                         'Author SCS fixed h=0.1; discarded warmup without adaptation' if tuning_policy == SCS_FIXED_TUNING else STEP_POLICY),
         'tuning_policy': tuning_policy,
-        'target_acceptance': None if tuning_policy in (BALL_TUNING, RADIAL_TUNING, ROTATION_TUNING, SCS_FIXED_TUNING, FIXED_DCS_TUNING) else .234,
+        'target_acceptance': None if tuning_policy in (BALL_TUNING, RADIAL_TUNING, ROTATION_TUNING, SCS_FIXED_TUNING, FIXED_SCS_TUNING, FIXED_DCS_TUNING) else .234,
         'common_cpu_backend': 'mixed: optimized Numba DCS, author JAX SCS' if config.get('dcs_backend') == 'numba' else 'JAX',
         'backend': 'Numba' if native else 'JAX',
         'implementation_revision': config.get('implementation_revision', IMPLEMENTATION_REVISION),

@@ -1,5 +1,41 @@
 # Validation
 
+## Identity-map and fixed-SCS follow-up
+
+The JAX ball transform now skips Möbius arithmetic only when every supplied
+deformation coordinate is exactly zero. The nonzero-deformation path remains
+unchanged. Billiards already use zero deformation in their effective map;
+this optimization does not refit or change any method's map or proposals.
+
+Validation passed **44 focused core regression tests**, **3 standalone public
+identity-transform regressions** and **8 additional transformation parity
+checks**. Coverage includes the constant transformed density of the
+uniform-ball Student-t case, an independent Jacobian calculation, finite
+interior points near the boundary, the existing rejection guards and all
+supported low-level target families. Common-input checks in 100D/500D retained
+exact acceptance decisions and states for all four DCS methods and the author
+SCS controls, including 3,072 transitions from independent stationary starts.
+The original fixed-0.1 SCS driver also retained its warmup endpoint, metadata
+and subsequent recorded batch. Compiled identity-map projections contained
+no Möbius dot operation and fewer divisions. These checks establish the
+intended algebraic equivalence; they do not promise bitwise agreement for
+every possible floating-point trajectory or comparative sampler superiority.
+
+For controlled studies, low-level configurations may set
+`step_tuning_policies['SCS']='fixed_scs_move_v1'` and a positive finite
+`scs_fixed_move`. The supplied value remains frozen through discarded warmup
+and production using the unchanged author transition. Tests cover 0.025,
+0.05, 0.1 and 0.2 in both dimensions and verify that metadata does not label
+this policy as the author's fixed-0.1 experiment. This is an execution API,
+not a step-selection rule. The public SCS default remains 0.1.
+
+A serial paired throughput check retained complete state projection and
+recording, with unchanged-path controls. It showed modest or negligible
+changes depending on the method and dimension, so no portable speed guarantee
+is made. Compare fresh complete cohorts when assessing timed performance
+after an implementation update. The larger historical validation counts
+below retain their original release scope.
+
 ## Current version-11 scope
 
 Version 11 uses one shared DCS move: fixed BW/reflected-BW/billiard increment
