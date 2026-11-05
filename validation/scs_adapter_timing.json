@@ -11,7 +11,7 @@
     "thin": 50
   },
   "source_commit": "ea6f27a6cb1d0ca90d8c1cd92c32fc3dcf8ea565",
-  "mapping_file": "/Users/mihabresar/Documents/ChatGPT/DiffeomorphicMonteCarlo/Koncna/results/single-scs-100d-paper/maps.json",
+  "mapping_file": "results/single-scs-100d-paper/maps.json",
   "direct_compile_seconds": 0.4343814169988036,
   "time_scope": "Synchronized compiled production; all states contribute tail/norm sums and checkpoints; excludes compilation and discarded warmup",
   "direct_description": "One unmodified author SCS scan, followed by original projection of every state and radial summaries inside the same compiled executable",

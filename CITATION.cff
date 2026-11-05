@@ -1,7 +1,7 @@
 cff-version: 1.2.0
-message: "Please cite the accompanying manuscript when using these experiments."
+message: "Cite the accompanying manuscript and record the exact software commit or archived release used."
 type: software
-title: "Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions — reproducible experiments"
+title: "Diffeomorphic Markov chain Monte Carlo: reproducible experiments"
 version: 0.2.0
 repository-code: "https://github.com/MihaBresar/DiffeomorphicMonteCarlo"
 authors:
@@ -10,4 +10,12 @@ authors:
   - family-names: "Mijatović"
     given-names: "Aleksandar"
 license: MIT
-abstract: "CPU benchmark implementations, independent references, and reproduction tools for diffeomorphic Markov chain Monte Carlo."
+abstract: "Sampling kernels, independent references, experiment configurations and reproduction tools for diffeomorphic Markov chain Monte Carlo."
+preferred-citation:
+  type: unpublished
+  title: "Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions"
+  authors:
+    - family-names: "Brešar"
+      given-names: "Miha"
+    - family-names: "Mijatović"
+      given-names: "Aleksandar"

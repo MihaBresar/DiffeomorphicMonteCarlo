@@ -1,6 +1,6 @@
 # Historical boundary relocation comparison
 
-Current version-7 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
+Current version-9 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
 in both JAX and optimized Numba modes, with VI on/off and 100D/500D targets.
 New reports contain only radial estimates/MSE/counts/time plus functional ESS
 and ESS/s. See [the current protocol](COMPARISONS.md); historical sections

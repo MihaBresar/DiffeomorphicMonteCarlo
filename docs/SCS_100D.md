@@ -160,7 +160,7 @@ Optimized DCS-RWM and DCS-BW generated 1.48× and 1.32× as many iterations per
 second as author SCS in this controlled check. SCS's scientific outputs were
 identical before and after; its 0.36% timing variation provides a stability
 check. These hardware-specific throughput ratios do not imply lower MSE or
-predict Ryzen timings. Full precision, individual timings, frozen states,
+predict timings on other processors. Full precision, individual timings, frozen states,
 parameters, environment and source hashes are archived in
 [`validation/jax_dcs_efficiency_benchmark.json`](../validation/jax_dcs_efficiency_benchmark.json).
 
@@ -243,7 +243,7 @@ assignments are recorded and checked; inconsistent pinned allocations fail.
 Earlier revisions could use different subsets of the 32 CPUs in that last
 wave, so rerun every method together for corrected timing comparisons.
 On macOS, allocation is explicitly OS-managed rather than strictly pinned.
-A 50-chain run can use 32 workers on the Ryzen 9 9950X3D. Sequential
+Choose a worker count supported by the available CPU and memory allocation. Sequential
 runs provide the clearest isolated timing comparison; parallel timings describe
 the recorded concurrent CPU workload. Keep the machine otherwise idle when
 measuring speed.
@@ -371,7 +371,7 @@ Historical implementation checks also remain available:
 - Three 25,000-iteration repeats with the same continuous adaptation found
   compiled DCS-RWM 24.00–24.70× and DCS-BW 25.60–25.90× faster than the NumPy
   reference on macOS ARM64. These are implementation speedups, with no promised
-  Ryzen speedup. See `validation/dcs_compilation_benchmark.json` and
+  speedup on other hardware. See `validation/dcs_compilation_benchmark.json` and
   `scripts/benchmark_dcs_compilation.py`.
 - Three alternating 50,000-iteration repeats gave median 0.41 seconds for the
   fixed-count SCS adapter and 0.41 seconds for a direct author scan, including

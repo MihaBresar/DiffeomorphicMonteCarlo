@@ -13,7 +13,7 @@ available explicitly for sensitivity checks.
 The distinction matters: the 45.60% increase in VI-on SCS mean-norm MSE in
 the [version-8 study](CALIBRATION_RESULTS.md) compared two **step-calibration
 rules with exactly the same fitted maps**. It was not evidence that VI caused
-that difference. Version 9 changes the fitting recipe at the user's request;
+that difference. Version 9 restores the original author fitting recipe;
 the fixed-step control isolates step choice within this new recipe.
 
 ## What comes from the authors

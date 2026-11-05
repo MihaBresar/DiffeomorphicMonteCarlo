@@ -1,4 +1,4 @@
-# Laptop comparison results
+# Archived exploratory comparison results
 
 These saved results predate the version-4 rotation mixture. They do not
 measure DCS-BW-rotate; all numerical values below retain their original scope.

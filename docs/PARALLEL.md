@@ -5,24 +5,25 @@ allows up to four independent chains to run concurrently. The initial selection
 is at most four workers and leaves one detected slot free when possible. Select
 **1 — sequential** for a single worker. More workers also require more RAM.
 
-Click **Use all CPU threads** to select every thread available to the process.
-The AMD Ryzen 9 9950X3D has [16 cores and 32 threads](https://www.amd.com/en/products/processors/desktops/ryzen/9000-series/amd-ryzen-9-9950x3d.html).
-With SMT enabled and all threads available to Python, the launcher permits **32
-workers**. The old cap at one worker per physical core has been removed. This
-option fills available threads while sufficient independent chains remain;
-it does not promise 100% CPU activity during every stage or a 2× speedup over 16.
+Click **Use all CPU threads** to select the logical CPU capacity available to
+the process, including simultaneous multithreading (SMT) where enabled. The
+launcher detects this capacity instead of assuming a processor model or core
+count. Available threads can be used while sufficient independent chains
+remain. Setup, fitting and reporting may use fewer threads; additional workers
+do not guarantee proportional speedups.
 
 Run **Quick check** first. Its production configuration has two chains per
-method, so it uses at most two workers even if you select a larger count. The
+method, so it uses at most two workers even when a larger count is selected. The
 four-chain logistic reference can use up to four. Full paper experiments have
 20 or 50 production chains per method and can use the larger selected count.
 The generic smaller reproductions have eight chains; the current sampler
 comparisons have 20. They use at most eight or 20 simultaneous workers,
-respectively. This can account for low CPU utilization even with 16 or 32 workers
-selected. Fitting, plotting, reference preparation and the final incomplete
-batch can use fewer threads. We do not add chains merely to fill the CPU, since
-that would change the specified experiment. Sixteen workers may give better
-per-chain throughput than 32 if SMT contention dominates; measure on your CPU.
+respectively. Selecting more workers than available chains does not increase
+concurrency. Fitting, plotting, reference preparation and the final incomplete
+batch can use fewer threads. Chain counts remain fixed by the experiment
+configuration. Fewer workers can improve per-chain throughput when SMT, memory
+bandwidth or cache contention dominates; assess the worker setting on the
+measurement hardware.
 
 The terminal equivalent is `--workers 4`, accepted by `run_experiment.py`,
 `prepare_reference.py` and `scripts/reproduce_all.py`. Their default remains 1.
@@ -31,8 +32,10 @@ production experiments. Worker counts above the detected capacity are rejected.
 
 ## What runs concurrently
 
-Each chain runs in a separate Python process. Workers claim the next pending
-chain from a shared queue as soon as they finish. An exclusively created
+Each chain runs in a separate Python process. The sampler comparisons use
+synchronized waves: methods run separately with the same ordered CPU allocation
+and number of simultaneous chains. In the other experiments, workers claim the
+next pending chain from a shared queue as soon as they finish. An exclusively created
 directory grants ownership of each chain; its job JSON stays immutable.
 This prevents competing workers from moving one another's job files on Windows.
 Faster workers can process more chains. Seeds depend on experiment seed,

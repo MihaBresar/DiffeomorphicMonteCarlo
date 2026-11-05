@@ -42,7 +42,7 @@ iteration, fused statistics, cached rejected-state values and separate
 production random streams. Existing throughput records below do not measure
 this added method.
 
-A local macOS ARM64 throughput check used 900,000 transitions per case, three rotated repeats, and the same saved 100D map and method-specific calibrated start/step. Median paired JAX/Numba time ratios were **10.73× for BW** and **10.27× for reflected BW**. Median rates were 161,765 versus 1,734,092 iterations/s for BW, and 129,286 versus 1,334,991 for reflected BW. Compilation and calibration were excluded. These measurements compare DCS implementations, not DCS against SCS, and do not establish MSE improvements or promised Ryzen speedups. The complete map, configuration and measurements are in [the validation record](../validation/radial_numba_throughput.json). Reproduce them using `python scripts/benchmark_radial_numba.py` while no other CPU-heavy jobs run. Source hashes identify the measured revision; the subsequently corrected RNG-description string does not alter sampling.
+A local macOS ARM64 throughput check used 900,000 transitions per case, three rotated repeats, and the same saved 100D map and method-specific calibrated start/step. Median paired JAX/Numba time ratios were **10.73× for BW** and **10.27× for reflected BW**. Median rates were 161,765 versus 1,734,092 iterations/s for BW, and 129,286 versus 1,334,991 for reflected BW. Compilation and calibration were excluded. These measurements compare DCS implementations, not DCS against SCS, and do not establish MSE improvements or predictions for other hardware. The complete map, configuration and measurements are in [the validation record](../validation/radial_numba_throughput.json). Reproduce them using `python scripts/benchmark_radial_numba.py` while no other CPU-heavy jobs run. Source hashes identify the measured revision; the subsequently corrected RNG-description string does not alter sampling.
 
 ## Paired implementation measurements
 
@@ -65,8 +65,8 @@ and tuning are excluded and separately recorded.
 | Eight Schools | DCS-HnR | 91.73× |
 | GARCH | DCS-HnR | 90.80× |
 
-These are implementation speedups, not MSE improvements or promised Ryzen
-speedups. Long floating-point trajectories can diverge after different reduction
+These are implementation speedups, not MSE improvements or predictions for other
+hardware. Long floating-point trajectories can diverge after different reduction
 rounding; proposal/density parity is verified separately. Repeat the measurements
 with `python scripts/benchmark_canonical_compilation.py`. Full-precision records,
 configs, maps and source hashes are in

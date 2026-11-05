@@ -145,7 +145,7 @@
     "Worker failure terminates sibling processes"
   ],
   "limitations": [
-    "No direct execution on the user's Ryzen hardware",
+    "Hardware-specific throughput was not evaluated outside the recorded macOS environment",
     "Quick runs test execution only",
     "See GitHub Actions for native Windows and Linux CI outcomes"
   ]

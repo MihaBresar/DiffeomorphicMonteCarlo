@@ -2,7 +2,7 @@
 
 This experiment uses d=100, Student-t degrees of freedom ν=2,
 α=(100,−100,0,…), DCS radial exponent β=2, and SCS latitude 1.1.
-The requested quantities are P(‖X‖≥50) and E[‖X‖], both with analytic references.
+The measured quantities are P(‖X‖≥50) and E[‖X‖], both with analytic references.
 This is a new fixed-wall-time experiment; elapsed times from earlier mixed
 diagnostic queues are not used to rescale their MSEs.
 

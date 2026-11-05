@@ -44,7 +44,7 @@ repeating diagnostics. See [ESS definitions](ESS.md).
 
 ## Why Eight Schools exposed the bottleneck
 
-The default 100D BW/RWM/SCS comparison calculates its two radial means online
+The default 100D five-sampler comparison calculates its two radial means online
 and saves compact radial traces. Its report uses those saved means. The generic
 Eight Schools experiment saves all ten physical coordinates and calculates
 diagnostics for twenty functionals: each parameter and its square. Its full
@@ -63,8 +63,8 @@ the same problem with sufficiently large outputs.
 A separate failure occurred before report construction: the worker held every
 sampling batch in a list, then `np.concatenate` requested a second complete
 array. The reported shape, 594,918 by 200 float64 values, requires 907.77 MiB
-per copy. Thirty-two similarly sized workers could hold 28.37 GiB of raw
-chunks before allocating the extra copies, numerical runtimes and workspaces.
+per copy. Raw storage grows with the number of concurrent workers, before
+accounting for extra copies, numerical runtimes and workspaces.
 The trace shows all 50 BW chains finished before RWM failed in its first wave;
 different draw counts within a time budget produce different memory loads.
 
@@ -128,13 +128,13 @@ new experiments.
 Advanced command-line use can refresh figures from a completed summary:
 
 ```bash
-python run_experiment.py --plot-only results/my-run
+python run_experiment.py --plot-only results/example-run
 ```
 
 To recalculate statistics from saved chains using the bounded-memory pipeline:
 
 ```bash
-python run_experiment.py --plot-only results/my-run --recompute-diagnostics
+python run_experiment.py --plot-only results/example-run --recompute-diagnostics
 ```
 
 If no completed summary exists, `--plot-only` rebuilds it automatically from
@@ -162,14 +162,14 @@ and a warmed diagnostic library.
 The updated runs used four individual-diagnostic threads. All means, quantiles,
 MSE values and diagnostics matched exactly, and all input file hashes were
 unchanged. These are individual local timing observations, not estimates of
-Windows speed or measurements of the user's completed full run. See the
+Windows performance or measurements of a full benchmark run. See the
 [receipt](../validation/result_processing_benchmark.json). RAM figures include
 imports and diagnostic working arrays; MB here means 1,000,000 bytes.
 
 To repeat the comparison, use a saved **Smaller reproduction** posterior run:
 
 ```bash
-python scripts/benchmark_result_processing.py --input results/my-eight-schools --repeat 6 --diagnostic-workers 4
+python scripts/benchmark_result_processing.py --input results/example-eight-schools --repeat 6 --diagnostic-workers 4
 ```
 
 The baseline deliberately recreates the previous allocation of all chains in

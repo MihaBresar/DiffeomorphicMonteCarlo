@@ -36,6 +36,21 @@ class ComparisonSuiteTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'scs_step_rule'):
             suite.configuration('quick',overrides={'scs_step_rule':'best-MSE'})
 
+    def test_fit_seed_override_matches_reported_and_executed_dcs_fit(self):
+        config = suite.configuration('quick', overrides={'fit_seed': 73})
+        self.assertIn('DCS: fresh-batch reverse KL, seed 73,', config['fitting_policy'])
+        self.assertIn('SCS: unchanged author VI, fixed base batch, seed 0,', config['fitting_policy'])
+        with patch.object(runner, 'fit_map', return_value=(
+                BallMap(100), {'seed': 73, 'steps': 20, 'training_draws': 128})) as dcs_fit, \
+                patch('dcs_bench.scs_paper.fit', return_value=(
+                    SphereMap(100).parameters(), {'seed': 0, 'steps': 20, 'training_draws': 128})) as scs_fit, \
+                redirect_stdout(StringIO()):
+            _, fitting = runner.prepare(config)
+        self.assertEqual(dcs_fit.call_args.args[2:], ('ball', 73))
+        self.assertEqual(fitting['ball']['seed'], 73)
+        self.assertEqual(fitting['sphere']['seed'], 0)
+        self.assertNotIn('fit_seed', scs_fit.call_args.args[0])
+
     def test_reflected_bw_retains_existing_pilot_defaults(self):
         from scripts import reproduce_boundary_100d as boundary
         previous = boundary.configuration('paper')

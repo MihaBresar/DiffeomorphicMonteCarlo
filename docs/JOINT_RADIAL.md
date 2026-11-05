@@ -12,7 +12,7 @@ Open **Start.bat** on Windows or **Start.command** on macOS. After environment
 setup, select the joint R-and-step audit, choose **Quick check**, and start a run.
 Use **Full paper settings** for the scientific comparison. The launcher identifier
 is `joint-r-step-audit`; it runs both targets and all 16 comparison cases.
-Choose CPU workers for the allocation available on your computer.
+Choose CPU workers within the detected allocation.
 
 The equivalent terminal command is:
 

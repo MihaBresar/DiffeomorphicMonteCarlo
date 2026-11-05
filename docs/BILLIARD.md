@@ -52,12 +52,19 @@ introduces a reverse/forward proposal ratio
 target ratio. No additional Möbius correction is applied when running in w.
 
 The pilot starts afresh at the w coordinate corresponding to the common
-physical all-ones point. Version 8 calibrates **billiard moves themselves**,
-using exactly the preset's warmup budget. SCS uses the same pilot policy and
-transition budget with its own sphere kernel. Both score bounded changes in
-physical log(1 + norm), with rejections contributing zero, and freeze the
-selected scale and final pilot state before production. No final MSE or known
-reference value is used to tune. See [the full calibration rule](COMPARISONS.md).
+physical all-ones point. Versions 8 and 9 calibrate **billiard moves themselves**,
+using exactly the preset's warmup budget. The pilot scores bounded changes in
+physical log(1 + norm), with rejections contributing zero, then freezes the
+selected scale before production from its last pilot state. No production
+MSE or known reference value enters this per-chain calibration.
+
+Version 8 gave SCS the same radial-pilot policy and transition budget. Current
+version 9 instead uses the authors' SCS VI and defaults to fixed h=0.1 during
+its discarded pilot and production. Acceptance-target 0.234 adaptation remains
+an explicit SCS sensitivity option. Both SCS policies keep the same number of
+discarded pilot transitions as DCS. Their global default was selected in the
+separately reported [development study](AUTHOR_SCS_CALIBRATION.md); it was not
+selected within any retained production chain. See [the full protocol](COMPARISONS.md).
 
 The version-6/7 runs instead calibrated reflected BW in the active coordinates
 and transferred its step to billiards. Their saved reports retain that rule.

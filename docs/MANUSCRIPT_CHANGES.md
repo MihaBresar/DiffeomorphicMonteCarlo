@@ -1,16 +1,55 @@
-# Manuscript updates required after the corrected runs
+# Relationship to the manuscript experiments
 
-The code changes do not require empirical examples to satisfy the main theorem assumptions. Keep logistic regression as a general empirical example.
+This repository contains corrected implementations and later sampler
+extensions. It is not a claim that running the current default configuration
+reproduces every numerical value in an earlier manuscript. The current
+five-method comparison includes reflected BW and billiards, which are distinct
+from the original ordinary BW proposal. Historical results and implementation
+checks remain in the [archive](ARCHIVE.md).
 
-1. Replace all five figures and the two posterior table rows using `RERUN.md`; reassess comparisons and numerical ratios from the new results.
-2. Replace the d=200, ν=3 analytic constants with 0.0291914455 and 19.5196857147. Coordinate-reference descriptions must use the normal-CDF sign-after-t-mixture construction.
-3. The RWM comparison now really uses d=200; the fixed-iteration SCS comparison uses ν=3; the infinite-mean experiment really uses α=0, zero location and identity/zero shifts; logistic production budgets are 30 seconds.
-4. GARCH has four parameters including μ and a fixed initial variance. Include μ in the likelihood and report the matching flat physical prior. Remove the unsupported assertion that the finite-recursion variances grow as ω/(1-α-β) near the stationarity boundary. Its data are simulated PosteriorDB benchmark data.
-5. Eight Schools now uses log τ for both samplers, with the correct Jacobian. State the coordinate transform rather than the old signed-τ regularization. Posterior DCS uses the identity affine map and β=1.
-6. Describe a separate warmup and frozen production kernel. DCS and SCS scales are adapted before retention. Map fitting uses fresh independent reverse-KL training draws at each step, a smooth bounded shift parameterization and no target clipping. Symmetric examples optimize scale only. Both synthetic projection families initialize scale by matching the known radial median; document this initialization. These are implementation changes, not merely renamed scripts.
-7. State maximum NUTS depth 10 and target acceptance 0.8 for comparisons, plus the independently tuned reference settings. Report compilation/fitting/warmup separately, the chosen CPU worker count and affinity policy, actual per-chain production times, and batch overshoot. Keep worker count and hardware fixed for comparisons; parallel timings describe the recorded concurrent execution policy. Posterior equal-time budgets exclude setup. Total elapsed run time is in the manifest; summed worker compilation durations are an amortized resource cost.
-8. Describe posterior reference draws as high-accuracy estimates, with reported MCSE, not exact truth. Table RMSE is `sqrt(mean_{chains,coordinates} (chain_estimate-reference)^2)`. The old metric based on a pooled chain mean measured a different quantity.
-9. Logistic Q–Q axes use independent reference marginal quantiles. The restored original figure style uses the empirical 5–95% range of chain quantile estimates, not a CLT confidence band. Remove the claim that marginal Q–Q plots establish a CLT. This is distinct from, and does not question, using examples beyond theorem assumptions.
-10. Norm-based MSE bootstrap intervals are descriptive with ν=3; stronger calibration claims need bounded functionals and a separate estimator-level calibration experiment. The new supplementary directional figures provide bounded checks of skewness.
+The active settings, including SCS author VI, fixed h=0.1 and its optional
+acceptance-tuned control, are specified in [COMPARISONS.md](COMPARISONS.md).
+The `paper` preset means the recorded full benchmark budget. Figures and
+numerical claims for a publication must identify the exact source revision,
+configuration and saved results used to produce them.
 
-The larger tail/dimension/β study, geometry ablation, independent fitting replications, formal Monte Carlo interval-calibration experiment and non-centered NUTS comparison suggested in the review are additional research designs. They are not silently substituted for the seven repaired manuscript experiments.
+## Corrections represented in the repository
+
+- Synthetic target densities and analytic references are centralized. For
+  the 200D ν=3 radial example, the tail probability at norm 50 is
+  0.0291914455 and the mean norm is 19.5196857147. The benchmark skew uses
+  a normal CDF; it differs from the Student-t-CDF skew in the SCS paper.
+- The 200D random-walk example uses its stated dimension. The super-heavy-tail
+  example is symmetric with ν=0.5 and untuned zero-centred maps. Its mean norm
+  does not exist, so comparisons use functions with defined reference values.
+- Eight Schools uses log τ with the corresponding Jacobian for both samplers.
+  GARCH includes μ, a fixed initial variance, the stated physical prior and
+  the pinned PosteriorDB model/data definition. Posterior DCS uses the
+  documented identity affine map and β=1.
+- Adaptation and fitting are separate from production. Every new experiment
+  discards the first third of its production iterations. The active SCS
+  baseline has a fixed step; other proposal-calibration policies are recorded
+  per method. Fitting recipes and initialization differ across experiment
+  families and must be read from their resolved configuration.
+- NUTS comparison settings include target acceptance 0.8 and maximum depth 10.
+  Reference chains have separate settings. Timing distinguishes preparation,
+  production, diagnostics and total elapsed execution. Parallel timing is
+  conditional on the recorded worker allocation and hardware load.
+- Posterior reference estimates have Monte Carlo uncertainty; they are not
+  exact truth. The posterior table's RMSE is the square root of the mean
+  squared chain-level errors over chains and coordinates, rather than the
+  error of one pooled estimate.
+- Logistic Q–Q plots compare against independent reference quantiles. Their
+  empirical 5–95% ranges describe variability across chains; they are not
+  confidence bands proving a central limit theorem.
+
+Norm-based empirical MSE under ν=3 can be unstable because the norm has no
+fourth moment. Current radial results do not establish coordinate-marginal
+superiority or universal sampler rankings. Earlier coordinate findings remain
+available. Empirical examples outside sufficient theorem assumptions are
+valid experiments, but those theorems do not establish convergence for them.
+
+[TARGETS.md](TARGETS.md), [RERUN.md](RERUN.md), [ESS.md](ESS.md) and
+[REPRODUCIBILITY.md](REPRODUCIBILITY.md) define the target, output and timing
+conventions used to interpret a new run. Existing paper figures require
+separate reconciliation with their generating source and configuration.

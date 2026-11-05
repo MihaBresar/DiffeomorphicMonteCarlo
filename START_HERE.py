@@ -385,7 +385,7 @@ def main():
     server = ThreadingHTTPServer(('127.0.0.1', 0), make_handler(controller, token))
     url = f'http://127.0.0.1:{server.server_port}'
     print(f'Experiment launcher: {url}', flush=True)
-    print('Keep this window open while experiments run. Use the buttons in your browser.', flush=True)
+    print('Keep this window open while experiments run. Use the buttons in the browser.', flush=True)
     if not args.no_browser:
         webbrowser.open(url)
     try:

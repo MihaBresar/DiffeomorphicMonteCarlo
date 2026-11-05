@@ -123,7 +123,7 @@ and `reflected_tuning.csv`, recording map parameters, excluded setup costs and
 every reflected-BW pilot candidate. Version-4 reports additionally save
 `angular_tuning.csv`, angular scales and angles in radians/degrees, and the
 historical warmup splits for rotation mixtures where those methods were recorded. Version-3 and later coordinate reports save
-`reference_values.csv` with the recorded reference values, MCSE and exact flags. Current version-8 runs contain the two analytic radial references.
+`reference_values.csv` with the recorded reference values, MCSE and exact flags. Current version-9 runs contain the two analytic radial references.
 Version-2 reports retain their four reference values. With VI off, fitting costs and training
 counts are zero; proposal calibration still runs.
 

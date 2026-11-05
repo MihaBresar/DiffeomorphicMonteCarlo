@@ -1,153 +1,128 @@
 # Diffeomorphic Markov chain Monte Carlo
 
-Reproducible experiments for *Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions*, by Miha Brešar and Aleksandar Mijatović.
+Research software accompanying *Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions*, by Miha Brešar and Aleksandar Mijatović.
 
-This corrected implementation centralizes target densities and transformations, saves individual chains, and regenerates figures and tables from saved results. The current comparison suite offers a shared-JAX comparison and a separate optimized-Numba DCS comparison, each with two targets and VI on/off for both map families. SCS calls the unmodified author transition directly. All experiments freeze proposal tuning before sampling, then discard the first third of generated sampling iterations. The synthetic and logistic targets are local constructions; only Eight Schools and GARCH use PosteriorDB. Empirical examples are not required to satisfy the paper's sufficient theorem assumptions.
+The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. It includes corrected manuscript experiments and subsequent sampler comparisons. **The current comparison is protocol version 9; it does not reproduce the original paper figures unchanged.** Billiards and reflected BW are later extensions. Original figures and earlier results remain available with their limitations documented.
 
-## Run with clicks — no commands needed
+Start with the [reviewer guide](docs/REVIEW_GUIDE.md), [comparison protocol](docs/COMPARISONS.md), or [experiment catalogue](docs/EXPERIMENTS.md). No general performance ranking is assumed: radial and coordinate measurements can favor different methods.
 
-Choose one of two comparisons:
+## Install and run
 
-- **Sampler comparison (JAX):** DCS-RWM, DCS-BW, author SCS, DCS-BW-reflect and optimized **DCS-Billiard**, all in the same JAX timing/recording framework.
-- **Optimized Numba comparison:** the same four DCS methods in fused native loops, versus the unchanged author SCS in JAX. This compares implementation efficiency, including different framework costs.
+Use **64-bit Python 3.12** and the pinned CPU dependencies in `requirements-cpu.txt`. Extract the repository ZIP before running it. Initial setup requires internet access; benchmark data are bundled. A GPU is not required.
 
-Both offer **100D or 500D skewed t(3)**, DCS β=2, and **VI on/off**. The current version 9 uses the pinned authors' VI routine and fixed h=0.1 for SCS, with acceptance tuning available as a sensitivity option. DCS fitting is unchanged. Ordinary RWM/BW tune toward acceptance 0.234; billiards tune their own production kernel by bounded physical radial movement, and reflected BW retains its ball-movement pilot. Every method receives the same separate pilot transition budget, and all production steps are frozen. Billiards retain the jointly fitted centre/R/β with zero effective deformation. The fitting recipes differ, so this is an author-baseline comparison rather than identical VI optimization. See [the proposal](docs/BILLIARD.md), [calibration protocol](docs/COMPARISONS.md), and [SCS fixed-step sensitivity](docs/AUTHOR_SCS_CALIBRATION.md).
+### Desktop launcher
 
-New reports contain mean norm, radial-tail probability, MSE, exact sample counts, time, **functional ESS and ESS per second**. Coordinate statistics and the rotation comparison methods are removed. The original radial plots remain. See [the protocol](docs/COMPARISONS.md) and [ESS definitions](docs/ESS.md).
+| System | Open the launcher |
+|---|---|
+| Windows | Double-click `Start.bat`. |
+| macOS | Double-click `Start.command`. If the downloaded script cannot open, use IDLE as below. |
+| Linux desktop, Windows or macOS with IDLE | In IDLE, open `START_HERE.py`, then select **Run → Run Module**. |
 
-On Windows, extract the downloaded ZIP into a fresh folder and double-click
-**Start.bat**. On macOS, double-click **Start.command**. Click **Set up
-environment**, then run **Quick check**. After it succeeds, choose **Full paper
-settings**, 100D or 500D, and **With VI** or **Without VI**. Select the JAX or
-Numba five-sampler comparison and click **Start run**. Repeat the target/VI
-combinations separately. Full settings use 50 chains per method at 20.00
-seconds per chain, after separate tuning. On the Ryzen 9 9950X3D, **Use all CPU
-threads** can select up to 32 workers. Results appear under the launcher.
-See [the click-to-run guide](docs/CLICK_TO_RUN.md).
+Click **Set up environment**, then choose the JAX five-sampler comparison and **Quick check**. Start with one or two CPU workers. After it completes, the launcher links to the report and figures. Keep its console or IDLE window open while it runs. Open the Python launcher, rather than opening `launcher/index.html` directly. See [click-to-run instructions](docs/CLICK_TO_RUN.md) for details.
 
-## Install and check from a terminal
+### Terminal
 
-Use **Python 3.12**, a CPU and a clean environment. Dependencies are pinned.
+From the extracted repository directory, on macOS or Linux:
 
-```bash
+```sh
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-cpu.txt
-python -m unittest discover -s tests -v
-python -m examples.basic_sampler
-python run_experiment.py sampler-comparison --preset quick
 ```
 
-On Windows activate with `.venv\Scripts\activate`. Local validation uses macOS ARM64. CI checks CPU workers on Linux and Windows; consult the repository's Actions tab for the latest results. Other Python/JAX versions are not part of the tested environment.
+On Windows, in Command Prompt:
 
-## Regenerate results
-
-```bash
-# All short execution checks, including independent logistic references:
-python scripts/reproduce_all.py --preset quick --output-root results/quick
-
-# Smaller reproductions (20 chains for the default SCS comparison, otherwise 8):
-python scripts/reproduce_all.py --preset reproduce --output-root results/reproduce
-
-# All full paper experiments and the combined posterior table:
-python scripts/reproduce_all.py --preset paper --output-root results/paper
-
-# The same pipeline with four parallel CPU workers:
-python scripts/reproduce_all.py --preset paper --workers 4 --output-root results/paper-4-workers
-
-# Continue interrupted work; completed chains are checked and reused:
-python scripts/reproduce_all.py --preset paper --output-root results/paper --resume
-
-# Rebuild figures/tables without running samplers:
-python scripts/reproduce_all.py --preset paper --output-root results/paper --plot-only
+```bat
+py -3.12 -m venv .venv
+.venv\Scripts\activate.bat
+python -m pip install -r requirements-cpu.txt
 ```
 
-The full run is substantial. Timed synthetic/regression comparisons require thousands of seconds of aggregate per-chain production sampling. Parallel workers overlap that work; speedup depends on CPU and memory limits. The fixed-iteration super-heavy-tail comparison, both posterior comparisons, warmup, fitting and reference generation add to this. Actual CPU time and disk use depend on the machine. First measure a `reproduce` run; do not extrapolate performance from `quick` plots. See [the rerun guide](docs/RERUN.md) for individual commands and exact manuscript filenames, and [parallel execution](docs/PARALLEL.md) for CPU allocation, timing and resume rules.
+Then run the smallest comparison:
 
-## Experiments
-
-| Identifier | Paper target | Production design |
-|---|---|---|
-| `skew-t-200d-nuts` | d=200, ν=3, α=(20,-30,0,…) | 50 chains/method, 20 s each |
-| `skew-t-200d-baselines` | Same target | 50 chains/method, 10 s each |
-| `sampler-comparison` | 100D/500D skew-t(3), DCS β=2 | 50 chains/method, 20 s each; DCS-RWM/BW/BW-reflect/Billiard and SCS in JAX |
-| `sampler-comparison-numba` | Same two selectable targets | Same budgets; optimized Numba DCS-RWM/BW/BW-reflect/Billiard versus author JAX SCS |
-| `skew-t-50d-nu-0.5` | Symmetric t, d=50, ν=0.5 | 50 chains/method, 500,000 steps each; discard 166,667 |
-| `logistic-regression` | d=20, independent t priors, ν=4 and 6 | 20 chains/method/ν, 30 s each |
-| `eight-schools` | Centered hierarchy, log τ coordinate | 50 chains, 150,000 NUTS steps; DCS matched to mean NUTS production time |
-| `garch11` | Four-parameter PosteriorDB GARCH | Same posterior timing design |
-
-**All seven experiments** includes the JAX comparison on the original 100D target, plus the other six experiments; it does not expand into all eight target/VI/backend combinations. Run the two comparisons individually to select the 500D target. Their presets are defined in `scripts/reproduce_scs_100d.py` and resolved by `scripts/reproduce_comparison.py`; the other six use `configs/<identifier>.json`. `--dry-run` shows the exact configuration.
-
-```bash
-python run_experiment.py sampler-comparison --target skew-t-100d --vi on --preset reproduce --workers 4 --output-dir results/jax-100d-vi
-python run_experiment.py sampler-comparison-numba --target skew-t-100d --vi off --preset reproduce --workers 4 --output-dir results/numba-100d-no-vi
-python run_experiment.py sampler-comparison --target skew-t-500d --vi on --preset paper --workers 32 --seed-batch 1 --output-dir results/jax-500d-batch-1
+```sh
+python run_experiment.py sampler-comparison --preset quick --workers 1 --output-dir results/first-check
 ```
 
-`--seed-batch b` accepts 0–999 and sets sampling seed 901001 + 1,000,000 × b, leaving DCS fit seed 42 and author SCS fit seed 0 unchanged. The comparison uses the manuscript's normal-CDF-skewed t density; it is not the SCS paper's Student-t-CDF example. SCS uses the authors' fixed-cloud VI and DCS retains fresh-batch VI; their optimizer settings and full fitting budgets differ and are recorded. Both execution modes reuse the same JAX step calibration. The [protocol](docs/COMPARISONS.md) lists these choices and clock scope.
+This checks execution and report generation. Its short chains are not evidence of sampler performance. Python 3.12 is the supported environment; Linux and Windows checks are defined in [CI](.github/workflows/ci.yml), and macOS has local validation. Inspect the [Actions results](https://github.com/MihaBresar/DiffeomorphicMonteCarlo/actions) for the status of a particular commit.
 
-Old SCS and boundary comparisons are removed from the launcher. Their command-line identifiers, archived results and replot support remain for provenance. The legacy `skew-t-100d-baselines` alias still forwards to the corrected 200D configuration.
+## Current comparison
 
-All canonical benchmark kernels now use compiled sampling loops, including hit-and-run and the ordinary/spherical baselines. See [native implementation checks and measured speedups](docs/NATIVE_KERNELS.md) and [the HnR/NUTS audit](docs/HNR_NUTS.md).
+Both modes contain **DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard**.
 
-The [4 November laptop results](docs/COMPARISON_RESULTS.md) cover all eight original-target/VI/backend combinations under version 2, with its four measurements (radial quantities and X₁): 560 chains, with full-precision errors, counts and timings. Coordinate and radial rankings differ. The earlier 3 November radial-only results remain documented separately; these smaller runs do not establish universal rankings. Version 3 added X₂/X₃ measurements; version 4 added the BW/rotation mixture. Neither addition is present in those archived results. Version 5 added reflected Gaussian RWM plus rotation. **Version 7 uses RWM, BW, reflected BW, billiards and SCS in both modes**, removes coordinate statistics and adds functional ESS. **Version 8 changed only the billiard/SCS calibration to equal-budget own-kernel radial pilots. Version 9 uses SCS author VI and defaults to fixed h=0.1, with acceptance adaptation available; DCS remains unchanged.** The older version 6 introduced JAX billiards. Run every method together in a fresh comparison for current figures. Archived results do not establish performance of later versions. See [the billiard construction and interpretation](docs/BILLIARD.md).
+| Command identifier | Production implementation |
+|---|---|
+| `sampler-comparison` | All five methods in the same JAX timing and recording framework |
+| `sampler-comparison-numba` | Optimized Numba DCS kernels versus the unchanged author SCS transition in JAX |
 
-## Saved artifacts
+The second mode measures implementation efficiency, including different framework and output costs. It does not isolate transition geometry.
 
-The other six experiments save `configuration.json`, `manifest.json`, `summary.json`, `chain_metrics.csv`, and PNG/PDF figures. Each scenario contains map parameters and optimization history, its independent reference and provenance, and one lossless NPZ checkpoint per method/chain. Checkpoints contain all retained physical-coordinate draws and metadata; NumPy loads them with `allow_pickle=False`. Reference preparation has its own checkpoints. Failed or empty chains raise an error and leave the run marked failed; they are never replaced by zeros.
+Both support the normal-CDF-skewed Student-t target with ν=3, α=(100,−100,0,…), dimension **100 or 500**, and DCS exponent β=2. Select `--target skew-t-100d` or `--target skew-t-500d`, and `--vi on` or `--vi off`. The 500D target is an extension. These targets differ from the Student-t-CDF-skewed target in the SCS paper.
 
-**200D random-walk baselines** uses a compact report for all presets: mean norm,
-tail probability, their MSEs, generated and retained sample counts, and timing.
-Each worker saves its two estimates after the one-third burn-in; the report
-reads these small summaries. References come directly from the analytic radial
-law. Functional ESS is recorded alongside these estimates; it skips R-hat, coordinate quantiles and directional
-checks, keeping the radial boxplots, MSE bars and sample-count/runtime figures.
+With VI on, SCS uses its authors' unchanged VI routine; DCS retains its own VI fit. Their fitting recipes and full budgets differ and are recorded. With VI off, both maps use unit scale, zero centre and zero deformation. Billiards retain the ball fit's centre, scale and β in post-Möbius coordinates, with zero effective deformation; the other DCS methods retain the original ball map.
 
-Workers stream draws through bounded buffers, preventing a second full-chain allocation at the end of sampling. Large reports process one chain and one cross-chain diagnostic quantity at a time, with progress messages and temporary disk storage. Saving chooses compression only when a bounded sample indicates useful space savings. Completed summaries can regenerate figures without repeating diagnostics. See [result processing](docs/RESULT_PROCESSING.md) for timing and storage details. Kernels, burn-in and retained-sample statistics are unchanged; new timed comparisons should rerun every method together because output streaming now occurs inside the production clock.
+DCS-RWM/BW adapt toward acceptance 0.234. Reflected BW uses a ball-movement pilot; billiards use their own production kernel in a bounded radial-movement pilot. SCS defaults to the authors' fixed **h=0.1**, with `--scs-step-rule acceptance` available for sensitivity analysis. Every method receives the same discarded pilot transition budget. All production steps are frozen, and the first third of generated production iterations is discarded.
 
-The general experiment reports, excluding the current comparison suite and the compact 200D baseline report, include chain estimates, MSE/RMSE and descriptive bootstrap intervals, functional MCSE, bulk/tail ESS, rank R-hat, NUTS divergences, tree saturation indicators, work counts, frozen tuning and timings. Unavailable diagnostics are null with an explanation. MSE is averaged over independent-chain squared errors. Posterior references remain finite Monte Carlo estimates, with their uncertainty reported.
+The fixed SCS choice followed a documented 100D development study; it was frozen before the planned full-paper seed-batch-8 assessment. It is not a demonstrated optimum for 500D. See [all sensitivity results and the selection rule](docs/AUTHOR_SCS_CALIBRATION.md).
 
-The general skew-t runs, excluding the current comparison suite and the compact 200D baselines, also create a supplementary `*_directional` figure. Radial functions cannot assess whether skewness is sampled correctly, so these check a bounded directional probability and a bounded directional mean against independent references. The current comparison suite reports only the two original radial functions, with analytic references, ESS and ESS/s. Thresholds are fixed before sampling. This restricted set of functions does not establish overall mixing; archived coordinate reports retain their original scope.
+| Preset | Chains per method | Production seconds per chain | Separate pilot transitions |
+|---|---:|---:|---:|
+| `quick` | 2 | 0.05 | 100 |
+| `reproduce` | 20 | 2 | 1,000 |
+| `paper` | 50 | 20 | 1,500 |
 
-The original Q–Q, radial boxplot and linear MSE figure families are restored,
-including both fixed-time and fixed-iteration comparisons. Additional directional
-and MSE-uncertainty plots live in `figures/supplementary`. Plot labels and HTML
-tables use two decimals, with scientific notation for MSE and small values.
-Integer sample counts stay exact; CSV and JSON files retain full numerical
-precision. See [the figure guide](docs/FIGURES.md).
+Smaller presets also reduce VI training. Full SCS VI uses 1,000 updates on 2,000 fixed reference draws; full DCS VI uses 1,500 updates with 2,000 fresh draws per update. The [protocol](docs/COMPARISONS.md) specifies the complete budgets and [reproducibility guide](docs/REPRODUCIBILITY.md) defines costs, seeds and diagnostics.
 
-The current comparisons also export inexpensive empirical MSE
-uncertainty summaries computed from per-chain squared errors. These describe
-the saved run; they are not formal 95% confidence intervals or uncertainty
-over refitting the maps. The t(3) norm has an infinite fourth moment, so its
-squared-error variance need not exist and empirical error bars can miss rare
-large errors. Keep this limitation in mind when comparing MSE across batches.
+```sh
+# Inspect the resolved configuration without sampling.
+python run_experiment.py sampler-comparison --preset paper --dry-run
 
-For the six other experiments, the **DCS map** selector offers **Möbius map** (the default VI fit of R, centre
-and Möbius parameters) and **Vanilla map** (fully untuned R=1, centre=0 and
-Möbius=0). Vanilla retains the experiment's β and skips map fitting entirely.
-Both choices keep proposal-scale warmup and freezing unchanged; SCS keeps its
-existing fit. They create separate experimental configurations, labelled in the
-figures and exact-value tables. The two PosteriorDB experiments keep their
-identity maps. For command-line runs use `--ball-map-policy mobius` or
-`--ball-map-policy vanilla`. Fixed R=√d has been removed from new runs; saved
-results can still be replotted. See [the implementation audit](docs/IMPLEMENTATION_AUDIT.md)
-for earlier tuning comparisons and their limits.
+# Smaller 100D comparison with VI; repeat with --vi off for the untuned maps.
+python run_experiment.py sampler-comparison --target skew-t-100d --vi on --preset reproduce --workers 2 --output-dir results/jax-100d-vi
 
-## Use the sampler on another target
+# Full 500D comparison with the frozen default and a fresh sampling batch.
+python run_experiment.py sampler-comparison --target skew-t-500d --vi on --preset paper --workers 2 --seed-batch 8 --output-dir results/jax-500d-batch-8
 
-```python
-import numpy as np
-from dcs_bench.api import sample
-
-log_density = lambda x: -2.5 * np.log1p(np.dot(x, x) / 3)
-x, info = sample(log_density, initial=np.zeros(2), draws=10000,
-                 warmup=1500, beta=2, seed=81)
+# Regenerate a completed report without sampling.
+python run_experiment.py --plot-only results/jax-100d-vi
 ```
 
-`sample` needs no gradients; it accepts DCS-BW, DCS-RWM and DCS-HnR. Benchmark map fitting uses JAX gradients. [Target and coordinate definitions](docs/TARGETS.md), [timing and reproducibility](docs/REPRODUCIBILITY.md), [validation](docs/VALIDATION.md), and [manuscript changes](docs/MANUSCRIPT_CHANGES.md) explain the scientific choices.
+Choose a fresh output directory for each comparison. Set the worker count to the available CPU allocation and keep it fixed across comparisons. Timed counts vary with hardware and system load even when seeds agree. Run the complete method set together; do not mix timing results from different code or execution policies.
 
-Code is [MIT licensed](LICENSE). Bundled third-party materials retain their upstream license; see [THIRD_PARTY.md](THIRD_PARTY.md). Citation metadata are in `CITATION.cff`. A publication release should archive the exact code and successful paper result directories together; add the archive DOI to the citation when it exists.
+## Measurements and saved outputs
 
-The historical [own-kernel calibration results](docs/CALIBRATION_RESULTS.md) retain version-8 smaller JAX runs with VI on/off and matched historical-pilot controls. The current [author-SCS calibration study](docs/AUTHOR_SCS_CALIBRATION.md) separates map fitting from proposal-step sensitivity. The current billiard variant is distinct from the original paper's BW sampler; these comparisons do not reproduce or validate the original figures.
+Current comparisons measure **radial-tail probability and mean norm**, with analytic reference values. Reports include per-chain estimates, MSE, exact generated and post-burn-in counts, production time, functional ESS and ESS/s. Rejected repeats contribute to every estimator and diagnostic. These radial functions do not establish marginal or overall mixing; historical coordinate results, including cases favoring SCS, remain in the record.
+
+| Artifact | Contents |
+|---|---|
+| `configuration.json`, `manifest.json` | Resolved settings, source hashes, environment, CPU policy, run status and elapsed time |
+| `maps.json`, `method_maps.json` | Fitted/untuned maps, fitting history and method-specific effective maps |
+| `summary.json`, `paper_values.csv`, `paper_values.html` | Per-chain and aggregated results; machine-readable values retain full precision |
+| `functional_ess.csv`, tuning CSV files | Functional ESS, unavailable reasons, and recorded pilot choices |
+| `chains/`, `figures/` | Saved scalar traces and metadata, plus PNG/PDF figures |
+
+Comparison ESS uses every post-burn-in scalar observation. Large unthinned temporary histories are removed after diagnostics; small saved traces can be thinned. Other experiments save retained physical draws and use their recorded diagnostic stride. See [ESS definitions](docs/ESS.md) and [output processing](docs/RESULT_PROCESSING.md).
+
+Displayed estimates use two decimals or scientific notation, while integer sample counts stay exact. Empirical MSE variability is conditional on the fitted maps and available chains. The t(3) norm has no fourth moment, so rare errors can dominate MSE and its estimated uncertainty. ESS is not a convergence guarantee.
+
+## Other experiments and historical evidence
+
+The repository also includes 200D skew-t comparisons with NUTS and random-walk baselines, a fixed-iteration 50D t(0.5) experiment, logistic regression, Eight Schools and GARCH. Only the two posterior examples use PosteriorDB. Empirical targets need not satisfy the manuscript's sufficient theorem assumptions. See [target definitions](docs/TARGETS.md) and the [figure-by-figure rerun guide](docs/RERUN.md).
+
+The all-experiments runner includes the JAX 100D comparison and those six experiments; it does not expand every target/VI/backend combination. The [archive index](docs/ARCHIVE.md) separates earlier evidence from the current protocol. Results and reports from older protocols must retain their recorded settings:
+
+- [Original archival figures](figures/archival/README.md): supplied images without complete run provenance.
+- [Earlier coordinate and radial comparisons](docs/COMPARISON_RESULTS.md): include outcomes favoring SCS.
+- [Version-8 calibration results](docs/CALIBRATION_RESULTS.md): own-kernel radial pilots and historical controls.
+- [Version-9 author-SCS sensitivity study](docs/AUTHOR_SCS_CALIBRATION.md): both SCS step choices and the development selection rule.
+- [Implementation audit](docs/IMPLEMENTATION_AUDIT.md) and [manuscript changes](docs/MANUSCRIPT_CHANGES.md): corrections and scope of older experiments.
+
+The current billiard variant is distinct from the original paper's BW sampler. New results cannot retrospectively validate the original figures.
+
+## Citation, attribution and contributions
+
+Cite the accompanying manuscript and record the exact software commit or archived release used. [CITATION.cff](CITATION.cff) contains the manuscript title and authors and the software metadata. No archive DOI is currently recorded; an archived publication release should add its verified DOI.
+
+Project code is [MIT licensed](LICENSE). The unchanged SCS source is pinned to [`ea6f27a6cb1d0ca90d8c1cd92c32fc3dcf8ea565`](https://github.com/liusf15/sub-cauchy-sampler/tree/ea6f27a6cb1d0ca90d8c1cd92c32fc3dcf8ea565), with its original license and checksums preserved. PosteriorDB and other dependencies retain their own terms; see [third-party attribution](THIRD_PARTY.md).
+
+For a new target, start with [the basic sampler example](examples/basic_sampler.py). For review or contributions, see [the reviewer guide](docs/REVIEW_GUIDE.md), [validation](docs/VALIDATION.md), [contributing](CONTRIBUTING.md) and [security policy](SECURITY.md).

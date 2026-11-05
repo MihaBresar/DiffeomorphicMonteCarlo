@@ -4,15 +4,14 @@ The **200D skew-t: random-walk baselines** choice produces a compact report:
 mean norm, tail probability, MSE, sample counts and time. It skips the lengthy
 individual and cross-chain diagnostics automatically for every run size.
 
-The launcher runs the experiments on **your computer**. GitHub stores the code;
-it does not run the full paper experiments for you. An internet connection is
+The launcher runs experiments on the **local computer**. GitHub hosts the code;
+benchmark computation takes place locally. An internet connection is
 needed for the initial package installation. The reference data are bundled.
 
-## Get the project onto another computer
+## Download the project
 
-1. Sign into GitHub and open
+1. Open
    [MihaBresar/DiffeomorphicMonteCarlo](https://github.com/MihaBresar/DiffeomorphicMonteCarlo).
-   While the repository is private, use an account that has access.
 2. Click the green **Code** button, then **Download ZIP**.
 3. Extract the ZIP into a normal local folder, such as Documents. On Windows,
    right-click the ZIP and choose **Extract All**. Open the extracted folder
@@ -21,7 +20,8 @@ needed for the initial package installation. The reference data are bundled.
 For later updates, [GitHub Desktop](https://desktop.github.com/) is convenient:
 **File → Clone repository → GitHub.com**, select this repository and click
 **Clone**. Subsequent updates use **Fetch origin / Pull origin**. These are
-alternatives; you only need one copy. Avoid updating the code during a run.
+alternative download methods; only one project copy is needed. Avoid updating
+the code during a run.
 
 ## Install Python once
 
@@ -43,8 +43,8 @@ installer. The benchmark dependencies are pinned for Python 3.12.
   Python installation, choose **File → Open**, select **START_HERE.py**, then
   choose **Run → Run Module** (or press **F5**). Keep IDLE open while it runs.
 
-You can drag the extracted project folder to any convenient location **before
-setup**. Keep all its files together. If you move it after setup, delete only
+Drag the extracted project folder to a convenient location **before setup**.
+Keep all its files together. If the folder is moved after setup, delete only
 its generated `.venv` folder and repeat setup; Python environments do not move
 reliably between paths or computers. Keep the `results` folder to retain runs.
 
@@ -59,7 +59,8 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
    execution; they are not publication results.
 3. After the quick check succeeds, choose **Smaller reproduction** or **Full
    paper settings** and click **Use all CPU threads**, then **Start run** again.
-   On the Ryzen 9 9950X3D, this allows up to 32 workers with SMT enabled.
+   This selects the logical CPU capacity available to the process. Reduce the
+   worker count if memory is limited; more workers do not guarantee faster runs.
 4. After completion, links to figures and tables appear automatically below the
    progress log. Click a PNG or PDF link to view a graph. All files remain in
    **results → click-runs → dated folder**. Under **Exact numbers and tables**,
@@ -72,8 +73,11 @@ the Numba option uses optimized native DCS loops against the unchanged author
 SCS JAX transition. Both offer 100D/500D and VI on/off. Rotation mixtures
 are no longer active choices.
 
-Full paper settings use 50 chains per method, 20.00 seconds per chain and
-1,500 separate pilot transitions. Both modes report mean norm, radial-tail
+For these two comparisons, **Full paper settings** selects the full benchmark
+budget: 50 chains per method, 20.00 seconds per chain and 1,500 separate
+discarded warmup transitions. The preset name does not imply an exact reproduction
+of previously published figures; the saved protocol version defines the
+experiment. Both modes report mean norm, radial-tail
 probability, MSE, exact counts, time, functional ESS and ESS per second.
 Coordinate measurements and their long reference simulation are omitted;
 radial references are analytic. The original radial figures remain, with a new
@@ -89,7 +93,7 @@ bounded radial-movement score; RWM/BW retain acceptance-target 0.234 tuning,
 and reflected BW retains ball-movement pilots with no geometric ceiling of 2.
 SCS defaults to the authors' fixed h=0.1; acceptance tuning toward 0.234
 remains available as a sensitivity option.
-Both have the same discarded pilot transition budget; the fixed setting
+Both SCS step rules receive the same discarded warmup-transition budget; the fixed setting
 does not adapt. The [SCS study](AUTHOR_SCS_CALIBRATION.md) documents the
 default-selection rule and sensitivity results. All production steps are
 frozen. Billiard trials and scores are saved in `radial_tuning.csv`.
@@ -109,8 +113,8 @@ abbreviated VI; full VI fitting can change the performance ordering.
 
 ## Stop or finish
 
-- Click **Stop** to interrupt a run. Click **Start run** when you are ready to
-  start again from scratch; every launch uses a new dated results folder.
+- Click **Stop** to interrupt a run. Click **Start run** to restart from scratch;
+  every launch uses a new dated results folder.
 - Use **Close launcher** when finished. Closing only the browser tab does not
   terminate the process. Closing the console/IDLE can interrupt running work.
 

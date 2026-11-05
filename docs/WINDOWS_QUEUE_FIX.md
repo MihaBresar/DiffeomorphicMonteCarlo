@@ -24,7 +24,7 @@ are unchanged by this fix.
 4. Choose the experiment, run size and CPU workers, then click **Start run**.
    The experiment starts from scratch, and figure links appear when it finishes.
 
-Keep the old project folder if you want to retain its output files. There is
+Keep the previous project folder to retain its output files. There is
 no need to copy its environment or interrupted run into the new project.
 
 ## Advanced command-line compatibility

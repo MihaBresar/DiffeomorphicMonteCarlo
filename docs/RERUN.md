@@ -98,9 +98,10 @@ in the comparison; the other experiments retain their existing map options.
 The optimized Numba and 500D comparisons are separate selections.
 Quick check only verifies that
 execution works. Use Smaller reproduction first to estimate resource needs;
-use Full paper settings for manuscript results. Keep worker counts and other
-computer activity comparable across methods. The Ryzen 16-core/32-thread CPU
-can use 32 workers where enough independent chains are available. See
+use Full paper settings for the recorded full benchmark budgets. This does not
+guarantee the values in any previous manuscript figure. Keep worker counts and
+other computer activity comparable across methods; concurrency is limited by
+the detected allocation, available chains and memory. See
 [parallel execution](PARALLEL.md).
 
 To compare fitted and untuned maps in other experiments, choose **Möbius map**

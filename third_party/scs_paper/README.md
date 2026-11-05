@@ -13,21 +13,26 @@ It does not modify the vendored files or install a global replacement module.
 JAX and Optax are already repository dependencies; `jax_tqdm` is unnecessary
 because no progress callback runs inside the benchmark.
 
-The current [JAX and optimized-Numba comparisons](../../docs/COMPARISONS.md) invoke the author's original
-projection and step-out transition. Both map families use the repository's
-shared fresh-batch VI budget with seed 42 when VI is on; VI off leaves both maps untuned. This is followed by separate per-chain
-step calibration. SCS and the original DCS methods target acceptance 0.234;
-reflected BW uses observed squared ball movement under the same
-warmup-transition budget. Production steps are frozen. The
-SCS latitude remains 1.1 and the physical initial state is all ones.
+The current [JAX and optimized-Numba comparisons](../../docs/COMPARISONS.md)
+invoke the authors' original projection and step-out transition. With VI on,
+SCS also calls the original variational optimizer: fixed reference draws,
+seed 0, Adam learning rate 0.01, and physical-coordinate clipping at ±1,000
+inside the fitting objective for both target and Jacobian evaluation. Full
+settings use 2,000 reference draws and 1,000 updates. Quick and Smaller presets
+use reduced budgets recorded in each configuration. DCS uses its own
+fresh-draw fitting routine; the two fitting recipes are intentionally distinct.
+With VI off, both map families use unit scale and zero centre/deformation.
 
-The historical adapter also retains the author's VI optimizer for reproducing
-older configurations. That earlier recipe used fixed proposal step 0.1 and a
-fixed 2,000-draw reference batch, seed 0, 1,000 Adam steps and learning rate
-0.01. Its optimizer clips physical coordinates to ±1,000 for target and
-Jacobian calculations. These historical fitting and fixed-step settings are
-not the current matched benchmark; current fitting and sampling do not clip
-the physical coordinates or target CDF.
+SCS defaults to the authors' skew-t step h=0.1, with a discarded equilibration
+phase and no step adaptation. Acceptance adaptation toward 0.234 is an explicit
+sensitivity option. Both receive the same discarded transition budget and
+freeze their production step. This choice and all measured alternatives are
+reported in [the calibration study](../../docs/AUTHOR_SCS_CALIBRATION.md).
+The SCS latitude is 1.1 and the physical pilot start is all ones.
+
+Production target evaluations remain unclipped. The clipping above belongs
+only to the unchanged author fitting routine. Historical configurations retain
+their original fitting and proposal-calibration policies.
 
 Short blocks of the original scan limit memory. Independent keys between
 blocks preserve the author's transition distribution; they do not reproduce
@@ -36,6 +41,6 @@ state, including repeats after rejection, contributes to the radial estimates.
 Thinning affects saved traces only. Compilation and discarded warmup have
 separate clocks; sampling is synchronized before its clock stops.
 
-This uses **the SCS paper transition applied to our selected target**: the original DCS normal-CDF skew-t at ν=3 in 100D or 500D, with the disclosed external fitting and calibration protocol. The author's published example
+This uses **the SCS paper transition applied to our selected target**: the original DCS normal-CDF skew-t at ν=3 in 100D or 500D, with the recorded fitting and step policy. The author's published example
 uses the Azzalini–Capitanio Student-t-CDF skew target at ν=2 and ν=1. It is not
 presented as a reproduction of the author's target or published figures.

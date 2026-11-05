@@ -6220,7 +6220,7 @@
     }
   ],
   "limitations": [
-    "Local macOS CPU measurements, not Ryzen measurements.",
+    "Local macOS CPU measurements; performance on other hardware was not measured.",
     "Short tuning audits are not full paper experiments and do not establish uniform dominance.",
     "Constant caching changes floating-point evaluation order; old and new adaptive chains are not guaranteed bitwise identical."
   ],

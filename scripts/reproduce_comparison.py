@@ -60,7 +60,7 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
             'DCS-Billiard': 'own_kernel_radial_pilot_v1',
             'SCS': 'indicator_dual_averaging_0234' if scs_step_rule == 'acceptance' else 'author_scs_fixed_01'},
         scs_step_rule=scs_step_rule,
-        fitting_policy=('DCS: fresh-batch reverse KL, seed 42, gradient-norm cap 10, no coordinate/CDF clipping. '
+        fitting_policy=(f'DCS: fresh-batch reverse KL, seed {config["fit_seed"]}, gradient-norm cap 10, no coordinate/CDF clipping. '
                         'SCS: unchanged author VI, fixed base batch, seed 0, coordinate clip 1000, no gradient clipping. '
                         'Both use Adam 0.01; fitting budgets and costs are recorded per family.'
                         if vi == 'on' else 'No VI for either family: R=1, centre=0, deformation=0'),

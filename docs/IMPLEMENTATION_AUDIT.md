@@ -1,6 +1,6 @@
 # DCS/SCS implementation and tuning audit
 
-This is a historical audit. The [current comparison suite](COMPARISONS.md) offers five-method JAX and optimized-Numba comparisons, each with target and shared VI switches.
+This is a historical audit. The [current comparison suite](COMPARISONS.md) offers five-method JAX and optimized-Numba comparisons, each with target and VI switches.
 The frozen-adaptation and launcher descriptions below describe the earlier release.
 
 The September 11 update restores the original figures, removes the physical-core

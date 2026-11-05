@@ -1,5 +1,40 @@
 # Validation of the corrected implementation
 
+## Public-release review (5 November 2026)
+
+The source and documentation review covered the active five-method comparison
+and all six generic experiments. **348 local regression tests passed** after
+correcting custom fitting-seed metadata and updating public documentation.
+All files implementing samplers, targets, transformations, references and
+diagnostics remained byte-identical to the preceding version-9 release.
+Numerical outcomes were preserved; an archived local file path and two
+hardware-specific prose notes were normalized for distribution.
+
+The review found no new numerical correctness defect. It does not certify
+optimal tuning, general convergence or universal rankings. The
+[reviewer guide](REVIEW_GUIDE.md) distinguishes matched resources from
+method-specific fitting, calibration, implementation and coordinate choices,
+and records the different scope of the six generic experiments. The
+Windows/Linux unit suites for the preceding numerical release also passed;
+complete workflow results are available through GitHub Actions.
+
+## Current protocol: version 9 (5 November 2026)
+
+The public comparisons use author SCS VI and fixed h=0.1, with a separate
+acceptance-tuned sensitivity control. DCS fitting and production kernels were
+preserved; billiards retain their own-kernel calibration. See the
+[current protocol](COMPARISONS.md), [review guide](REVIEW_GUIDE.md) and
+[complete development results](AUTHOR_SCS_CALIBRATION.md).
+
+The version-9 release passed **347 local automated tests**, **280 study chains**
+and **48 Quick-check chains**. The study includes both VI settings, both SCS
+step policies and a separate SCS check with the full author VI budget. Quick
+checks establish execution and bookkeeping, not comparative performance.
+Windows/Linux workflow results are recorded in
+[GitHub Actions](https://github.com/MihaBresar/DiffeomorphicMonteCarlo/actions).
+The dated sections below describe the revisions tested at that time; they do
+not establish a later version's performance.
+
 ## Own-kernel radial calibration (4 November 2026)
 
 Version 8 tunes billiards and SCS with their actual production kernels and
@@ -244,8 +279,9 @@ The September 11 follow-up passed **30 tests**, all seven end-to-end quick
 experiments with two workers, and full replot/resume checks with **58 NPZ files
 unchanged**. Browser checks covered all-thread selection, restoring a saved run's
 figures, supplementary grouping and full-precision numerical tables. A synthetic
-16-core/32-thread topology test checks Ryzen-style allocation; the local machine
-is macOS, so actual Ryzen performance remains to be measured on that machine.
+A synthetic 16-core/32-thread topology test checks allocation across physical
+cores and simultaneous multithreading siblings. It does not measure throughput
+on that topology; the reported local performance measurements used macOS.
 See [`validation/plots_cpu_checks.json`](../validation/plots_cpu_checks.json) and
 [the implementation audit](IMPLEMENTATION_AUDIT.md). GitHub Actions validates
 native Linux/Windows execution separately.

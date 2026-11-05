@@ -64,7 +64,7 @@ class ParallelTests(unittest.TestCase):
         self.assertEqual(record['inherited_nproc'], '8')
         self.assertFalse(record['parallel_tasks'])
 
-    def test_ryzen_16_core_32_thread_allocation(self):
+    def test_smt_16_core_32_thread_allocation(self):
         cores = [[2*i, 2*i+1] for i in range(16)]
         slots = _ordered_slots(cores)
         self.assertEqual(slots[:16], list(range(0, 32, 2)))
