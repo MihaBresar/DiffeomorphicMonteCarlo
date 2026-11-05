@@ -69,12 +69,12 @@ class LauncherTests(unittest.TestCase):
         seed_menu = ExperimentMenu()
         seed_menu.feed((launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8')
                        .replace('id="experiment"', 'id="other-menu"').replace('id="seed-batch"', 'id="experiment"'))
-        self.assertEqual([x['value'] for x in seed_menu.options], [str(x) for x in range(6)])
+        self.assertEqual([x['value'] for x in seed_menu.options], [str(x) for x in range(9)])
         self.assertEqual([x['value'] for x in seed_menu.options if 'selected' in x], ['0'])
 
     def test_seed_batches_reach_only_the_two_100d_runners(self):
         for experiment in launcher.SCS_COMPARISONS:
-            for batch in (0, 1, 5, 999):
+            for batch in (0, 1, 5, 6, 7, 8, 999):
                 with self.subTest(experiment=experiment, batch=batch):
                     command, = launcher.commands_for_run('quick', experiment, Path('results/test'), seed_batch=batch)
                     if batch:
@@ -117,6 +117,38 @@ class LauncherTests(unittest.TestCase):
                             self.assertEqual(command[command.index('--seed-batch')+1], str(batch))
                         else:
                             self.assertNotIn('--seed-batch', command)
+
+    def test_fresh_runs_reserve_distinct_folders_when_clock_and_candidate_collide(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(launcher, 'RUNS', Path(tmp)), \
+                patch.object(launcher, 'environment_ready', return_value=True), \
+                patch.object(launcher, 'datetime') as clock, \
+                patch.object(launcher.secrets, 'token_hex', side_effect=['occupied', 'first', 'second']):
+            clock.now.return_value.strftime.return_value = 'same-clock'
+            existing = Path(tmp)/'same-clock-quick'
+            existing.mkdir()
+            original = {'previous_run': 'must remain unchanged'}
+            (existing/'launcher-run.json').write_text(json.dumps(original))
+            (existing/'launcher.log').write_text('Previous log\n')
+            (Path(tmp)/'same-clock-quick-occupied').mkdir()
+            controller = launcher.Controller()
+            folders = []
+            for experiment, batch in [('sampler-comparison', 6), ('skew-t-100d-boundary', 0)]:
+                with patch.object(controller, 'run_command') as execute, \
+                        patch.object(controller, 'start_job', side_effect=lambda work, status: work()):
+                    controller.run(experiment=experiment, seed_batch=batch)
+                    folder = Path(tmp)/controller.current_run
+                    folders.append(folder)
+                    metadata = json.loads((folder/'launcher-run.json').read_text())
+                    self.assertEqual(metadata['experiment'], experiment)
+                    self.assertEqual(metadata['seed_batch'], batch)
+                    command = execute.call_args.args[0]
+                    self.assertEqual(command[command.index('--output-dir')+1], str(folder/experiment))
+                    self.assertNotIn('--resume', command)
+            self.assertEqual([folder.name for folder in folders],
+                             ['same-clock-quick-first', 'same-clock-quick-second'])
+            self.assertEqual(json.loads((existing/'launcher-run.json').read_text()), original)
+            self.assertEqual((existing/'launcher.log').read_text(), 'Previous log\n')
+            self.assertFalse(any((Path(tmp)/'same-clock-quick-occupied').iterdir()))
 
     def test_http_api_forwards_batch_without_coercing_invalid_types(self):
         controller = Mock()

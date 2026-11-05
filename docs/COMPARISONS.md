@@ -9,7 +9,7 @@ removed from new comparison runs. Their saved reports remain readable.
 | `sampler-comparison` | All five methods in JAX |
 | `sampler-comparison-numba` | DCS-RWM, DCS-BW, DCS-BW-reflect and DCS-Billiard in optimized Numba; unchanged author SCS in JAX |
 
-Both modes use protocol version 8. RWM means DCS-RWM in transformed ball
+Both modes use protocol version 9. RWM means DCS-RWM in transformed ball
 coordinates. Its isotropic Gaussian proposal rejects exterior endpoints;
 ordinary BW uses a uniform-ball increment and also rejects exterior endpoints.
 Reflected BW folds exterior endpoints along the proposal chord before its
@@ -39,9 +39,6 @@ of method, VI and pilot outcomes. CSV/JSON retain full precision.
 - Same per-chain production-time budget, number of chains, total pilot
   transition budget, 300-transition clock batches and first-third burn-in.
 - Repeated states after rejection contribute to estimates and ESS.
-- Equal map-fitting optimizer and fresh-draw budgets with VI enabled:
-  reverse KL, Adam 0.01, gradient-norm cap 10, seed 42 and initial unit scale.
-  The target, CDF and physical coordinates are not clipped.
 - Same ordered CPU allocation and simultaneous chains per wave, including
   partial waves. Method order rotates across waves. Runtime helper threads
   may exist; all JAX compute pools use the common `PJRT_NPROC=1` policy.
@@ -50,7 +47,8 @@ of method, VI and pilot outcomes. CSV/JSON retain full precision.
   cross-backend trajectories are not bitwise copies.
 
 VI **off** uses R=1, centre zero and deformation zero for both map families.
-DCS β stays 2; SCS latitude stays 1.1. Proposal steps are still pretuned.
+DCS β stays 2; SCS latitude stays 1.1. DCS steps are still pretuned; SCS
+defaults to fixed h=0.1, with acceptance adaptation available separately.
 VI **on** fits ball and sphere families once each. Billiards retain the joint
 ball fit's centre/R/β but run in post-Möbius coordinates, with effective δ=0.
 This is not a new VI fit with δ constrained to zero. RWM/BW/reflected BW retain the original
@@ -58,11 +56,26 @@ fitted ball map. `method_maps.json`, `effective_maps.csv`, summary and manifest
 record the distinction. Base-normalizing constants differ, so reported VI
 losses are not comparable normalized KL values across families.
 
+Version 9 uses the **pinned authors' VI routine for SCS**, while leaving DCS
+VI unchanged. SCS uses one fixed reference cloud, seed 0, Adam 0.01, and
+physical-coordinate clipping at ±1,000 inside its VI objective, including
+the Jacobian argument. It does not clip optimizer gradients. DCS uses fresh
+base draws at each update, seed 42, Adam 0.01, a gradient-norm cap of 10 and
+no coordinate or CDF clipping. Both start at zero centre/deformation and
+unit scale. Production target densities are unclipped for every method.
+
+These are different fitting recipes, not identical optimizers or equal
+unique-draw budgets. Full settings use the authors' 1,000 updates on 2,000
+fixed reference draws for SCS; DCS retains 1,500 updates with 2,000 fresh
+draws per update. Fitting costs and parameters are recorded separately.
+The unchanged author VI and transition are applied to this repository's
+normal-CDF-skewed t target, not the authors' Student-t-CDF-skewed example.
+See [the author baseline and sensitivity study](AUTHOR_SCS_CALIBRATION.md).
+
 ## Separate proposal calibration
 
-DCS-Billiard and SCS each run their **actual production kernel** during the
-separate pilot. They receive exactly the same total transition budget and
-select by the same radial-movement score. For consecutive accepted-or-repeated
+DCS-Billiard runs its **actual production kernel** during its separate pilot
+and selects by a radial-movement score. For consecutive accepted-or-repeated
 physical states, set Δ = log(1 + ‖X_next‖) − log(1 + ‖X_current‖); the score is
 mean Δ²/(1 + Δ²). Rejections score zero. This bounded proxy does not use target
 truth, production MSE or ESS and is not a guarantee of optimal mixing.
@@ -77,14 +90,30 @@ scale guards still apply. This finite search is not a new geometric step cap.
 
 All pilot observations are discarded. The last pilot state and selected scale
 initialize production; no production adaptation is performed. Billiards use
-their effective post-Möbius map, and SCS uses its recorded sphere map. The
+their effective post-Möbius map. The
 same JAX pilot is used for either JAX or Numba production. Equal transition
 budgets need not take equal time; actual pilot seconds are reported separately
 and excluded from production time. `radial_tuning.csv` records candidate
 steps, scores, acceptance and selections, separately from reflected-BW pilots.
 
-Ordinary DCS-RWM and DCS-BW retain observed-acceptance dual averaging toward
-0.234. Reflected BW retains its ball-movement pilot: up to eight rounds of
+Ordinary DCS-RWM and DCS-BW use observed-acceptance dual averaging toward
+0.234. SCS defaults to the authors' skew-t **fixed h=0.1**, including during
+its discarded pilot. It is not an adaptively selected step. Acceptance
+adaptation toward 0.234 remains an explicit alternative; it uses the
+unchanged author transition and recorded sphere map. That adaptation is a
+benchmark modification, rather than the authors' fixed-step skew-t recipe.
+
+`--scs-step-rule acceptance` or `--scs-step-rule fixed` explicitly chooses
+the SCS policy for a new comparison. The [sensitivity runner](AUTHOR_SCS_CALIBRATION.md#reproduction)
+reuses a completed primary's exact maps and budgets and automatically runs
+the opposite policy. The smaller study's pre-result rule retains acceptance
+as the global default only if its MSE improves both radial functions in a
+full-author-VI on check and the no-VI check; otherwise it falls back globally
+to fixed h=0.1. Acceptance failed that rule, so the default is fixed h=0.1.
+Both checks use the small production budget. All results are reported, and
+a fresh full-paper batch evaluates that development choice.
+
+Reflected BW retains its ball-movement pilot: up to eight rounds of
 rotating h/2, h and 2h trials, selecting by observed squared movement in the
 shared ball map with rejected moves scoring zero. It has no geometric step
 ceiling of 2. Its trials remain in `reflected_tuning.csv`.
@@ -94,8 +123,19 @@ their scales before sampling. All rules retain broad numerical guards; a guard
 hit or equal budget does not establish optimal tuning. Gaussian RWM's scale is
 a coordinate standard deviation; BW/billiard scale is a proposal-ball radius.
 Historical version-6/7 billiards retain their recorded reflected-BW pilot.
-The maps, β, SCS latitude, production kernels and production-time budgets are
-unchanged in version 8. A fresh run is needed to measure the new calibration.
+Version 8 used the same own-kernel radial score for SCS and billiards; its
+[results and historical control recipe](CALIBRATION_RESULTS.md) are retained.
+Version 9 changes SCS fitting and defaults to the authors' fixed h=0.1,
+with acceptance calibration available for sensitivity checks;
+DCS fitting, calibration and production kernels remain unchanged.
+
+Equal pilot transition counts do not establish equally optimal tuning, nor
+equal preparation time. Numerical step sizes have different geometric
+meanings across kernels, and the active methods use different selection
+criteria. Report the SCS acceptance and fixed-step sensitivity outcomes
+together. Freeze the main protocol before evaluating a fresh full-paper
+seed batch; the smaller study is development evidence, not an independent
+validation of a choice informed by its results.
 
 ## ESS and timing
 
@@ -123,11 +163,16 @@ than isolating geometric transition cost. The author SCS source is unchanged.
 
 ## Budgets and outputs
 
-| Preset | Chains/method | Seconds/chain | Separate pilot | VI updates × draws/update |
-|---|---:|---:|---:|---:|
-| Quick check | 2 | 0.05 | 100 | 20 × 128 |
-| Smaller reproduction | 20 | 2 | 1,000 | 400 × 500 |
-| Full paper settings | 50 | 20 | 1,500 | 1,500 × 2,000 |
+| Preset | Chains/method | Seconds/chain | Separate pilot | DCS VI updates × fresh draws/update | SCS VI updates × fixed cloud size |
+|---|---:|---:|---:|---:|---:|
+| Quick check | 2 | 0.05 | 100 | 20 × 128 | 20 × 128 |
+| Smaller reproduction | 20 | 2 | 1,000 | 400 × 500 | 400 × 500 |
+| Full paper settings | 50 | 20 | 1,500 | 1,500 × 2,000 | 1,000 × 2,000 |
+
+The SCS cloud is reused at every update. Thus full settings evaluate 2,000
+reference states over 1,000 updates, not just 2,000 target evaluations in
+total. Smaller presets reduce the authors' fitting budget and do not claim
+to reproduce the paper's full VI fit.
 
 VI off uses no fitting updates. Compilation, fitting, pilots, synchronization,
 ESS computation and final file/report generation are outside production time.
@@ -149,6 +194,11 @@ of convergence or absence of bias. MSE variability is conditional on fixed
 fitted maps; the t(3) norm has no fourth moment, so rare errors can make
 empirical MSE uncertainty unstable. Use longer runs and fresh seed batches
 before drawing publication conclusions.
+
+The active measurements support claims about radial-tail probability and mean
+norm. They do not establish general sampler or marginal superiority. Earlier
+[coordinate measurements](COMPARISON_RESULTS.md), including cases favoring SCS,
+remain available for that broader assessment.
 
 See [click-to-run instructions](CLICK_TO_RUN.md), [rerun commands](RERUN.md)
 and [the billiard proposal](BILLIARD.md).

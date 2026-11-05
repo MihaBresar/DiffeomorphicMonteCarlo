@@ -79,14 +79,21 @@ Coordinate measurements and their long reference simulation are omitted;
 radial references are analytic. The original radial figures remain, with a new
 ESS figure and `functional_ess.csv`. Displayed numbers use two decimals.
 
-VI off keeps unit scale, zero centre and zero deformation, while still tuning
-proposal steps. VI on fits both map families. Billiards retain the fitted
+VI off keeps unit scale, zero centre and zero deformation. VI on fits both
+map families: SCS uses its authors' fixed-cloud VI and DCS retains its
+fresh-batch fit. These are different fitting recipes and full fitting budgets;
+the recorded fitting costs are outside production time. Billiards retain the fitted
 centre/R/β and use zero production deformation, as explained in
-[the construction](BILLIARD.md). Billiard and SCS each tune their own moves
-with equal pilot transition budgets and the same radial-movement score.
-RWM/BW retain acceptance-target 0.234 tuning; reflected BW retains ball-movement
-pilots with no geometric ceiling of 2. All steps then freeze.
-The new trials and scores are saved in `radial_tuning.csv`. The first third of production is discarded in every case.
+[the construction](BILLIARD.md). Billiards tune their own moves using a
+bounded radial-movement score; RWM/BW retain acceptance-target 0.234 tuning,
+and reflected BW retains ball-movement pilots with no geometric ceiling of 2.
+SCS defaults to the authors' fixed h=0.1; acceptance tuning toward 0.234
+remains available as a sensitivity option.
+Both have the same discarded pilot transition budget; the fixed setting
+does not adapt. The [SCS study](AUTHOR_SCS_CALIBRATION.md) documents the
+default-selection rule and sensitivity results. All production steps are
+frozen. Billiard trials and scores are saved in `radial_tuning.csv`.
+The first third of production is discarded in every case.
 
 ESS is computed after sampling from unthinned scalar histories, including
 rejections. The log reports this stage. FFT work is limited to one chain at a
@@ -97,7 +104,8 @@ it is not replaced by the iteration count. See [ESS interpretation](ESS.md).
 Use a fresh seed batch to check repeatability conditional on the fitted maps.
 The same batch reuses random streams, but time stopping can change counts.
 Run each target/VI combination separately and rerun all five methods together.
-New version-8 runs do not change historical saved reports.
+New version-9 runs do not change historical saved reports. Smaller runs use
+abbreviated VI; full VI fitting can change the performance ordering.
 
 ## Stop or finish
 

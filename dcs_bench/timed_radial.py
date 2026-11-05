@@ -26,6 +26,7 @@ BATCH_SIZE = 300
 PREFIX_STRIDE = 100
 STEP_POLICY = 'common raw dual averaging of observed acceptance to 0.234 during separate warmup; smoothed final scale frozen'
 ACCEPTANCE_TUNING = 'indicator_dual_averaging_0234'
+SCS_FIXED_TUNING = 'author_scs_fixed_01'
 BALL_TUNING = 'ball_esjd_pilot_v1'
 RADIAL_TUNING = 'own_kernel_radial_pilot_v1'
 ROTATION_TUNING = 'split_ball_angular_esjd_v1'
@@ -62,8 +63,10 @@ def resolve_step_tuning(config):
     for method, policy in policies.items():
         if method not in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, RWM_ROTATION_METHOD, BILLIARD_METHOD, 'SCS'):
             raise ValueError(f'Unknown tuning method: {method}')
-        if policy not in (ACCEPTANCE_TUNING, BALL_TUNING, RADIAL_TUNING, ROTATION_TUNING):
+        if policy not in (ACCEPTANCE_TUNING, SCS_FIXED_TUNING, BALL_TUNING, RADIAL_TUNING, ROTATION_TUNING):
             raise ValueError(f'Unknown step tuning policy: {policy}')
+        if policy == SCS_FIXED_TUNING and method != 'SCS':
+            raise ValueError('The author fixed h=0.1 control is defined for SCS only')
         if policy == BALL_TUNING and method not in ('DCS-BW-reflect', BILLIARD_METHOD):
             raise ValueError('Ball ESJD calibration is defined for reflected BW and billiards only')
         if policy == RADIAL_TUNING and method not in (BILLIARD_METHOD, 'SCS'):
@@ -75,6 +78,8 @@ def resolve_step_tuning(config):
     selected = policies.get(config['algorithm'],
                             ROTATION_TUNING if config['algorithm'] in ROTATION_METHODS else
                             BALL_TUNING if config['algorithm'] == BILLIARD_METHOD else ACCEPTANCE_TUNING)
+    if selected == SCS_FIXED_TUNING and config.get('initial_scale', .1) != .1:
+        raise ValueError('The author fixed-step control requires initial_scale=0.1')
     if selected == BALL_TUNING and config['warmup'] < 3:
         raise ValueError('Ball ESJD calibration requires at least three warmup transitions')
     if selected == RADIAL_TUNING and config['warmup'] < 8:
@@ -270,6 +275,13 @@ def _calibrate(block, initial, key, warmup, initial_scale, scale_ceiling=None):
     return final[0], jnp.exp(jnp.clip(final[4], -30., log_ceiling)), final[5]
 
 
+def _fixed_scs_warmup(block, initial, key, warmup):
+    """Same discarded transition budget, with the paper's step fixed at 0.1."""
+    import jax.numpy as jnp
+    states, accepts = block(initial, key, warmup, jnp.asarray(.1))
+    return states[-1], jnp.asarray(.1), jnp.sum(accepts)
+
+
 def _radial_batch(block, projection, state, key, scale, thin, threshold, coordinate_threshold=None):
     """The same full-state projection and statistic work, including rejections."""
     import jax.numpy as jnp
@@ -315,6 +327,10 @@ def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initi
         burn = lambda state, key: calibrate_ball_esjd(calibration_block, state, key, warmup, initial_scale, scale_ceiling)
     elif tuning_policy == ACCEPTANCE_TUNING:
         burn = lambda state, key: _calibrate(block, state, key, warmup, initial_scale, scale_ceiling)
+    elif tuning_policy == SCS_FIXED_TUNING:
+        if algorithm != 'SCS' or initial_scale != .1 or warmup < 1:
+            raise ValueError('Fixed h=0.1 requires SCS and a positive discarded warmup')
+        burn = lambda state, key: _fixed_scs_warmup(block, state, key, warmup)
     else:
         raise ValueError(f'Unknown step tuning policy: {tuning_policy}')
     batch = lambda state, key, scale: _radial_batch(
@@ -398,7 +414,7 @@ class _Matched:
             config['algorithm'], config['warmup'], config['thin'],
             float(config.get('threshold', 50.)), self.initial_scale, scale_ceiling)
         # Preserve the original compiled-program key and RNG path for controls.
-        if self.tuning_policy in (BALL_TUNING, RADIAL_TUNING):
+        if self.tuning_policy in (BALL_TUNING, RADIAL_TUNING, SCS_FIXED_TUNING):
             arguments += (self.tuning_policy,)
         extra = ({'coordinate_threshold': float(config['coordinate_threshold'])}
                  if config.get('coordinate_metrics', False) else {})
@@ -448,6 +464,10 @@ class _Matched:
             self.scale = float(scale)
             self._scale = scale
         self.tuning_metadata['calibrated_state_sha256'] = hashlib.sha256(np.asarray(self.state).tobytes()).hexdigest()
+        if self.tuning_policy == SCS_FIXED_TUNING:
+            self.tuning_metadata.update(calibration_algorithm='SCS',
+                tuning_note='Author skew-t fixed h=0.1; same discarded warmup transition budget, no step adaptation',
+                step_size_adapted=False, fixed_step=.1)
         self.warmup_acceptance = float(accepts) / config['warmup'] if config['warmup'] else None
         self.implementation = ('Original author JAX SCS transition' if config['algorithm'] == 'SCS'
             else 'DCS JAX transition') + '; separate calibration, full-state scans and radial recording'
@@ -754,9 +774,10 @@ def _run_timed(mapping_dict, config, seed, before_sampling, after_sampling,
                         if config['algorithm'] == RWM_ROTATION_METHOD else
                         ROTATION_STEP_POLICY if tuning_policy == ROTATION_TUNING else
                         radial_step_policy if tuning_policy == RADIAL_TUNING else
-                        BALL_STEP_POLICY if tuning_policy == BALL_TUNING else STEP_POLICY),
+                        BALL_STEP_POLICY if tuning_policy == BALL_TUNING else
+                        'Author SCS fixed h=0.1; discarded warmup without adaptation' if tuning_policy == SCS_FIXED_TUNING else STEP_POLICY),
         'tuning_policy': tuning_policy,
-        'target_acceptance': None if tuning_policy in (BALL_TUNING, RADIAL_TUNING, ROTATION_TUNING) else .234,
+        'target_acceptance': None if tuning_policy in (BALL_TUNING, RADIAL_TUNING, ROTATION_TUNING, SCS_FIXED_TUNING) else .234,
         'common_cpu_backend': 'mixed: optimized Numba DCS, author JAX SCS' if config.get('dcs_backend') == 'numba' else 'JAX',
         'backend': 'Numba' if native else 'JAX',
         'implementation_revision': config.get('implementation_revision', IMPLEMENTATION_REVISION),

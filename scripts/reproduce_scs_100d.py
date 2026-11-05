@@ -1,4 +1,4 @@
-"""One 100D skewed Student-t(3) comparison with matched fitting and CPU kernels.
+"""One 100D skewed Student-t(3) comparison with recorded fitting and CPU kernels.
 
 Fresh runs only. Exact radial estimates use every post-burn-in iteration, including
 rejections. The first third of each timed sampling run is discarded. Each method runs alone in synchronized waves at the same concurrency.
@@ -119,6 +119,20 @@ def source_hashes():
 def prepare(config):
     target = Target(config['target'])
     maps, fitting = {}, {}
+    author_vi = (config.get('vi', 'on') != 'off'
+                 and config.get('sphere_map_policy') == 'author-paper-vi')
+    if author_vi:
+        # The historical DCS budget is not the author's SCS budget. Smaller
+        # presets must opt into their reduced author budget explicitly.
+        budget = {'optimizer_steps': 1000, 'optimizer_samples': 2000}
+        supplied = config.get('scs_vi', {})
+        if not isinstance(supplied, dict) or set(supplied) - set(budget):
+            raise ValueError('scs_vi accepts only optimizer_steps and optimizer_samples')
+        budget.update(supplied)
+        for name, value in budget.items():
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ValueError(f'scs_vi.{name} must be a positive integer')
+        author_config = {'target': config['target'], **budget}
     for family in ('ball', 'sphere'):
         if config.get('vi', 'on') == 'off':
             mapping = (BallMap(target.d, beta=config['beta']) if family == 'ball'
@@ -130,12 +144,23 @@ def prepare(config):
                 fitting_policy='No VI for either family: R=1, centre=0, deformation=0')
             print(f'Using untuned {family} map (VI off)', flush=True)
             continue
-        print(f'Fitting {family} map with the shared VI protocol', flush=True)
+        if family == 'sphere' and author_vi:
+            from dcs_bench.scs_paper import fit as author_fit
+            print('Fitting sphere map with the original SCS author VI routine', flush=True)
+            maps[family], metadata = author_fit(author_config)
+            fitting[family] = dict(metadata, vi_enabled=True,
+                coordinate_clipping=True, cdf_clipping=False,
+                fitting_policy=('Original SCS author reverse KL, fixed base draws with seed 0, '
+                                'Adam 0.01, physical-coordinate clip 1000; no gradient clipping'))
+            continue
+        print(f'Fitting {family} map with the {"DCS" if author_vi else "shared"} VI protocol', flush=True)
         mapping, metadata = fit_map(target, config, family, config['fit_seed'])
         maps[family] = mapping.parameters()
+        policy = (f'DCS {config.get("vi_batch_policy", "fresh")}-batch reverse KL, Adam 0.01, '
+                  'gradient-norm cap 10; no coordinate/CDF clipping') if author_vi else config['fitting_policy']
         fitting[family] = dict(metadata, learning_rate=.01, gradient_norm_cap=10.,
             coordinate_clipping=False, cdf_clipping=False,
-            fitting_policy=config['fitting_policy'])
+            fitting_policy=policy)
     return maps, fitting
 
 

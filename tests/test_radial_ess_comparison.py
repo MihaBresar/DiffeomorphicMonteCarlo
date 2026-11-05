@@ -60,7 +60,7 @@ class RadialEssComparisonTests(unittest.TestCase):
                 self.assertFalse(config['coordinate_metrics'])
                 self.assertTrue(config['ess_enabled'])
                 self.assertNotIn('coordinate_threshold', config)
-                self.assertEqual(config['step_tuning_policies'], {'DCS-BW-reflect':'ball_esjd_pilot_v1', 'DCS-Billiard':'own_kernel_radial_pilot_v1', 'SCS':'own_kernel_radial_pilot_v1'})
+                self.assertEqual(config['step_tuning_policies'], {'DCS-BW-reflect':'ball_esjd_pilot_v1', 'DCS-Billiard':'own_kernel_radial_pilot_v1', 'SCS':'author_scs_fixed_01'})
                 self.assertIn('Analytic',config['reference_policy'])
                 self.assertEqual(config['warmup'],1500)
 

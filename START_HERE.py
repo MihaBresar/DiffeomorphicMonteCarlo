@@ -235,6 +235,7 @@ class Controller:
     def run(self, preset='quick', experiment='sampler-comparison', run_id=None, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=0, comparison_target='skew-t-100d', vi='on'):
         if not self.ready:
             raise ValueError('Click Set up environment first')
+        saved_run_requested = bool(run_id)
         if run_id:
             if run_id in ('.', '..') or not re.fullmatch(r'[A-Za-z0-9_.-]+', run_id):
                 raise ValueError('Invalid saved run')
@@ -250,12 +251,29 @@ class Controller:
                 raise ValueError('The fixed R=sqrt(d) option has been removed. Start a new run with a Möbius or vanilla map.')
         else:
             run_id = datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'-'+preset
+            fresh_run_base = run_id
             directory = RUNS/run_id
-        commands = commands_for_run(preset, experiment, directory, resume=bool(run_id and directory.exists()),
+        commands = commands_for_run(preset, experiment, directory, resume=saved_run_requested,
                                     plot_only=plot_only, workers=workers, ball_map_policy=ball_map_policy,
                                     seed_batch=seed_batch, comparison_target=comparison_target, vi=vi)
         def work():
-            directory.mkdir(parents=True, exist_ok=True)
+            nonlocal run_id, directory, commands
+            if saved_run_requested:
+                directory.mkdir(parents=True, exist_ok=True)
+            else:
+                # Clock resolution can give consecutive fresh runs the same
+                # timestamp. Reserve a new directory atomically; an existing
+                # folder never turns a fresh request into a resume or overwrite.
+                while True:
+                    try:
+                        directory.mkdir(parents=True, exist_ok=False)
+                        break
+                    except FileExistsError:
+                        run_id = fresh_run_base+'-'+secrets.token_hex(4)
+                        directory = RUNS/run_id
+                        commands = commands_for_run(preset, experiment, directory, resume=False,
+                            plot_only=plot_only, workers=workers, ball_map_policy=ball_map_policy,
+                            seed_batch=seed_batch, comparison_target=comparison_target, vi=vi)
             (directory/'launcher-run.json').write_text(json.dumps({'preset': preset, 'experiment': experiment,
                 'workers': workers, 'ball_map_policy': ball_map_policy, 'seed_batch': seed_batch,
                 'comparison_target': comparison_target, 'vi': vi}, indent=2)+'\n')

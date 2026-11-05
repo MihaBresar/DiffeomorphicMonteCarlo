@@ -1,10 +1,11 @@
 # Historical three-method 100D skewed-t comparison
 
-Current version-7 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
+Current version-9 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
 in both JAX and optimized Numba modes, with VI on/off and 100D/500D targets.
 New reports contain only radial estimates/MSE/counts/time plus functional ESS
 and ESS/s. See [the current protocol](COMPARISONS.md); historical sections
-below retain their stated original scope.
+below retain their stated original scope. Version 9 uses author SCS VI with
+unchanged DCS fitting; see the [step-policy sensitivity study](AUTHOR_SCS_CALIBRATION.md).
 
 **This page preserves an earlier protocol.** It is no longer a launcher
 choice. The [current comparisons](COMPARISONS.md) contain RWM, BW, reflected BW, billiards

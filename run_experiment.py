@@ -58,6 +58,8 @@ def parser():
     p.add_argument('--target', choices=('skew-t-100d', 'skew-t-500d'),
                    help='Target for either sampler comparison')
     p.add_argument('--vi', choices=('on', 'off'), help='Enable or disable VI fitting for both comparison map families')
+    p.add_argument('--scs-step-rule', choices=('acceptance', 'fixed'),
+                   help='Sampler comparisons only: author fixed h=0.1 (default) or acceptance calibration')
     p.add_argument('--time-budget', type=float)
     p.add_argument('--nuts-target-accept', type=float)
     p.add_argument('--ball-map-policy', choices=['mobius', 'vanilla'],
@@ -73,6 +75,8 @@ def main(argv=None):
         p.error('--seed-batch is available only when running a sampler comparison')
     if (args.target is not None or args.vi is not None) and (args.plot_only or args.experiment not in COMPARISONS):
         p.error('--target and --vi apply only to the new sampler comparisons')
+    if args.scs_step_rule is not None and (args.plot_only or args.experiment not in COMPARISONS):
+        p.error('--scs-step-rule applies only to the new sampler comparisons')
     if args.recompute_diagnostics and not args.plot_only:
         p.error('--recompute-diagnostics requires --plot-only SAVED_RUN')
     if args.list:
@@ -82,7 +86,7 @@ def main(argv=None):
         summary_path = args.plot_only/'summary.json'
         if summary_path.exists():
             summary = json.loads(summary_path.read_text(encoding='utf-8'))
-            if summary.get('config', {}).get('protocol') in ('original-dcs-author-scs-v1', 'timed-dcs-author-scs-v2', 'timed-matched-dcs-scs-v3', 'timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2', 'timed-boundary-dcs-scs-v3', 'timed-sampler-comparison-v1', 'timed-numba-comparison-v1', 'timed-sampler-comparison-v2', 'timed-numba-comparison-v2', 'timed-sampler-comparison-v3', 'timed-numba-comparison-v3', 'timed-sampler-comparison-v4', 'timed-numba-comparison-v4', 'timed-sampler-comparison-v5', 'timed-numba-comparison-v5', 'timed-sampler-comparison-v6', 'timed-sampler-comparison-v7', 'timed-numba-comparison-v7', 'timed-sampler-comparison-v8', 'timed-numba-comparison-v8'):
+            if summary.get('config', {}).get('protocol') in ('original-dcs-author-scs-v1', 'timed-dcs-author-scs-v2', 'timed-matched-dcs-scs-v3', 'timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2', 'timed-boundary-dcs-scs-v3', 'timed-sampler-comparison-v1', 'timed-numba-comparison-v1', 'timed-sampler-comparison-v2', 'timed-numba-comparison-v2', 'timed-sampler-comparison-v3', 'timed-numba-comparison-v3', 'timed-sampler-comparison-v4', 'timed-numba-comparison-v4', 'timed-sampler-comparison-v5', 'timed-numba-comparison-v5', 'timed-sampler-comparison-v6', 'timed-sampler-comparison-v7', 'timed-numba-comparison-v7', 'timed-sampler-comparison-v8', 'timed-numba-comparison-v8', 'timed-sampler-comparison-v9', 'timed-numba-comparison-v9'):
                 from scripts.scs_100d_figures import render_report
                 render_report(args.plot_only, summary)
                 print(args.plot_only.resolve())
@@ -113,7 +117,7 @@ def main(argv=None):
             command += ['--output-dir', str(args.output_dir)]
         if args.dry_run:
             command.append('--dry-run')
-        for name in ('runs', 'time_budget', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples', 'seed', 'seed_batch'):
+        for name in ('runs', 'time_budget', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples', 'seed', 'seed_batch', 'scs_step_rule'):
             if getattr(args, name) is not None:
                 command += ['--'+name.replace('_', '-'), str(getattr(args, name))]
         return comparison_main(command)
@@ -142,7 +146,7 @@ def main(argv=None):
         return single_main(command)
     if args.experiment in ALIASES:
         print(f'Legacy name {args.experiment} now resolves to {ALIASES[args.experiment]} (d=200).', file=sys.stderr)
-    overrides = {k: v for k, v in vars(args).items() if k not in ('experiment', 'list', 'preset', 'output_dir', 'reference_dir', 'resume', 'plot_only', 'recompute_diagnostics', 'dry_run', 'seed_batch', 'target', 'vi')}
+    overrides = {k: v for k, v in vars(args).items() if k not in ('experiment', 'list', 'preset', 'output_dir', 'reference_dir', 'resume', 'plot_only', 'recompute_diagnostics', 'dry_run', 'seed_batch', 'target', 'vi', 'scs_step_rule')}
     config = load_config(args.experiment, args.preset, overrides)
     output = args.output_dir or Path('results')/config['experiment']/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
     if args.dry_run:

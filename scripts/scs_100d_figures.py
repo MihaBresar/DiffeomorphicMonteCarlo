@@ -84,8 +84,13 @@ def _table(rows):
     return '<div class="table-wrap"><table><thead><tr>'+header+'</tr></thead><tbody>'+body+'</tbody></table></div>'
 
 
-def _policy(name, timed=False, matched=False, ball_esjd=False, own_kernel=False):
-    if own_kernel and name in ('DCS-Billiard', 'SCS'):
+def _policy(name, timed=False, matched=False, ball_esjd=False, own_kernel=False, tuning_policies=None):
+    selected = (tuning_policies or {}).get(name)
+    if selected == 'author_scs_fixed_01':
+        return 'Author skew-t setting: fixed h = 0.1 with separate discarded equilibration; no step adaptation'
+    if selected == 'indicator_dual_averaging_0234':
+        return 'Acceptance-target 0.234 dual averaging; selected step frozen before production'
+    if selected == 'own_kernel_radial_pilot_v1' or (selected is None and own_kernel and name in ('DCS-Billiard', 'SCS')):
         return 'Own-production-kernel radial pilots; bounded squared physical log(1+norm) movement, equal pilot budget and frozen production step'
     if name == 'DCS-Billiard':
         return 'Reflected-BW ball-movement pilots in post-Mobius coordinates; frozen step used by optimized invariant-chord billiard production'
@@ -142,12 +147,22 @@ def render_report(root, summary):
                                       'timed-sampler-comparison-v4', 'timed-numba-comparison-v4',
                                       'timed-sampler-comparison-v5', 'timed-numba-comparison-v5',
                                       'timed-sampler-comparison-v6', 'timed-sampler-comparison-v7', 'timed-numba-comparison-v7',
-                                      'timed-sampler-comparison-v8', 'timed-numba-comparison-v8')
+                                      'timed-sampler-comparison-v8', 'timed-numba-comparison-v8',
+                                      'timed-sampler-comparison-v9', 'timed-numba-comparison-v9')
     optimized = config.get('protocol') in ('timed-numba-comparison-v1', 'timed-numba-comparison-v2',
-                                          'timed-numba-comparison-v3', 'timed-numba-comparison-v4', 'timed-numba-comparison-v5', 'timed-numba-comparison-v7', 'timed-numba-comparison-v8')
+                                          'timed-numba-comparison-v3', 'timed-numba-comparison-v4', 'timed-numba-comparison-v5', 'timed-numba-comparison-v7', 'timed-numba-comparison-v8', 'timed-numba-comparison-v9')
     radial_ess = config.get('protocol') in ('timed-sampler-comparison-v7', 'timed-numba-comparison-v7',
-                                            'timed-sampler-comparison-v8', 'timed-numba-comparison-v8')
-    own_kernel = config.get('protocol') in ('timed-sampler-comparison-v8', 'timed-numba-comparison-v8')
+                                            'timed-sampler-comparison-v8', 'timed-numba-comparison-v8',
+                                      'timed-sampler-comparison-v9', 'timed-numba-comparison-v9')
+    own_kernel = config.get('protocol') in ('timed-sampler-comparison-v8', 'timed-numba-comparison-v8',
+                                      'timed-sampler-comparison-v9', 'timed-numba-comparison-v9')
+    author_vi_protocol = config.get('protocol') in ('timed-sampler-comparison-v9', 'timed-numba-comparison-v9')
+    tuning_policies = config.get('step_tuning_policies', {}) if own_kernel else {}
+    scs_fixed = tuning_policies.get('SCS') == 'author_scs_fixed_01'
+    matched_step_control = bool(config.get('calibration_control_provenance', {}).get('maps_reused_without_refitting'))
+    radial_pilot_methods = {name for name in ('DCS-Billiard', 'SCS')
+                            if own_kernel and (tuning_policies.get(name) == 'own_kernel_radial_pilot_v1' or
+                            (name not in tuning_policies and not author_vi_protocol))}
     vi_mode = config.get('vi', 'on')
     boundary = config.get('protocol') in ('timed-boundary-dcs-scs-v1', 'timed-boundary-dcs-scs-v2', 'timed-boundary-dcs-scs-v3')
     restored_controls = config.get('protocol') == 'timed-boundary-dcs-scs-v2'
@@ -159,19 +174,24 @@ def render_report(root, summary):
     names = [name for name in (config.get('algorithms', METHODS) if suite else METHODS) if name in cases]
     if len(names) != len(cases) or len(set(names)) != len(names):
         raise ValueError('Configured methods must list every completed case exactly once')
+    if author_vi_protocol:
+        if 'SCS' in names and tuning_policies.get('SCS') not in ('indicator_dual_averaging_0234', 'author_scs_fixed_01'):
+            raise ValueError('Version-9 SCS reports require the recorded acceptance or fixed-author step policy')
+        if 'DCS-Billiard' in names and tuning_policies.get('DCS-Billiard') != 'own_kernel_radial_pilot_v1':
+            raise ValueError('Version-9 billiard reports require own-kernel radial calibration')
     has_rotation = any(name in names for name in ROTATION_METHODS)
     has_rwm_rotation = 'DCS-RWM-rotate' in names
     has_billiard = 'DCS-Billiard' in names
     if has_billiard and 'DCS-Billiard' not in summary.get('method_maps', {}):
         raise ValueError('Billiard reports require the recorded effective post-Mobius map')
     if own_kernel:
-        for method in ('DCS-Billiard', 'SCS'):
+        for method in radial_pilot_methods:
             for record in cases.get(method, {}).get('records', []):
                 history = record.get('radial_tuning_history', [])
                 if (record.get('calibration_algorithm') != method or
                         record.get('radial_tuning_pilot_iterations') != config['warmup'] or
                         not history or sum(row['iterations'] for row in history) != config['warmup']):
-                    raise ValueError('Version-8 reports require complete own-kernel radial pilot provenance')
+                    raise ValueError('Reports require complete own-kernel radial pilot provenance')
     counts = {name: _counts(cases[name], config, timed) for name in names}
     metric_names = tuple(summary.get('functionals', METRICS))
     if metric_names not in (METRICS, METRICS+X1_METRICS, METRICS+X1_METRICS+X23_METRICS):
@@ -209,9 +229,11 @@ def render_report(root, summary):
     if suite:
         target_title = config.get('target_title') or f'{dimension}D skewed Student-t, ν = {nu:g}'
         title = ('EXECUTION CHECK — ' if smoke else '') + target_title
-        title += (' — five samplers, optimized Numba DCS / author SCS' if optimized and radial_ess else
+        sampler_count = {1: 'one', 2: 'two', 5: 'five'}.get(len(names), str(len(names)))
+        sampler_label = sampler_count+(' sampler' if len(names) == 1 else ' samplers')
+        title += (f' — {sampler_label}, optimized Numba DCS / author SCS' if optimized and radial_ess else
                   ' — optimized Numba DCS / author SCS' if optimized else
-                  ' — five samplers, JAX' if radial_ess else
+                  f' — {sampler_label}, JAX' if radial_ess else
                   ' — seven samplers, JAX' if has_billiard else
                   ' — six samplers, JAX' if has_rwm_rotation else
                   ' — five samplers, JAX' if has_rotation else ' — four samplers, JAX')
@@ -250,6 +272,13 @@ def render_report(root, summary):
     if own_kernel:
         tuning_note = ('VI '+str(vi_mode)+'. Billiard and SCS tune their own kernels with equal radial-pilot budgets; '
                        'every production step stays frozen.')
+    if author_vi_protocol:
+        tuning_note = ('VI '+str(vi_mode)+'. SCS targets acceptance 0.234; billiard tunes its own radial moves. '
+                       'Equal pilot-transition budgets; production steps frozen.')
+    if scs_fixed:
+        tuning_note = ('VI '+str(vi_mode)+'. SCS uses author fixed h=0.1; '+
+                       ('DCS proposal scales are pretuned. ' if any(name != 'SCS' for name in names) else '')+
+                       'Equal discarded warmup; production steps stay fixed.')
     x = np.arange(1, len(names)+1)
     colors = [COLORS[name] for name in names]
     figure_names = []
@@ -551,7 +580,7 @@ def render_report(root, summary):
         count = counts[name]
         per_chain = count['generated'][0] if len(set(count['generated'])) == 1 else 'varies; see chain table'
         retained = (count['retained'][0] if len(set(count['retained'])) == 1 else 'varies; see chain table')
-        row = {'method': name, 'production_step_policy': _policy(name, timed, matched, ball_esjd, own_kernel), 'chains': case['chains'],
+        row = {'method': name, 'production_step_policy': _policy(name, timed, matched, ball_esjd, own_kernel, tuning_policies), 'chains': case['chains'],
                'iterations_per_chain': per_chain, 'mean_iterations': count['mean_generated'],
                'total_iterations': case['total_iterations'],
                'mean_estimation_iterations': count['mean_used'], 'total_estimation_iterations': sum(count['used']),
@@ -605,8 +634,8 @@ def render_report(root, summary):
             history = row.pop('tuning_history', None)
             angular_history = row.pop('angular_tuning_history', None)
             radial_history = row.pop('radial_tuning_history', None)
-            row.update(method=name, production_step_policy=_policy(name, timed, matched, ball_esjd, own_kernel))
-            if own_kernel and name in ('DCS-Billiard', 'SCS'):
+            row.update(method=name, production_step_policy=_policy(name, timed, matched, ball_esjd, own_kernel, tuning_policies))
+            if name in radial_pilot_methods:
                 for pilot in radial_history or []:
                     radial_tuning_rows.append(dict(method=name, chain=row['chain'], seed=row.get('seed'),
                         pilot_kernel=row.get('calibration_algorithm'),
@@ -709,6 +738,13 @@ def render_report(root, summary):
                            'samples_per_step': fitting.get('samples_per_step'),
                            'total_training_draws': total_draws, 'training_count_source': count_source,
                            'training_batch_policy': fitting.get('training_batch_policy', fitting.get('batch_policy'))})
+        if author_vi_protocol:
+            setup_rows[-1].update(map_policy=fitting.get('map_policy'), seed=fitting.get('seed'),
+                learning_rate=fitting.get('learning_rate'), objective=fitting.get('objective'),
+                vi_coordinate_clip=fitting.get('vi_coordinate_clip'),
+                gradient_norm_cap=fitting.get('gradient_norm_cap'),
+                gradient_clipping=fitting.get('gradient_clipping'), source_commit=fitting.get('source_commit'),
+                full_author_vi_budget=fitting.get('full_author_vi_budget'))
     count_rows = [{key: row[key] for key in ('method', 'chains', 'iterations_per_chain', 'mean_iterations',
                    'total_iterations', 'mean_estimation_iterations', 'total_estimation_iterations',
                    'total_discarded_iterations', 'warmup_iterations', 'thin', 'retained_per_chain',
@@ -832,7 +868,7 @@ def render_report(root, summary):
                          'laws coincide with reflected BW only for a radial transformed target in the same '
                          'coordinates and at the same frozen step. Skewed targets and comparisons across maps '
                          'do not have this guarantee. Short laptop results do not establish universal dominance.')
-        if own_kernel:
+        if own_kernel and not author_vi_protocol:
             notes[1] = ('DCS-Billiard and SCS each tune their actual production kernel with the same total '
                         'warmup-transition budget and radial score. DCS-RWM and ordinary DCS-BW retain '
                         'acceptance-target 0.234 calibration; reflected BW retains its ball-movement pilots. '
@@ -849,6 +885,48 @@ def render_report(root, summary):
                          'Pilot time is reported separately from equal production-time budgets. Numba uses the same '
                          'JAX calibration state and step as its JAX counterpart. The previous reflected-BW billiard '
                          'pilot remains part of the historical version-6/7 protocols only.')
+        if author_vi_protocol:
+            if has_billiard:
+                notes.append('Billiard pilots score bounded squared changes of physical log(1 + norm), including '
+                         'zero after rejection. Five coarse and three refinement trials share the pilot budget; '
+                         'all trial scores are saved in radial_tuning.csv. This is a movement proxy, not MSE or ESS. '
+                         'Pilot observations are discarded, and production errors never select a step.')
+            notes[1] = ('SCS, DCS-RWM and ordinary DCS-BW use acceptance-target 0.234 calibration. '
+                        'DCS-Billiard calibrates its actual production kernel by bounded radial movement; '
+                        'reflected BW uses ball-movement pilots. Every method receives the same total '
+                        'pilot-transition budget and freezes its step before production. Equal resources '
+                        'do not establish equally optimal tuning. The first-third production burn-in is additional.')
+            if vi_mode == 'on':
+                notes[2] = ('SCS uses the unmodified authors’ VI routine: one fixed training batch, seed 0, '
+                            'Adam at 0.01 and physical-coordinate clipping at 1000 within the VI objective. '
+                            'DCS retains fresh-batch VI, recorded fit seed '+str(config.get('fit_seed', 42))+' and gradient-norm clipping at 10. '
+                            'These are distinct fitting protocols; their actual budgets and times are recorded. '
+                            'The production target is not clipped. Billiard retains the joint ball fit’s '
+                            'centre/R/beta and uses effective delta=0 in post-Mobius coordinates; other DCS '
+                            'methods retain the fitted ball map. All effective maps are recorded.')
+            notes.append('SCS acceptance calibration follows the paper’s general tuning guidance, with the '
+                         'benchmark’s recorded dual-averaging implementation. It is not the fixed h=0.1 '
+                         'setting used in the authors’ skew-t example. The author VI routine is unchanged; '
+                         'only the target and explicitly recorded training budgets are supplied by this benchmark.')
+        if scs_fixed:
+            notes[1] = ('SCS uses the authors’ skew-t example step h=0.1 throughout separate discarded '
+                        'equilibration and production, with no step adaptation. '+
+                        ('DCS-RWM and ordinary BW target acceptance 0.234; billiard calibrates its own '
+                         'radial moves and reflected BW uses ball-movement pilots. ' if has_billiard else '')+
+                        'All compared methods receive the same discarded warmup-transition and production-time '
+                        'budgets. The first-third production discard is additional, and production scales remain fixed.')
+            if vi_mode == 'off':
+                notes[2] = ('VI is disabled for both map families: unit scale, zero centre and zero deformation. '
+                            'DCS retains beta=2 and SCS latitude 1.1. DCS proposal scales are pretuned; '
+                            'SCS uses fixed h=0.1 with separate discarded equilibration.')
+            notes = [note for note in notes if not note.startswith('SCS acceptance calibration follows')]
+            notes.append('The fixed h=0.1 is the step used in the authors’ skew-t example. '
+                         'The target, timing and burn-in remain those of this benchmark; '
+                         'this does not reproduce their published experiment in full.')
+            if matched_step_control:
+                notes.append('This step-size sensitivity control uses the same author transition and exact recorded '
+                             'SCS map as the primary comparison. It does not refit VI; the saved primary map, '
+                             'sampling seeds and budgets are reused and their provenance is recorded.')
         notes[7] = ('Every method samples the same recorded target: '+target_title+'. This is a benchmark of radial '
                     'tail-probability and mean-norm estimation, not a reproduction of the SCS publication figures or '
                     'a general mixing guarantee. The unmodified author SCS transition is retained.')
@@ -994,7 +1072,10 @@ def render_report(root, summary):
         reflected_heading = 'Reflected-step pilot tuning and frozen steps' if has_rwm_rotation else 'Reflected BW pilot tuning and frozen steps'
         page += '<details><summary>'+reflected_heading+'</summary><p>The score is the mean squared jump in ball coordinates, including zero movement after rejection. It is not an MSE estimate. Full pilot candidates are available in <a href="reflected_tuning.csv">reflected_tuning.csv</a> and the saved summary.</p>'+_table(tuning_summaries)+'</details>'
     if radial_tuning_summaries:
-        page += '<details><summary>Own-kernel radial pilots and frozen steps</summary><p>Billiard and SCS each tune their actual production kernel using equal pilot transition budgets. The score is bounded squared movement of physical log(1 + norm), including zero after rejection; it is not MSE or ESS. Pilot seconds can differ and are excluded from production time. Full candidates are available in <a href="radial_tuning.csv">radial_tuning.csv</a>.</p>'+_table(radial_tuning_summaries)+'</details>'
+        radial_intro = ('Billiard tunes its actual production kernel. SCS uses its separately recorded step policy; '
+                        'all methods receive equal discarded warmup-transition budgets. ' if author_vi_protocol else
+                        'Billiard and SCS each tune their actual production kernel using equal pilot transition budgets. ')
+        page += '<details><summary>Own-kernel radial pilots and frozen steps</summary><p>'+radial_intro+'The score is bounded squared movement of physical log(1 + norm), including zero after rejection; it is not MSE or ESS. Pilot seconds can differ and are excluded from production time. Full candidates are available in <a href="radial_tuning.csv">radial_tuning.csv</a>.</p>'+_table(radial_tuning_summaries)+'</details>'
     if angular_tuning_summaries:
         page += '<details><summary>Rotation pilot tuning and frozen angles</summary><p>The score is the mean squared jump of unit directions, including zero movement after rejection. The angle is 2 atan(angular scale). Reflected-step and angular pilots share the existing warmup budget; both scales are frozen before sampling. Full candidates are available in <a href="angular_tuning.csv">angular_tuning.csv</a>.</p>'+_table(angular_tuning_summaries)+'</details>'
     page += '<h2>Every chain</h2>'+_table(chain_rows)

@@ -1,5 +1,13 @@
 # Changes
 
+## 2026-11-05 — author SCS fitting and step-size sensitivity, version 9
+
+- Use the pinned authors' unchanged VI routine for SCS with a fixed reference cloud, seed 0, coordinate clipping in the fitting objective, and their full 1,000-update/2,000-draw budget. Preserve DCS fitting and all production kernels.
+- Default SCS to the authors' fixed h=0.1 after the prespecified development rule rejected acceptance tuning as the global default. Keep acceptance-target 0.234 adaptation as an explicit alternative. Retain billiards' own-kernel radial calibration, RWM/BW acceptance calibration and reflected-BW movement calibration, with equal discarded pilot transition counts.
+- Add a matched-map SCS sensitivity runner that reuses a completed version-9 run's maps, seeds, pilot and production budgets and tests the opposite step policy, acceptance or fixed h=0.1. Both policies are explicitly selectable. Report both settings; preserve historical version-8 results separately.
+- Disclose different VI recipes, the shared normal-CDF target, excluded preparation costs and radial-only scope. This is not the exact SCS paper experiment, equally optimal tuning, a marginal-superiority claim, or a reproduction of the original DCS paper's BW figures.
+- Keep fresh launcher requests separate from saved-run requests and reserve output folders atomically, including when consecutive Windows timestamps collide. Update checks for seed batch 6.
+
 ## 2026-11-04 — own-kernel radial calibration, version 8
 
 - Calibrate billiard production moves directly instead of inheriting a reflected-BW step. Give author SCS the same separate transition budget and radial pilot policy using its own transition.

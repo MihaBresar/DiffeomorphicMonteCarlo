@@ -15,6 +15,27 @@ from scripts import reproduce_scs_100d as runner
 
 class ComparisonSuiteTests(unittest.TestCase):
 
+    def test_author_vi_presets_and_explicit_budget_overrides(self):
+        for preset, scs_steps, dcs_steps, draws in (
+                ('quick',20,20,128),('reproduce',400,400,500),('paper',1000,1500,2000)):
+            config = suite.configuration(preset)
+            self.assertEqual(config['scs_vi'], dict(optimizer_steps=scs_steps,optimizer_samples=draws))
+            self.assertEqual(config['optimizer_steps'],dcs_steps)
+            self.assertEqual(config['sphere_map_policy'],'author-paper-vi')
+        config = suite.configuration('paper',overrides={'optimizer_steps':7,'optimizer_samples':31})
+        self.assertEqual(config['scs_vi'],dict(optimizer_steps=7,optimizer_samples=31))
+        self.assertEqual(config['optimizer_steps'],7)
+
+    def test_explicit_scs_step_rules_keep_other_methods_unchanged(self):
+        tuned=suite.configuration('quick',overrides={'scs_step_rule':'acceptance'})
+        fixed=suite.configuration('quick',overrides={'scs_step_rule':'fixed'})
+        self.assertEqual(fixed['step_tuning_policies']['SCS'],'author_scs_fixed_01')
+        for method in ('DCS-Billiard','DCS-BW-reflect'):
+            self.assertEqual(fixed['step_tuning_policies'][method],tuned['step_tuning_policies'][method])
+        self.assertIn('no step adaptation',fixed['tuning_note'])
+        with self.assertRaisesRegex(ValueError,'scs_step_rule'):
+            suite.configuration('quick',overrides={'scs_step_rule':'best-MSE'})
+
     def test_reflected_bw_retains_existing_pilot_defaults(self):
         from scripts import reproduce_boundary_100d as boundary
         previous = boundary.configuration('paper')
@@ -44,7 +65,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertEqual(config['beta'], beta)
                         self.assertEqual(config['dcs_backend'], backend)
                         self.assertEqual(config['vi_enabled'], vi == 'on')
-                        self.assertEqual(config['step_tuning_policies'], {'DCS-BW-reflect': 'ball_esjd_pilot_v1', 'DCS-Billiard': 'own_kernel_radial_pilot_v1', 'SCS': 'own_kernel_radial_pilot_v1'})
+                        self.assertEqual(config['step_tuning_policies'], {'DCS-BW-reflect': 'ball_esjd_pilot_v1', 'DCS-Billiard': 'own_kernel_radial_pilot_v1', 'SCS': 'author_scs_fixed_01'})
                         self.assertNotIn('mixture_probability', config)
                         self.assertNotIn('initial_angular_scale', config)
                         self.assertNotIn('step_scale_ceilings', config)
@@ -60,7 +81,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertNotIn('coordinate_threshold', config)
                         self.assertTrue(config['ess_enabled'])
                         self.assertEqual(config['reference_samples'], 5_000_000)
-                        self.assertTrue(config['protocol'].endswith('-v8'))
+                        self.assertTrue(config['protocol'].endswith('-v9'))
 
     def test_vi_off_bypasses_fitting_for_both_map_families_without_skipping_warmup(self):
         for target_id in ('skew-t-100d', 'skew-t-500d'):
@@ -84,8 +105,9 @@ class ComparisonSuiteTests(unittest.TestCase):
                 self.assertEqual(maps['ball']['beta'], config['beta'])
                 self.assertEqual(maps['sphere']['latitude'], config['latitude'])
 
-    def test_vi_on_passes_selected_target_and_same_budget_to_both_fits(self):
+    def test_historical_shared_vi_preserves_both_fits(self):
         config = suite.configuration('paper', comparison='jax', target='skew-t-500d', vi='on')
+        config['sphere_map_policy'] = 'vi'  # Historical v8 fitting remains reproducible.
         calls = []
 
         def fake_fit(target, settings, family, seed):

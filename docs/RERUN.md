@@ -1,6 +1,6 @@
 # Running the updated experiments
 
-Current version-8 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
+Current version-9 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
 in both JAX and optimized Numba modes, with VI on/off and 100D/500D targets.
 New reports contain only radial estimates/MSE/counts/time plus functional ESS
 and ESS/s. See [the current protocol](COMPARISONS.md); historical sections
@@ -12,7 +12,7 @@ then double-click **Start.bat**. On macOS, use **Start.command**. Click
 and click **Start run**. The launcher starts fresh runs automatically.
 
 All seven experiments now discard the first third of their actual generated
-sampling iterations **after separate step-size tuning**. Tuning never counts
+sampling iterations **after a separate pilot**. Pilots never count
 inside that third. Sampling scales are frozen. Timed runs apply this rule to
 the final measured iteration count; thinning keeps its original iteration grid.
 For 500,000 iterations, discard 166,667 and use the remaining 333,333 before
@@ -21,7 +21,7 @@ thinning. At thinning 10 this stores 33,334 post-burn-in states.
 ## Current sampler comparisons
 
 Choose **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)** or
-**Five samplers: optimized Numba DCS versus SCS**. Both version-8 suites
+**Five samplers: optimized Numba DCS versus SCS**. Both version-9 suites
 contain the same methods, with 100D/500D and VI on/off. Numba production differs
 in implementation and recording costs; author SCS remains in JAX.
 
@@ -32,11 +32,16 @@ are removed. Both radial references are analytic. Old files retain their
 recorded scope and cannot reconstruct unthinned ESS or a new sampler.
 
 Billiards retain jointly fitted centre/R/β after Möbius with effective δ=0.
-Billiard and SCS each tune their own production kernel with equal pilot
-transition budgets and the same bounded physical radial-movement score.
+Billiards tune their own production kernel with a bounded physical
+radial-movement score. SCS defaults to the authors' fixed h=0.1 and also
+supports acceptance-target 0.234 tuning, with a discarded pilot under either policy.
 RWM/BW retain acceptance-target 0.234 pilots; reflected BW retains its
 ball-movement pilot in the shared fitted ball map with no geometric ceiling
 of 2. All steps freeze and the first third of production is discarded.
+Every method receives the same number of pilot transitions. Use
+`--scs-step-rule acceptance` or `--scs-step-rule fixed` to select the SCS
+policy explicitly; the [matched-map sensitivity helper](AUTHOR_SCS_CALIBRATION.md#reproduction)
+runs the opposite policy from a completed primary without refitting.
 Use fresh sampling batches to assess variability conditional on the fitted
 maps. Keep worker count and machine conditions consistent. See
 [protocol](COMPARISONS.md) and [ESS](ESS.md).
@@ -66,11 +71,14 @@ exact integers, and CSV/JSON retain full precision.
 
 Both current comparisons use 2 chains of 0.05 seconds for Quick check, 20 chains of
 2 seconds for Smaller reproduction, and 50 chains of 20 seconds for Full paper
-settings, for every target and VI choice. With VI, both map families receive
-equal fresh-batch budgets. Without VI, both maps use R=1 with zero centre/deformation,
-and no fitting draws. Billiard/SCS use their own-kernel radial pilots, RWM/BW
-use acceptance-target 0.234, and reflected BW uses ball-movement pilots, all
-within the same total transition budget.
+settings, for every target and VI choice. With VI, SCS uses the pinned
+authors' fixed-cloud optimizer, seed 0, and full budget of 1,000 updates on
+2,000 reference draws; DCS retains seed 42 and 1,500 updates with 2,000 fresh
+draws each. Their clipping rules also differ, as recorded in the
+[protocol](COMPARISONS.md). Quick and Smaller settings reduce both fitting
+budgets; full fitting may change rankings. Without VI, both maps use R=1
+with zero centre/deformation and no fitting draws. The same separate
+transition budget applies to every method and both SCS step policies.
 All steps freeze before timed sampling. Numba DCS starts from the same JAX
 pilot state and selected step as its JAX counterpart.
 

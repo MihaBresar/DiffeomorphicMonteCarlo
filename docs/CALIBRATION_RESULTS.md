@@ -1,8 +1,8 @@
-# Own-kernel calibration: smaller JAX results
+# Historical version-8 own-kernel calibration results
 
-Recorded on 4 November 2026. These are prespecified exploratory runs, not full-paper evidence.
+Recorded on 4 November 2026. These are prespecified exploratory runs, not full-paper evidence. The tables and archived numerical results below are unchanged. Current version 9 uses a different SCS VI and defaults to the authors' fixed h=0.1, with acceptance adaptation available; see [the active author-baseline study](AUTHOR_SCS_CALIBRATION.md).
 
-The new version-8 calibration uses the actual billiard and SCS production kernels,
+The version-8 calibration used the actual billiard and SCS production kernels,
 the same bounded physical radial-movement score and the same pilot transition budget.
 RWM, BW and reflected BW keep their previous calibration. Targets, maps, VI,
 production kernels, radial estimators and ESS definitions are unchanged.
@@ -54,20 +54,41 @@ The pilots produce different initial production states and random trajectories, 
 old/new chains are not trajectory-matched. This single batch does not establish a stable ranking.
 The t(3) norm has finite variance but no fourth moment; empirical MSE can vary substantially.
 
-## Reproduction
+## Historical reproduction and current runs
 
-Use the JAX five-sampler comparison, 100D target, Smaller reproduction, seed batch 6,
-four workers, and repeat with VI on/off. Select Fresh batch 6 — calibration study
-in the launcher. The equivalent commands are shown below.
+These results belong to version 8. Running the current launcher or command
+line creates version 9 and does **not** reproduce these numerical settings.
+The version-8 primary implementation was published at
+[`d89b0e6bdbad09991ec5a5910ab354951bca76dd`](https://github.com/MihaBresar/DiffeomorphicMonteCarlo/tree/d89b0e6bdbad09991ec5a5910ab354951bca76dd).
+The archived validation records below retain the primary and historical-control
+budgets, source/map hashes and numerical outcomes. Reproducing these historical
+controls requires the recorded version-8 scientific sources and the old
+SCS acceptance/billiard reflected-pilot policies; do not substitute current
+version-9 defaults or bypass source-provenance checks.
 
-```sh
-python run_experiment.py sampler-comparison --target skew-t-100d --vi on --preset reproduce --seed-batch 6 --workers 4 --output-dir results/own-pilot-vi-on
-python run_experiment.py sampler-comparison --target skew-t-100d --vi off --preset reproduce --seed-batch 6 --workers 4 --output-dir results/own-pilot-vi-off
-```
+For current reproducible primary and matched-map sensitivity runs, use the
+[version-9 commands](AUTHOR_SCS_CALIBRATION.md#reproduction). They compare
+acceptance-tuned SCS with fixed h=0.1 under its authors' fitting routine.
+They answer a different question from the historical version-8 controls.
 
-Full paper settings use 50 chains, 20.00 seconds and 1,500 separate pilot transitions per method.
-Select fresh seed batches for independent evaluation. Wall-clock budgets mean exact sample counts
-and errors depend on the computer and scheduling, even with identical random seeds.
+Full paper settings use 50 chains, 20.00 seconds and 1,500 separate pilot
+transitions per method. Wall-clock budgets mean exact sample counts and
+errors depend on the computer and scheduling, even with identical random
+seeds. Freeze the fitting and calibration protocol before running a fresh
+full-paper seed batch and report the prespecified sensitivity outcomes.
+
+The shared pilot rule is a defined benchmark, not evidence that every method
+has equally optimal tuning. These results concern two radial quantities only.
+Earlier [coordinate results](COMPARISON_RESULTS.md) include cases favoring SCS
+and remain part of the public record; radial results do not establish general
+or marginal superiority. Twenty-chain results here are exploratory, and fresh
+full-paper runs assess the frozen implementation rather than guaranteeing its
+ordering in advance.
+The present DCS-Billiard proposal and calibration differ from the original
+paper's BW implementation. These results evaluate the current variant;
+the original paper's figures require their own reproduction and correction.
+The documented map-family, effective-coordinate and tuning differences remain
+part of the experimental protocol.
 
 [Full-precision CSV](../validation/own_kernel_calibration_results.csv),
 [JSON results](../validation/own_kernel_calibration_results.json),

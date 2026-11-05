@@ -40,8 +40,8 @@ class OwnKernelCalibrationReportTests(unittest.TestCase):
         for backend in ('jax','numba'):
             for vi in ('on','off'):
                 config = suite.configuration('paper', comparison=backend, vi=vi)
-                for method in ('DCS-Billiard','SCS'):
-                    self.assertEqual(config['step_tuning_policies'][method], 'own_kernel_radial_pilot_v1')
+                self.assertEqual(config['step_tuning_policies']['DCS-Billiard'], 'own_kernel_radial_pilot_v1')
+                self.assertEqual(config['step_tuning_policies']['SCS'], 'author_scs_fixed_01')
                 self.assertEqual(config['warmup'],1500)
                 self.assertEqual(config['initial_scale'],.1)
                 self.assertEqual(config['beta'],2.)
