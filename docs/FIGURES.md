@@ -1,8 +1,9 @@
-# Original figures and exact values
+# Figures and exact values
 
-The original figure families are restored. The corrected saved chains and
-references determine the numbers; old paper values are never pasted into new
-results. Both fixed-time and fixed-iteration designs remain in the repository.
+Figures and tables are generated from each run's saved chains and references.
+Both fixed-time and fixed-iteration designs are available. Filenames preserve
+the corresponding manuscript figure families; numerical values describe the
+recorded current experiment.
 
 The two current sampler-comparison reports identify their selected target,
 **VI on/off for both map families**, and JAX or optimized Numba execution.
@@ -15,43 +16,41 @@ selected run; they do not imply a general sampler ranking.
 In the other experiments, DCS labels identify the selected map as **Möbius VI** or **vanilla**. Vanilla
 means R=1, centre=0 and Möbius=0, with the experiment's β unchanged. Exact-value
 tables record the policy and its parameter meaning. The two PosteriorDB targets
-keep their identity maps. Old fixed-R=√d results retain their historical labels.
+keep their identity maps.
 
 | Main paper file | Panels, in their original order |
 |---|---|
 | `NUTS_PBW_vs` | Radial tail and norm boxplots with numerical reference lines |
 | `VsRWM_NUTS` | Linear MSE bars for tail probability and mean norm |
-| `VsSCS` | Linear MSE bars for tail probability and mean norm, then average iteration count at equal time (runtime for historical fixed-count runs) |
+| `VsSCS` | Linear MSE bars for tail probability and mean norm, then average iteration count at equal time |
 | `SuperInfiniteFirstTest` | Linear MSE bars for tail probability, mean log norm, then average runtime at equal iterations |
 | `QQ-regresssion` | Two-by-two marginal Q–Q plots for β₁, with ν=4 and ν=6 |
 
-Current reports identify `timed-sampler-comparison-v8` or
-`timed-numba-comparison-v8`. They retain `VsSCS`, `scs_100d_estimates`,
+Current reports identify `timed-sampler-comparison-v9` or
+`timed-numba-comparison-v9`. They retain `VsSCS`, `scs_100d_estimates`,
 `scs_100d_runtime` and `scs_100d_bias_variance`, and add `scs_100d_ess` for
 mean functional ESS per chain and ESS/s. The filenames remain the same in
 500D; titles identify the target. New comparisons report only radial-tail
 probability and mean norm, with analytic references. Coordinate plots are no
 longer generated. CSV/JSON preserve exact counts and full precision.
 
-All methods have equal production-time and pilot transition budgets. Billiard
-and SCS now tune their own production kernels using the same bounded physical
-radial-movement score. RWM/BW retain acceptance-target 0.234 calibration;
-reflected BW retains ball-movement pilots without a geometric ceiling of 2.
+All methods have equal production-time and discarded pilot transition budgets.
+Billiards tune their own kernel using a bounded physical radial-movement score.
+SCS defaults to the authors' fixed h=0.1, with acceptance-target 0.234 tuning
+available as a sensitivity option. RWM/BW use acceptance-target 0.234 calibration;
+reflected BW uses ball-movement pilots without a geometric ceiling of 2.
 Every step freezes before production and the first third is discarded. Effective
-maps and histories are recorded; `radial_tuning.csv` contains the new pilots,
-while `reflected_tuning.csv` contains the reflected-BW trials.
+maps and histories are recorded; `radial_tuning.csv` contains the billiard trials,
+while `reflected_tuning.csv` contains the reflected-BW trials. See the
+[current protocol](COMPARISONS.md) and [SCS step-policy study](AUTHOR_SCS_CALIBRATION.md).
 Functional ESS uses unthinned post-burn-in scalar histories, including
 rejections. Any unavailable chain makes that method aggregate unavailable.
-See [ESS definitions and limits](ESS.md). Archived versions retain their
-recorded coordinate measurements and method lists; replotting cannot invent
-unrecorded methods or recover unthinned ESS from a thinned history.
+See [ESS definitions and limits](ESS.md). Replotting uses recorded measurements;
+it cannot reconstruct unrecorded transitions.
 
-Replotting earlier three-method or boundary summaries preserves their recorded
-target, tuning policy and design. It does not relabel them as the new suite.
-Legacy CLI identifiers and report regeneration remain supported, although the
-old comparisons are no longer launcher choices. The All seven sequence now
-uses the five-method JAX comparison on 100D skewed t with the chosen VI policy;
-the other six experiments retain their existing map options.
+The All seven sequence uses the five-method JAX comparison on 100D skewed t
+with the chosen VI policy; the other six experiments retain their existing
+map options.
 
 The compact **200D random-walk baselines** report keeps just `VsRWM_NUTS`
 (two MSE panels), `VsRWM_NUTS_ergodic_averages` (tail and norm estimates), and
@@ -77,7 +76,6 @@ per chain at thinning 10. Its original image basenames and plot families remain,
 runtime replacing unequal iteration counts in the main figure's third panel.
 For this target the mean norm does not exist; its second MSE panel continues to
 estimate the finite mean of log₁₀(1+‖X‖), and the marginal quantile plots remain.
-Older timed results keep their recorded design when replotted.
 
 The original purple/orange/pink method colors, linear MSE axes, boxplots with
 mean lines, and Q–Q median lines with empirical 5–95% chain bands are retained.
@@ -118,14 +116,11 @@ Each experiment saves:
   reconstruct the reported MSE independently.
 - **`*_marginal_qq.csv`** and **`QQ-regresssion.csv`**: the plotted quantiles and bands, where that experiment includes them.
 
-The new comparison suites also save `tuned_parameters.csv`, `setup_times.csv`
-and `reflected_tuning.csv`, recording map parameters, excluded setup costs and
-every reflected-BW pilot candidate. Version-4 reports additionally save
-`angular_tuning.csv`, angular scales and angles in radians/degrees, and the
-historical warmup splits for rotation mixtures where those methods were recorded. Version-3 and later coordinate reports save
-`reference_values.csv` with the recorded reference values, MCSE and exact flags. Current version-9 runs contain the two analytic radial references.
-Version-2 reports retain their four reference values. With VI off, fitting costs and training
-counts are zero; proposal calibration still runs.
+The current comparison suites also save `tuned_parameters.csv`, `setup_times.csv`,
+`radial_tuning.csv` and `reflected_tuning.csv`, recording map parameters,
+excluded setup costs and pilot candidates. `reference_values.csv` records the
+two analytic radial references. With VI off, fitting costs and training counts
+are zero; the separate discarded pilots still run.
 
 Generated iterations include repeated states after rejected proposals. Retained
 samples exclude the first-third sampling burn-in and reflect thinning; separate

@@ -122,12 +122,8 @@ All methods receive the preset's same total pilot transition budget and freeze
 their scales before sampling. All rules retain broad numerical guards; a guard
 hit or equal budget does not establish optimal tuning. Gaussian RWM's scale is
 a coordinate standard deviation; BW/billiard scale is a proposal-ball radius.
-Historical version-6/7 billiards retain their recorded reflected-BW pilot.
-Version 8 used the same own-kernel radial score for SCS and billiards; its
-[results and historical control recipe](CALIBRATION_RESULTS.md) are retained.
-Version 9 changes SCS fitting and defaults to the authors' fixed h=0.1,
-with acceptance calibration available for sensitivity checks;
-DCS fitting, calibration and production kernels remain unchanged.
+SCS uses the authors' fitting routine and defaults to their fixed h=0.1,
+with acceptance calibration available for sensitivity checks.
 
 Equal pilot transition counts do not establish equally optimal tuning, nor
 equal preparation time. Numerical step sizes have different geometric
@@ -196,9 +192,7 @@ empirical MSE uncertainty unstable. Use longer runs and fresh seed batches
 before drawing publication conclusions.
 
 The active measurements support claims about radial-tail probability and mean
-norm. They do not establish general sampler or marginal superiority. Earlier
-[coordinate measurements](COMPARISON_RESULTS.md), including cases favoring SCS,
-remain available for that broader assessment.
+norm. They do not establish general sampler or marginal superiority.
 
 See [click-to-run instructions](CLICK_TO_RUN.md), [rerun commands](RERUN.md)
 and [the billiard proposal](BILLIARD.md).

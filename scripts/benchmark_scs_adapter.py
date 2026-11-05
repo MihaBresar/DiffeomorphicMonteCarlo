@@ -19,7 +19,8 @@ import jax.numpy as jnp
 
 import argparse
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--saved-summary', type=Path, default=ROOT/'validation/scs_100d_comparison.json')
+parser.add_argument('--saved-summary', type=Path, required=True,
+    help='Saved 100D skew-t comparison summary.json containing the fitted sphere map')
 parser.add_argument('--output', type=Path, default=ROOT/'results/scs-adapter-timing.json')
 args = parser.parse_args()
 mapping_path = args.saved_summary

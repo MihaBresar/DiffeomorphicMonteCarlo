@@ -1,10 +1,9 @@
-# Running the updated experiments
+# Running the experiments
 
 Current version-9 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
 in both JAX and optimized Numba modes, with VI on/off and 100D/500D targets.
 New reports contain only radial estimates/MSE/counts/time plus functional ESS
-and ESS/s. See [the current protocol](COMPARISONS.md); historical sections
-below retain their stated original scope.
+and ESS/s. See [the current protocol](COMPARISONS.md).
 
 On Windows, download the updated repository ZIP, extract it into a new folder,
 then double-click **Start.bat**. On macOS, use **Start.command**. Click
@@ -28,8 +27,8 @@ in implementation and recording costs; author SCS remains in JAX.
 Run every method together in a fresh folder. New runs contain radial-tail
 probability and mean norm, their MSEs, counts and times, plus functional ESS
 and ESS/s. Coordinate statistics and rotation methods
-are removed. Both radial references are analytic. Old files retain their
-recorded scope and cannot reconstruct unthinned ESS or a new sampler.
+are omitted. Both radial references are analytic. Keep the configuration,
+manifest and saved data with the report to identify the experiment.
 
 Billiards retain jointly fitted centre/R/β after Möbius with effective δ=0.
 Billiards tune their own production kernel with a bounded physical
@@ -47,16 +46,14 @@ maps. Keep worker count and machine conditions consistent. See
 [protocol](COMPARISONS.md) and [ESS](ESS.md).
 
 Other experiment ESS reports describe their recorded retained-draw basis;
-check the saved stride. Historical data cannot recover unrecorded transitions.
+check the saved stride.
 
-## Earlier compiled-kernel and burn-in update
+## Experiment choices
 
-The compiled implementation and burn-in policy require fresh runs for **all
-seven experiments**, including the two posterior table rows. Old runs remain
-historical results. Changing labels to two decimals alone needs no sampling:
-figures can be rebuilt from saved results without changing their statistics.
-MSE labels use two decimal places in scientific notation, sample counts remain
-exact integers, and CSV/JSON retain full precision.
+Use a fresh output directory for each new run. Completed figures can be rebuilt
+from saved results without sampling or changing their statistics. MSE labels
+use two decimal places in scientific notation, sample counts remain exact
+integers, and CSV/JSON retain full precision.
 
 | Launcher experiment | Current comparison | Outputs |
 |---|---|---|
@@ -81,11 +78,6 @@ with zero centre/deformation and no fitting draws. The same separate
 transition budget applies to every method and both SCS step policies.
 All steps freeze before timed sampling. Numba DCS starts from the same JAX
 pilot state and selected step as its JAX counterpart.
-
-The CLI identifiers `skew-t-100d-fixed` and `skew-t-100d-boundary` and their
-scripts remain available for historical protocols, as do report regeneration
-and the [three-method](SCS_100D.md) and [boundary](BOUNDARY_100D.md) descriptions.
-They do not launch the new configurable suite and are no longer menu choices.
 
 The super-heavy-tail experiment retains equal iteration counts. Its mean norm
 does not exist at ν=0.5, so use its tail probability, finite mean log norm and
@@ -114,13 +106,16 @@ retain their identity maps.
 ## Optional command-line equivalents
 
 ```bash
-python scripts/reproduce_all.py --preset paper --workers 32 --vi on --output-root results/paper-new
-python run_experiment.py sampler-comparison --target skew-t-100d --vi on --preset paper --workers 32 --output-dir results/comparison-100d-vi
-python run_experiment.py sampler-comparison-numba --target skew-t-100d --vi off --preset paper --workers 32 --output-dir results/numba-100d-no-vi
-python run_experiment.py sampler-comparison --target skew-t-500d --vi off --preset paper --workers 32 --output-dir results/comparison-500d-no-vi
-python run_experiment.py skew-t-50d-nu-0.5 --preset paper --workers 32 --output-dir results/superheavy-new
+python scripts/reproduce_all.py --preset paper --workers 2 --vi on --output-root results/paper-new
+python run_experiment.py sampler-comparison --target skew-t-100d --vi on --preset paper --workers 2 --output-dir results/comparison-100d-vi
+python run_experiment.py sampler-comparison-numba --target skew-t-100d --vi off --preset paper --workers 2 --output-dir results/numba-100d-no-vi
+python run_experiment.py sampler-comparison --target skew-t-500d --vi off --preset paper --workers 2 --output-dir results/comparison-500d-no-vi
+python run_experiment.py skew-t-50d-nu-0.5 --preset paper --workers 2 --output-dir results/superheavy-new
 python run_experiment.py --plot-only results/comparison-100d-vi
 ```
+
+These examples use two workers; choose a worker count appropriate to the
+machine and keep it fixed across comparisons.
 
 The other experiment identifiers are `skew-t-200d-nuts`,
 `skew-t-200d-baselines`, `eight-schools`, `garch11` and `logistic-regression`.
@@ -135,7 +130,6 @@ R-hat ≤1.01, bulk ESS ≥2,000, tail ESS ≥1,000, no divergences or full-tree
 saturation in every parameter. A failed quality screen requires a better
 reference; the thresholds are not weakened by this update.
 
-Original manuscript plot filenames are preserved in each run's `figures`
-folder. Inspect diagnostics before replacing manuscript figures and both rows
-of the posterior table. Earlier audit scripts and their saved reports preserve
-their historical protocols; they are not additional launcher experiments.
+Manuscript plot filenames are preserved in each run's `figures` folder.
+Inspect diagnostics and the resolved protocol before using the generated
+figures or posterior-table rows in a publication.

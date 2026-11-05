@@ -2,9 +2,9 @@
 
 Research software accompanying *Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions*, by Miha Brešar and Aleksandar Mijatović.
 
-The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. It includes corrected manuscript experiments and subsequent sampler comparisons. **The current comparison is protocol version 9; it does not reproduce the original paper figures unchanged.** Billiards and reflected BW are later extensions. Original figures and earlier results remain available with their limitations documented.
+The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. It includes corrected manuscript experiments and subsequent sampler comparisons. **The current comparison is protocol version 9; it does not reproduce the original paper figures unchanged.** Billiards and reflected BW are later extensions. The documentation describes the current experiments so they can be independently run and inspected.
 
-Start with the [reviewer guide](docs/REVIEW_GUIDE.md), [comparison protocol](docs/COMPARISONS.md), or [experiment catalogue](docs/EXPERIMENTS.md). No general performance ranking is assumed: radial and coordinate measurements can favor different methods.
+Start with the [reviewer guide](docs/REVIEW_GUIDE.md), [comparison protocol](docs/COMPARISONS.md), or [experiment catalogue](docs/EXPERIMENTS.md). No general performance ranking is assumed; comparisons must be assessed for the functions and budgets measured.
 
 ## Install and run
 
@@ -91,7 +91,7 @@ Choose a fresh output directory for each comparison. Set the worker count to the
 
 ## Measurements and saved outputs
 
-Current comparisons measure **radial-tail probability and mean norm**, with analytic reference values. Reports include per-chain estimates, MSE, exact generated and post-burn-in counts, production time, functional ESS and ESS/s. Rejected repeats contribute to every estimator and diagnostic. These radial functions do not establish marginal or overall mixing; historical coordinate results, including cases favoring SCS, remain in the record.
+Current comparisons measure **radial-tail probability and mean norm**, with analytic reference values. Reports include per-chain estimates, MSE, exact generated and post-burn-in counts, production time, functional ESS and ESS/s. Rejected repeats contribute to every estimator and diagnostic. These radial functions do not establish marginal or overall mixing.
 
 | Artifact | Contents |
 |---|---|
@@ -105,19 +105,11 @@ Comparison ESS uses every post-burn-in scalar observation. Large unthinned tempo
 
 Displayed estimates use two decimals or scientific notation, while integer sample counts stay exact. Empirical MSE variability is conditional on the fitted maps and available chains. The t(3) norm has no fourth moment, so rare errors can dominate MSE and its estimated uncertainty. ESS is not a convergence guarantee.
 
-## Other experiments and historical evidence
+## Other experiments
 
 The repository also includes 200D skew-t comparisons with NUTS and random-walk baselines, a fixed-iteration 50D t(0.5) experiment, logistic regression, Eight Schools and GARCH. Only the two posterior examples use PosteriorDB. Empirical targets need not satisfy the manuscript's sufficient theorem assumptions. See [target definitions](docs/TARGETS.md) and the [figure-by-figure rerun guide](docs/RERUN.md).
 
-The all-experiments runner includes the JAX 100D comparison and those six experiments; it does not expand every target/VI/backend combination. The [archive index](docs/ARCHIVE.md) separates earlier evidence from the current protocol. Results and reports from older protocols must retain their recorded settings:
-
-- [Original archival figures](figures/archival/README.md): supplied images without complete run provenance.
-- [Earlier coordinate and radial comparisons](docs/COMPARISON_RESULTS.md): include outcomes favoring SCS.
-- [Version-8 calibration results](docs/CALIBRATION_RESULTS.md): own-kernel radial pilots and historical controls.
-- [Version-9 author-SCS sensitivity study](docs/AUTHOR_SCS_CALIBRATION.md): both SCS step choices and the development selection rule.
-- [Implementation audit](docs/IMPLEMENTATION_AUDIT.md) and [manuscript changes](docs/MANUSCRIPT_CHANGES.md): corrections and scope of older experiments.
-
-The current billiard variant is distinct from the original paper's BW sampler. New results cannot retrospectively validate the original figures.
+The all-experiments runner includes the JAX 100D comparison and those six experiments; it does not expand every target/VI/backend combination. The [manuscript relationship](docs/MANUSCRIPT_CHANGES.md) explains the corrections and scope of current experiments. The current billiard variant is distinct from the original paper's BW sampler. New results cannot retrospectively validate the original figures.
 
 ## Citation, attribution and contributions
 

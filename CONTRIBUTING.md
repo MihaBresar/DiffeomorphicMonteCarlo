@@ -16,7 +16,7 @@ For a sampler or experiment change, also run the affected quick experiment and i
 
 ## Scientific changes
 
-Changes to targets, transforms, proposals, acceptance rules, fitting, adaptation, seeds, budgets, retained samples, timing boundaries, estimators or diagnostics can change the scientific experiment. Identify them explicitly. Update protocol/configuration documentation and add a focused regression or numerical check. Preserve historical results and their original settings; never relabel them as evidence for a new protocol.
+Changes to targets, transforms, proposals, acceptance rules, fitting, adaptation, seeds, budgets, retained samples, timing boundaries, estimators or diagnostics can change the scientific experiment. Identify them explicitly. Update protocol/configuration documentation and add a focused regression or numerical check. Keep a result tied to its original source revision and settings; never relabel it as evidence for a changed protocol.
 
 Keep shared implementation in `dcs_bench/`; `experiments/` and compatibility entry points should call that implementation. Preserve pinned third-party source and licenses. A proposed vendor update must identify its upstream revision and explain any resulting experiment changes.
 

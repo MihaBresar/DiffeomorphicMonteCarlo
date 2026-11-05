@@ -10,11 +10,9 @@ study's fallback rule, which was fixed before inspecting its results.
 The rule does not choose by DCS ranking. Acceptance adaptation remains
 available explicitly for sensitivity checks.
 
-The distinction matters: the 45.60% increase in VI-on SCS mean-norm MSE in
-the [version-8 study](CALIBRATION_RESULTS.md) compared two **step-calibration
-rules with exactly the same fitted maps**. It was not evidence that VI caused
-that difference. Version 9 restores the original author fitting recipe;
-the fixed-step control isolates step choice within this new recipe.
+Both step policies use exactly the same fitted maps. The control therefore
+isolates step choice within the original author fitting recipe; it does not
+measure the effect of changing VI.
 
 ## What comes from the authors
 
@@ -75,6 +73,14 @@ seed batch 7. Both VI settings and both SCS step choices are reported. The
 first third of actual production iterations is discarded. The five-method
 primary uses acceptance-tuned SCS; the separate control reuses its exact map,
 seeds and budgets while keeping SCS h=0.1. It does not refit either family.
+
+The seed-batch number only selects sampling seeds: batch `b` starts at
+`901001 + 1000000*b`, with successive seeds assigned to successive chains.
+Batch 7 therefore starts at 7901001; it uses the same random-number generator
+as batch 0. Each chain's seed determines its pilot and production streams.
+Changing this batch does not change the fitting seeds (DCS 42, author SCS 0)
+or refit maps with new VI randomness. "Fresh" refers to a new set of sampling
+seeds, not a different sampling or fitting algorithm.
 
 A pre-results addendum also checks SCS with its **full author VI budget**,
 1,000 updates on 2,000 fixed reference draws, while keeping the same small
@@ -257,8 +263,6 @@ validation result; the fresh batch supplies that assessment. In particular,
 do not select the SCS setting according to which makes DCS look strongest.
 
 Only radial-tail probability and mean norm are measured here, with their
-MSEs, counts, production time and functional ESS. Earlier
-[coordinate findings](COMPARISON_RESULTS.md), including cases favoring SCS,
-remain part of the record. The current billiard proposal differs from the
+MSEs, counts, production time and functional ESS. The current billiard proposal differs from the
 original paper's BW sampler. These results cannot establish general
 dominance, marginal superiority or correctness of the original figures.

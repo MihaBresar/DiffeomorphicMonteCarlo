@@ -197,7 +197,7 @@ def run(saved_summary, baseline_root=None, repeats=5, batches=150):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--saved-summary', type=Path,
-        default=ROOT / 'validation/scs_100d_matched_comparison.json')
+        required=True, help='Saved comparison summary.json containing fitted maps and calibration records')
     parser.add_argument('--baseline-root', type=Path)
     parser.add_argument('--output', type=Path, default=ROOT / 'results/jax-dcs-benchmark.json')
     parser.add_argument('--repeats', type=int, default=5)

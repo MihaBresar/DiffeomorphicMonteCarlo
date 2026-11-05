@@ -1,6 +1,6 @@
 # Reproducibility and timing
 
-This page describes the current comparison and then the six other manuscript experiments. The resolved `configuration.json` and the source/runtime record in `manifest.json` define an individual run. Historical results retain their own protocol; new documentation does not change their settings.
+This page describes the current comparison and then the six other manuscript experiments. The resolved `configuration.json` and the source/runtime record in `manifest.json` define an individual run.
 
 ## Current comparison: version 9
 
@@ -36,7 +36,7 @@ Sampling completes its final 300-transition batch. Actual elapsed seconds, overs
 
 The common CPU policy is `pjrt-single-compute-thread-v1`: `PJRT_NPROC=1` is set before JAX initialization for DCS and SCS, alongside numerical-library thread limits. Runtime helper threads may still exist. Linux/Windows workers use allowed CPU threads, filling physical cores before SMT siblings; macOS allocation is OS-managed. [Parallel execution](PARALLEL.md) describes detection and affinity. Keep hardware, worker count and system load comparable, and avoid concurrent unrelated benchmarks.
 
-Earlier results using only Eigen thread limits have a different execution policy. Do not combine their rates or counts with current runs. Changing execution resources or output collection can change timed counts and therefore MSE; rerun the complete method set after such changes.
+Do not combine rates or counts from different execution policies. Changing execution resources or output collection can change timed counts and therefore MSE; rerun the complete method set after such changes.
 
 ### Estimates, uncertainty and ESS
 
@@ -70,7 +70,7 @@ Generic workers stream draws through bounded buffers. Thinning, physical convers
 
 Posterior DCS receives the mean production time of fixed-count NUTS runs; setup is reported separately. The quick posterior preset alone imposes a one-second minimum DCS budget as an execution check, so its plots are not an equal-time performance result. Benchmark NUTS uses target acceptance 0.8 and maximum depth 10; reference runs use their independently recorded settings.
 
-The generic `ball_map_policy` selector changes DCS only: `mobius` fits the map, while `vanilla` keeps R=1, centre=0 and deformation=0 with β retained. This differs from the current comparison's `--vi off`, which disables fitting for both map families. PosteriorDB examples retain their specified identity maps. The SCS fitting policy in historical/generic configurations must be read from those configurations, not inferred from version 9.
+The generic `ball_map_policy` selector changes DCS only: `mobius` fits the map, while `vanilla` keeps R=1, centre=0 and deformation=0 with β retained. This differs from the current comparison's `--vi off`, which disables fitting for both map families. PosteriorDB examples retain their specified identity maps. The SCS fitting policy in generic configurations must be read from those configurations, not inferred from version 9.
 
 Generic ESS/MCSE describes the retained series used by the estimator; it is not multiplied by the thinning stride. Multichain diagnostics use a recorded common prefix of the shortest chain, while means and per-chain diagnostics use all retained draws. A constant functional has unavailable ESS/MCSE rather than an artificial zero; rank R-hat requires multiple chains. The compact 200D baseline report omits coordinate quantiles and cross-chain diagnostics. [Result processing](RESULT_PROCESSING.md) explains storage and progress reporting.
 
@@ -78,6 +78,6 @@ Generic checkpoints support resume after source, configuration and environment v
 
 ## Publication archive
 
-Archive the exact clean source snapshot, pinned requirements, resolved inputs and complete successful result directories used for the manuscript. Record the commit or release and an archive DOI when one exists. Keep execution checks, development studies and independent full runs clearly distinguished. Original archival images without manifests remain historical assets, not verified reproductions. Do not overwrite them with new figures.
+Archive the exact clean source snapshot, pinned requirements, resolved inputs and complete successful result directories used for the manuscript. Record the commit or release and an archive DOI when one exists. Keep execution checks, development studies and independent full runs clearly distinguished.
 
 Storage and setup costs depend on dimension, counts, worker concurrency and diagnostics. Measure a smaller run before scheduling a full study. Preserve exact numbers and metadata alongside rendered figures; two-decimal presentation must not replace full-precision exports.

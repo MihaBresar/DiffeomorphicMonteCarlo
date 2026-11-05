@@ -4,8 +4,7 @@ This repository contains corrected implementations and later sampler
 extensions. It is not a claim that running the current default configuration
 reproduces every numerical value in an earlier manuscript. The current
 five-method comparison includes reflected BW and billiards, which are distinct
-from the original ordinary BW proposal. Historical results and implementation
-checks remain in the [archive](ARCHIVE.md).
+from the original ordinary BW proposal.
 
 The active settings, including SCS author VI, fixed h=0.1 and its optional
 acceptance-tuned control, are specified in [COMPARISONS.md](COMPARISONS.md).
@@ -45,9 +44,9 @@ configuration and saved results used to produce them.
 
 Norm-based empirical MSE under ν=3 can be unstable because the norm has no
 fourth moment. Current radial results do not establish coordinate-marginal
-superiority or universal sampler rankings. Earlier coordinate findings remain
-available. Empirical examples outside sufficient theorem assumptions are
-valid experiments, but those theorems do not establish convergence for them.
+superiority or universal sampler rankings. Empirical examples outside sufficient
+theorem assumptions are valid experiments, but those theorems do not establish
+convergence for them.
 
 [TARGETS.md](TARGETS.md), [RERUN.md](RERUN.md), [ESS.md](ESS.md) and
 [REPRODUCIBILITY.md](REPRODUCIBILITY.md) define the target, output and timing

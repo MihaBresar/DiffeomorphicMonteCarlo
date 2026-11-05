@@ -6,7 +6,7 @@ This repository supports inspection and independent reruns of the corrected expe
 
 The current JAX and optimized-Numba comparisons use version 9. They compare DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard on 100D/500D normal-CDF-skewed t(3) targets, with VI on/off. Billiards and reflected BW are subsequent extensions. The current suite measures radial-tail probability and mean norm; it cannot establish coordinate or general sampler superiority.
 
-The original manuscript figures are [archival assets](../figures/archival/README.md) without complete run provenance. Current runs incorporate implementation and calibration corrections and do not validate those figures retrospectively. [Earlier coordinate measurements](COMPARISON_RESULTS.md), including cases favoring SCS, and [version-8 calibration results](CALIBRATION_RESULTS.md) remain available. The [version-9 SCS study](AUTHOR_SCS_CALIBRATION.md) reports both fixed and acceptance-tuned policies rather than only a favorable setting.
+Current runs incorporate implementation and calibration corrections and do not reproduce or validate the original manuscript figures retrospectively. The [manuscript relationship](MANUSCRIPT_CHANGES.md) identifies their scope. The [version-9 SCS study](AUTHOR_SCS_CALIBRATION.md) documents the current step-policy choice and reports both fixed and acceptance-tuned outcomes.
 
 ## Minimal independent check
 
