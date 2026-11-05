@@ -9,7 +9,7 @@ removed from new comparison runs. New comparisons always fit both map families b
 | `sampler-comparison` | All five methods in JAX |
 | `sampler-comparison-numba` | DCS-RWM, DCS-BW, DCS-BW-reflect and DCS-Billiard in optimized Numba; unchanged author SCS in JAX |
 
-Both modes use protocol version 10. RWM means DCS-RWM in transformed ball
+Both modes use protocol version 11. RWM means DCS-RWM in transformed ball
 coordinates. Its isotropic Gaussian proposal rejects exterior endpoints;
 ordinary BW uses a uniform-ball increment and also rejects exterior endpoints.
 Reflected BW folds exterior endpoints along the proposal chord before its
@@ -54,7 +54,7 @@ fitted ball map. `method_maps.json`, `effective_maps.csv`, summary and manifest
 record the distinction. Base-normalizing constants differ, so reported VI
 losses are not comparable normalized KL values across families.
 
-Version 10 uses the **pinned authors' VI routine for SCS** and matches the
+Versions 10 and 11 use the **pinned authors' VI routine for SCS** and match the
 number of fitting objective/gradient evaluations across both families. DCS
 uses a fixed reference cloud and a full budget of 1,000 updates. SCS retains
 its original fixed-cloud routine, seed 0, Adam 0.01, and
@@ -77,32 +77,33 @@ The unchanged author VI and transition are applied to this repository's
 normal-CDF-skewed t target, not the authors' Student-t-CDF-skewed example.
 See [the author baseline and sensitivity study](AUTHOR_SCS_CALIBRATION.md).
 
-## Separate proposal calibration
+Version 11 does not change these fitting settings or maps. Fresh-cloud VI for
+both families is a separate experimental study, not the public default.
 
-DCS-Billiard runs its **actual production kernel** during its separate pilot
-and selects by a radial-movement score. For consecutive accepted-or-repeated
-physical states, set Δ = log(1 + ‖X_next‖) − log(1 + ‖X_current‖); the score is
-mean Δ²/(1 + Δ²). Rejections score zero. This bounded proxy does not use target
-truth, production MSE or ESS and is not a guarantee of optimal mixing.
+## Shared DCS move and separate warmup
 
-The prespecified search tests five coarse scales h × (0.25, 1, 4, 16, 64),
-then three refinement scales at (0.5, 1, 2) times the coarse winner. The existing
-initial h remains 0.1. The complete warmup budget is allocated across these
-eight windows: 125 transitions each for Smaller reproduction, and 187 or 188
-for Full paper settings. Candidate execution order is randomized by the pilot
-seed within each stage; chronological order and counts are saved. Numerical
-scale guards still apply. This finite search is not a new geometric step cap.
+All four DCS variants share one fixed move **h=0.07**. BW, reflected BW and
+billiard draw the same uniform-ball increment distribution of radius h.
+RWM uses Gaussian coordinate standard deviation **σ=h/√(d+2)**, matching the
+increment covariance h²I/(d+2). This does not make the proposal distributions,
+physical endpoints or acceptance probabilities identical. Billiards retain
+their effective post-Möbius coordinates; this is part of their transition,
+not a separate map fit or step optimization.
 
-All pilot observations are discarded. The last pilot state and selected scale
-initialize production; no production adaptation is performed. Billiards use
-their effective post-Möbius map. The
-same JAX pilot is used for either JAX or Numba production. Equal transition
-budgets need not take equal time; actual pilot seconds are reported separately
-and excluded from production time. `radial_tuning.csv` records candidate
-steps, scores, acceptance and selections, separately from reflected-BW pilots.
+Each variant runs its actual production kernel during separate discarded
+warmup, keeping the shared step fixed. Reflected BW and billiard receive no
+additional step-selection pilot under this default. Numba production receives
+the identical JAX warmup state and frozen step. Warmup time is recorded
+separately from sampling time.
 
-Ordinary DCS-RWM and DCS-BW use observed-acceptance dual averaging toward
-0.234. SCS defaults to the authors' skew-t **fixed h=0.1**, including during
+`--dcs-fixed-move 0.15` changes h for all four DCS variants. These values are
+declared settings, not demonstrated optima. The historical
+`--dcs-step-rule acceptance` control restores ordinary BW/RWM acceptance
+adaptation toward 0.234, reflected-BW ball-movement pilots and billiard
+radial-movement pilots. Record the selected policy and report prespecified
+alternatives without selecting by which method wins.
+
+SCS defaults to the authors' skew-t **fixed h=0.1**, including during
 its discarded pilot. It is not an adaptively selected step. Acceptance
 adaptation toward 0.234 remains an explicit alternative; it uses the
 unchanged author transition and recorded sphere map. That adaptation is a
@@ -118,21 +119,24 @@ to fixed h=0.1. Acceptance failed that rule, so the default is fixed h=0.1.
 Both historical checks used the small production budget. All results are reported, and
 a fresh full-paper batch evaluates that development choice.
 
-Reflected BW retains its ball-movement pilot: up to eight rounds of
-rotating h/2, h and 2h trials, selecting by observed squared movement in the
-shared ball map with rejected moves scoring zero. It has no geometric step
-ceiling of 2. Its trials remain in `reflected_tuning.csv`.
+Under the historical adaptive control only, reflected BW tests rotating
+h/2, h and 2h trials by squared ball movement, and billiard tests its own
+kernel using bounded squared changes of physical log(1+norm). Rejections
+score zero. Their histories are exported when those controls are selected;
+they are not run or represented as fixed-step default warmup.
 
-All methods receive the preset's same total pilot transition budget and freeze
-their scales before sampling. All rules retain broad numerical guards; a guard
-hit or equal budget does not establish optimal tuning. Gaussian RWM's scale is
-a coordinate standard deviation; BW/billiard scale is a proposal-ball radius.
+All methods receive the preset's same total discarded warmup-transition budget.
+Under the default, all five methods use fixed-step equilibration. Adaptive
+controls retain broad numerical guards and freeze before production. Equal
+counts do not establish equal warmup time or optimal settings.
+Gaussian RWM's recorded scale is a coordinate standard deviation;
+BW/reflected-BW/billiard scale is the initial proposal-ball radius.
 SCS uses the authors' fitting routine and defaults to their fixed h=0.1,
 with acceptance calibration available for sensitivity checks.
 
 Equal pilot transition counts do not establish equally optimal tuning, nor
 equal preparation time. Numerical step sizes have different geometric
-meanings across kernels, and the active methods use different selection
+meanings across kernels, and optional historical controls use different selection
 criteria. Report the SCS acceptance and fixed-step sensitivity outcomes
 together. Freeze the main protocol before evaluating a fresh full-paper
 seed batch; the smaller study is development evidence, not an independent
@@ -174,10 +178,13 @@ The SCS cloud is reused at every update. Thus full settings evaluate 2,000
 reference states over 1,000 updates, not just 2,000 target evaluations in
 total. Smaller presets reduce the authors' fitting budget and do not claim
 to reproduce the paper's full VI fit. Version 9 gave DCS 1,500 full fitting
-updates and fresh draws at every update. Version 10 uses 1,000 full updates
-and a fixed reference cloud at every preset. Rerun all methods together for
-new comparisons, including Quick and Smaller runs; their update counts are
-unchanged, but the DCS fitting draws are now reused.
+updates and fresh draws at every update. Version 10 introduced 1,000 full
+updates and a fixed reference cloud at every preset; version 11 retains this
+fitting policy. Version 10's method-specific DCS calibration—acceptance-target
+0.234 for ordinary RWM/BW, ball movement for reflected BW and radial movement
+for billiards—is replaced by the v11 shared fixed-move default. Rerun all five methods together in
+fresh folders for new v11 sampling comparisons at every preset. Old reports
+retain their original fitted maps and step policies.
 
 Compilation, fitting, pilots, synchronization,
 ESS computation and final file/report generation are outside production time.

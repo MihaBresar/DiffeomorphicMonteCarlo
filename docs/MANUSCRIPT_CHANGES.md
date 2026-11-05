@@ -6,8 +6,9 @@ reproduces every numerical value in an earlier manuscript. The current
 five-method comparison includes reflected BW and billiards, which are distinct
 from the original ordinary BW proposal.
 
-The active settings, including SCS author VI, fixed h=0.1 and its optional
-acceptance-tuned control, are specified in [COMPARISONS.md](COMPARISONS.md).
+The active version-11 settings, including shared BW/reflected-BW/billiard increment radius h=0.07,
+Gaussian RWM coordinate standard deviation h/√(d+2), SCS author VI, fixed
+SCS h=0.1 and sensitivity controls, are specified in [COMPARISONS.md](COMPARISONS.md).
 The `paper` preset means the recorded full benchmark budget. Figures and
 numerical claims for a publication must identify the exact source revision,
 configuration and saved results used to produce them.
@@ -28,7 +29,9 @@ configuration and saved results used to produce them.
   documented identity affine map and β=1.
 - Adaptation and fitting are separate from production. Every new experiment
   discards the first third of its production iterations. The active SCS
-  baseline has a fixed step; other proposal-calibration policies are recorded
+  baseline and all four DCS comparison variants have fixed steps during
+  discarded warmup and production. The DCS variants share one move scale,
+  with the stated Gaussian normalization. Other proposal-calibration policies are recorded
   per method. Fitting recipes and initialization differ across experiment
   families and must be read from their resolved configuration.
 - All VI-enabled SCS fits call the pinned authors' optimizer, including
@@ -39,6 +42,12 @@ configuration and saved results used to produce them.
   production remains the checked Numba implementation with acceptance-target
   0.234 step tuning, while the 100D/500D comparison retains author JAX
   production and the fixed-h=0.1 default.
+- Version 11 retains version 10's fitted maps and changes all four DCS variants
+  from method-specific calibration to a shared fixed move h=0.07,
+  with h=0.15 available as a sensitivity setting. Gaussian RWM scales by
+  1/√(d+2) to match BW increment covariance. This requires new sampling and
+  does not establish either value as optimal. Fresh-cloud VI studies are
+  separate experiments and are not public fitting defaults.
 - NUTS comparison settings include target acceptance 0.8 and maximum depth 10.
   Reference chains have separate settings. Timing distinguishes preparation,
   production, diagnostics and total elapsed execution. Parallel timing is

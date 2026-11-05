@@ -23,8 +23,12 @@ def write(path, value):
 def primary_fixture(root, backend='jax', vi='on', version=None):
     with patch.object(runner, 'cpu_info', return_value=HARDWARE):
         config = suite.configuration('quick', workers=2, overrides={'scs_step_rule':'acceptance'}, comparison=backend, vi=vi)
+    if version in (9, 10):
+        config['protocol'] = f'timed-{"sampler" if backend == "jax" else "numba"}-comparison-v{version}'
+        config['dcs_step_rule'] = 'acceptance'
+        for method in ('DCS-RWM', 'DCS-BW'):
+            config['step_tuning_policies'][method] = 'indicator_dual_averaging_0234'
     if version == 9:
-        config['protocol'] = 'timed-sampler-comparison-v9' if backend == 'jax' else 'timed-numba-comparison-v9'
         config['vi_batch_policy'] = 'fresh'
         config.pop('vi_budget_policy', None)
     d = config['dimension']
@@ -100,7 +104,7 @@ class CalibrationControlTests(unittest.TestCase):
     def test_v10_control_rejects_mismatched_fit_records(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)/'primary'
-            files = primary_fixture(root)
+            files = primary_fixture(root, version=10)
             self.assertTrue(files['configuration.json']['protocol'].endswith('-v10'))
             for name in ('maps.json', 'summary.json'):
                 files[name]['fitting']['ball']['objective_point_evaluations'] = 2561

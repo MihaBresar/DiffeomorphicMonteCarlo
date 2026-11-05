@@ -14,7 +14,7 @@ The [SCS paper](https://arxiv.org/abs/2601.11066) is by Sebastiano Grazzi,
 Sifan Liu, Gareth O. Roberts and Jun Yang.
 
 The adapter removes progress callbacks, compiles before timing, and evaluates
-radial summaries in bounded scan blocks. The active version-10 baseline uses
+radial summaries in bounded scan blocks. The active version-11 baseline uses
 the authors' VI recipe and fixed h=0.1; an explicit acceptance-tuned alternative
 is retained. Full settings use the authors' 1,000 VI updates on 2,000 fixed
 reference draws. Smaller presets reduce that fitting budget. Version 10 gives DCS the same 1,000-update/2,000-point full budget and a

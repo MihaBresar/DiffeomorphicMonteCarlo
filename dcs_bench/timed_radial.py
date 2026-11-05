@@ -27,6 +27,7 @@ PREFIX_STRIDE = 100
 STEP_POLICY = 'common raw dual averaging of observed acceptance to 0.234 during separate warmup; smoothed final scale frozen'
 ACCEPTANCE_TUNING = 'indicator_dual_averaging_0234'
 SCS_FIXED_TUNING = 'author_scs_fixed_01'
+FIXED_DCS_TUNING = 'fixed_dcs_move_v1'
 BALL_TUNING = 'ball_esjd_pilot_v1'
 RADIAL_TUNING = 'own_kernel_radial_pilot_v1'
 ROTATION_TUNING = 'split_ball_angular_esjd_v1'
@@ -34,6 +35,7 @@ ROTATION_METHOD = 'DCS-BW-rotate'
 RWM_ROTATION_METHOD = 'DCS-RWM-rotate'
 ROTATION_METHODS = (ROTATION_METHOD, RWM_ROTATION_METHOD)
 BILLIARD_METHOD = 'DCS-Billiard'
+FIXED_DCS_METHODS = ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', BILLIARD_METHOD)
 BALL_STEP_POLICY = ('Discarded-pilot squared jump distance in ball coordinates; '
                     'up to eight rotating h/2, h, 2h triplet rounds within the existing warmup budget, then frozen')
 ROTATION_STEP_POLICY = ('Split the existing discarded warmup budget between reflected-BW ball movement '
@@ -63,16 +65,18 @@ def resolve_step_tuning(config):
     for method, policy in policies.items():
         if method not in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', ROTATION_METHOD, RWM_ROTATION_METHOD, BILLIARD_METHOD, 'SCS'):
             raise ValueError(f'Unknown tuning method: {method}')
-        if policy not in (ACCEPTANCE_TUNING, SCS_FIXED_TUNING, BALL_TUNING, RADIAL_TUNING, ROTATION_TUNING):
+        if policy not in (ACCEPTANCE_TUNING, SCS_FIXED_TUNING, FIXED_DCS_TUNING, BALL_TUNING, RADIAL_TUNING, ROTATION_TUNING):
             raise ValueError(f'Unknown step tuning policy: {policy}')
+        if policy == FIXED_DCS_TUNING and method not in FIXED_DCS_METHODS:
+            raise ValueError('Fixed DCS moves are defined for RWM, BW, reflected BW and billiards only')
         if policy == SCS_FIXED_TUNING and method != 'SCS':
             raise ValueError('The author fixed h=0.1 control is defined for SCS only')
         if policy == BALL_TUNING and method not in ('DCS-BW-reflect', BILLIARD_METHOD):
             raise ValueError('Ball ESJD calibration is defined for reflected BW and billiards only')
         if policy == RADIAL_TUNING and method not in (BILLIARD_METHOD, 'SCS'):
             raise ValueError('Own-kernel radial calibration is defined for billiards and SCS only')
-        if method == BILLIARD_METHOD and policy not in (BALL_TUNING, RADIAL_TUNING):
-            raise ValueError('Billiards require the historical reflected-BW pilot or own-kernel radial calibration')
+        if method == BILLIARD_METHOD and policy not in (BALL_TUNING, RADIAL_TUNING, FIXED_DCS_TUNING):
+            raise ValueError('Billiards require a fixed own-kernel move, the historical reflected-BW pilot or own-kernel radial calibration')
         if (policy == ROTATION_TUNING) != (method in ROTATION_METHODS):
             raise ValueError('Rotation mixtures require split reflected-step/angular calibration')
     selected = policies.get(config['algorithm'],
@@ -80,6 +84,10 @@ def resolve_step_tuning(config):
                             BALL_TUNING if config['algorithm'] == BILLIARD_METHOD else ACCEPTANCE_TUNING)
     if selected == SCS_FIXED_TUNING and config.get('initial_scale', .1) != .1:
         raise ValueError('The author fixed-step control requires initial_scale=0.1')
+    if selected == FIXED_DCS_TUNING:
+        _fixed_dcs_move(config)
+        if isinstance(config['warmup'], bool) or not isinstance(config['warmup'], int) or config['warmup'] < 1:
+            raise ValueError('Fixed DCS moves require a positive integer discarded warmup')
     if selected == BALL_TUNING and config['warmup'] < 3:
         raise ValueError('Ball ESJD calibration requires at least three warmup transitions')
     if selected == RADIAL_TUNING and config['warmup'] < 8:
@@ -96,8 +104,25 @@ def resolve_step_tuning(config):
     return selected
 
 
+def _fixed_dcs_move(config):
+    """Validate the prespecified BW radius used to normalize fixed DCS moves."""
+    if config['algorithm'] not in FIXED_DCS_METHODS:
+        raise ValueError('Fixed DCS moves are defined for RWM, BW, reflected BW and billiards only')
+    radius = config.get('dcs_fixed_move')
+    if isinstance(radius, bool) or not isinstance(radius, Real) or not np.isfinite(radius) or radius <= 0.:
+        raise ValueError('dcs_fixed_move must be positive and finite')
+    return float(radius)
+
+
 def _initial_proposal_scale(config):
-    """Keep BW-radius initialization and convert only the Gaussian mixture."""
+    """Resolve the actual BW radius or Gaussian coordinate standard deviation."""
+    policies = config.get('step_tuning_policies', {})
+    if isinstance(policies, dict) and policies.get(config['algorithm']) == FIXED_DCS_TUNING:
+        radius = _fixed_dcs_move(config)
+        if config['algorithm'] == 'DCS-RWM':
+            dimension = int(scs_paper.target_spec(config)['dimension'])
+            return radius / np.sqrt(dimension + 2.)
+        return radius
     radius = float(config.get('initial_scale', .1))
     if config['algorithm'] == RWM_ROTATION_METHOD:
         from .rwm_rotation import initial_sigma
@@ -123,8 +148,11 @@ def resolve_step_scale_ceiling(config):
     for name, value in limits.items():
         if name not in methods:
             raise ValueError(f'Unknown step-scale ceiling method: {name}')
+        policies = config.get('step_tuning_policies', {})
         minimum = (_initial_proposal_scale(dict(config, algorithm=name))
-                   if name == RWM_ROTATION_METHOD else initial_scale)
+                   if name == RWM_ROTATION_METHOD or
+                   (isinstance(policies, dict) and policies.get(name) == FIXED_DCS_TUNING)
+                   else initial_scale)
         if isinstance(value, bool) or not isinstance(value, Real) or \
                 not np.isfinite(value) or value < minimum:
             raise ValueError(f'step_scale_ceilings[{name!r}] must be finite and at least initial_scale')
@@ -282,6 +310,13 @@ def _fixed_scs_warmup(block, initial, key, warmup):
     return states[-1], jnp.asarray(.1), jnp.sum(accepts)
 
 
+def _fixed_dcs_warmup(block, initial, key, warmup, scale):
+    """Discard the usual warmup budget without adapting a prespecified move."""
+    import jax.numpy as jnp
+    states, accepts = block(initial, key, warmup, jnp.asarray(scale))
+    return states[-1], jnp.asarray(scale), jnp.sum(accepts)
+
+
 def _radial_batch(block, projection, state, key, scale, thin, threshold, coordinate_threshold=None):
     """The same full-state projection and statistic work, including rejections."""
     import jax.numpy as jnp
@@ -314,8 +349,8 @@ def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initi
     if algorithm == BILLIARD_METHOD and tuning_policy == BALL_TUNING:
         calibration_block, _, _, _ = _components(
             effective_mapping(mapping, algorithm), spec, 'DCS-BW-reflect')
-    elif algorithm == BILLIARD_METHOD and tuning_policy != RADIAL_TUNING:
-        raise ValueError('Billiards require reflected-BW or own-kernel radial calibration')
+    elif algorithm == BILLIARD_METHOD and tuning_policy not in (RADIAL_TUNING, FIXED_DCS_TUNING):
+        raise ValueError('Billiards require fixed own-kernel warmup, reflected-BW or own-kernel radial calibration')
     if not np.isfinite(float(density(initial))) or not np.all(np.isfinite(np.asarray(projection(initial)))):
         raise ValueError('Nonfinite initial density or physical point')
     if tuning_policy == RADIAL_TUNING:
@@ -331,6 +366,11 @@ def _programs(mapping_json, spec_json, algorithm, warmup, thin, threshold, initi
         if algorithm != 'SCS' or initial_scale != .1 or warmup < 1:
             raise ValueError('Fixed h=0.1 requires SCS and a positive discarded warmup')
         burn = lambda state, key: _fixed_scs_warmup(block, state, key, warmup)
+    elif tuning_policy == FIXED_DCS_TUNING:
+        if algorithm not in FIXED_DCS_METHODS or warmup < 1 or \
+                not np.isfinite(initial_scale) or initial_scale <= 0.:
+            raise ValueError('Fixed DCS moves require RWM/BW/reflected BW/billiards, a positive step and discarded warmup')
+        burn = lambda state, key: _fixed_dcs_warmup(block, state, key, warmup, initial_scale)
     else:
         raise ValueError(f'Unknown step tuning policy: {tuning_policy}')
     batch = lambda state, key, scale: _radial_batch(
@@ -414,7 +454,7 @@ class _Matched:
             config['algorithm'], config['warmup'], config['thin'],
             float(config.get('threshold', 50.)), self.initial_scale, scale_ceiling)
         # Preserve the original compiled-program key and RNG path for controls.
-        if self.tuning_policy in (BALL_TUNING, RADIAL_TUNING, SCS_FIXED_TUNING):
+        if self.tuning_policy in (BALL_TUNING, RADIAL_TUNING, SCS_FIXED_TUNING, FIXED_DCS_TUNING):
             arguments += (self.tuning_policy,)
         extra = ({'coordinate_threshold': float(config['coordinate_threshold'])}
                  if config.get('coordinate_metrics', False) else {})
@@ -468,18 +508,35 @@ class _Matched:
             self.tuning_metadata.update(calibration_algorithm='SCS',
                 tuning_note='Author skew-t fixed h=0.1; same discarded warmup transition budget, no step adaptation',
                 step_size_adapted=False, fixed_step=.1)
+        elif self.tuning_policy == FIXED_DCS_TUNING:
+            radius = _fixed_dcs_move(config)
+            self.tuning_metadata.update(calibration_algorithm=config['algorithm'],
+                tuning_note='Prespecified DCS move; the actual production kernel runs for the '
+                    'full discarded warmup budget without step adaptation. BW, reflected BW and '
+                    'billiards use initial uniform-ball increment radius h; '
+                    'RWM uses Gaussian coordinate standard deviation h/sqrt(d+2), matching '
+                    'the initial uniform-ball increment coordinate variance.',
+                step_size_adapted=False, fixed_move_radius=radius, fixed_step=self.scale,
+                fixed_move_normalization='BW/reflected BW/billiard increment radius h; RWM coordinate sigma=h/sqrt(d+2)',
+                proposal_coordinate_variance=radius**2 / (int(spec['dimension'])+2.),
+                scale_parameter='Gaussian coordinate standard deviation' if config['algorithm'] == 'DCS-RWM'
+                    else 'initial uniform-ball increment radius',
+                tuning_pilot_iterations=config['warmup'])
         self.warmup_acceptance = float(accepts) / config['warmup'] if config['warmup'] else None
         self.implementation = ('Original author JAX SCS transition' if config['algorithm'] == 'SCS'
             else 'DCS JAX transition') + '; separate calibration, full-state scans and radial recording'
         if config['algorithm'] == BILLIARD_METHOD:
-            own_kernel = self.tuning_policy == RADIAL_TUNING
+            fixed_step = self.tuning_policy == FIXED_DCS_TUNING
+            own_kernel = self.tuning_policy in (RADIAL_TUNING, FIXED_DCS_TUNING)
             self.implementation = ('Optimized endpoint-only JAX specular billiard with invariant extra chords; '
-                'post-Mobius coordinates, ' + ('own-kernel radial pilot' if own_kernel else 'reflected-BW pilot') +
+                'post-Mobius coordinates, ' + ('fixed-step own-kernel warmup' if fixed_step else
+                    'own-kernel radial pilot' if own_kernel else 'reflected-BW pilot') +
                 ', shared full-state statistics')
             self.tuning_metadata.update(
                 effective_map=deepcopy(mapping),
                 proposal_coordinates='Post-Mobius w; retained supplied centre/R/beta, zero direct deformation',
-                calibration_coordinates=('Own billiard radial-movement pilot' if own_kernel else 'Reflected-BW ball-movement pilot') +
+                calibration_coordinates=('Fixed-step own billiard warmup' if fixed_step else
+                    'Own billiard radial-movement pilot' if own_kernel else 'Reflected-BW ball-movement pilot') +
                     ' in post-Mobius w, from the common physical all-ones start',
                 calibration_algorithm=BILLIARD_METHOD if own_kernel else 'DCS-BW-reflect',
                 calibrated_state_sha256=hashlib.sha256(np.asarray(self.state).tobytes()).hexdigest(),
@@ -775,9 +832,11 @@ def _run_timed(mapping_dict, config, seed, before_sampling, after_sampling,
                         ROTATION_STEP_POLICY if tuning_policy == ROTATION_TUNING else
                         radial_step_policy if tuning_policy == RADIAL_TUNING else
                         BALL_STEP_POLICY if tuning_policy == BALL_TUNING else
+                        'Prespecified DCS move: BW/reflected BW/billiard increment radius h, RWM coordinate sigma=h/sqrt(d+2); '
+                        'same fixed step throughout discarded warmup and sampling' if tuning_policy == FIXED_DCS_TUNING else
                         'Author SCS fixed h=0.1; discarded warmup without adaptation' if tuning_policy == SCS_FIXED_TUNING else STEP_POLICY),
         'tuning_policy': tuning_policy,
-        'target_acceptance': None if tuning_policy in (BALL_TUNING, RADIAL_TUNING, ROTATION_TUNING, SCS_FIXED_TUNING) else .234,
+        'target_acceptance': None if tuning_policy in (BALL_TUNING, RADIAL_TUNING, ROTATION_TUNING, SCS_FIXED_TUNING, FIXED_DCS_TUNING) else .234,
         'common_cpu_backend': 'mixed: optimized Numba DCS, author JAX SCS' if config.get('dcs_backend') == 'numba' else 'JAX',
         'backend': 'Numba' if native else 'JAX',
         'implementation_revision': config.get('implementation_revision', IMPLEMENTATION_REVISION),

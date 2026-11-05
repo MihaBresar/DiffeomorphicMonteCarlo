@@ -19,7 +19,9 @@ METHODS = ['SCS']
 PROTOCOLS = {'timed-sampler-comparison-v9': 'jax',
              'timed-numba-comparison-v9': 'numba',
              'timed-sampler-comparison-v10': 'jax',
-             'timed-numba-comparison-v10': 'numba'}
+             'timed-numba-comparison-v10': 'numba',
+             'timed-sampler-comparison-v11': 'jax',
+             'timed-numba-comparison-v11': 'numba'}
 
 
 def _read(path):
@@ -43,7 +45,7 @@ def prepare_control(primary):
         ('configuration.json', 'manifest.json', 'maps.json', 'summary.json'))
     protocol = config.get('protocol')
     if protocol not in PROTOCOLS or manifest.get('status') != 'complete':
-        raise ValueError('The primary must be a completed version-9 or version-10 sampler comparison')
+        raise ValueError('The primary must be a completed version-9, version-10 or version-11 sampler comparison')
     backend = PROTOCOLS[protocol]
     if config != manifest.get('config') or config != summary.get('config') or manifest.get('protocol') != protocol:
         raise ValueError('Primary configuration, manifest and summary do not agree')
@@ -70,20 +72,20 @@ def prepare_control(primary):
         raise ValueError('Primary ball and sphere maps and fit records are required')
     if maps != summary.get('maps') or fitting != summary.get('fitting'):
         raise ValueError('Primary map artifact and summary do not agree')
-    if protocol.endswith('-v10'):
+    if protocol.endswith(('-v10', '-v11')):
         steps, draws = config.get('optimizer_steps'), config.get('optimizer_samples')
         if (config.get('vi') != 'on' or config.get('vi_batch_policy') != 'fixed'
                 or config.get('vi_budget_policy') != 'equal_updates_and_fixed_reference_clouds_v1'
                 or not isinstance(steps, int) or isinstance(steps, bool) or steps < 1
                 or not isinstance(draws, int) or isinstance(draws, bool) or draws < 1
                 or config.get('scs_vi') != dict(optimizer_steps=steps, optimizer_samples=draws)):
-            raise ValueError('Version-10 primary requires matched fixed-cloud VI budgets')
+            raise ValueError('Version-10/11 primary requires matched fixed-cloud VI budgets')
         for fit in fitting.values():
             if (fit.get('steps') != steps or fit.get('training_draws') != draws
                     or fit.get('batch_policy') != 'fixed' or fit.get('total_training_draws') != draws
                     or fit.get('gradient_updates') != steps or fit.get('unique_reference_draws') != draws
                     or fit.get('objective_point_evaluations') != steps*draws):
-                raise ValueError('Version-10 primary requires actual matched fixed-cloud fitting records')
+                raise ValueError('Version-10/11 primary requires actual matched fixed-cloud fitting records')
     expected = runner.effective_method_maps(config, maps)
     for saved in (artifact.get('method_maps'), data['method_maps.json'],
                   summary.get('method_maps'), manifest.get('method_maps')):
@@ -153,7 +155,7 @@ def run(primary, output):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('primary', type=Path, help='Completed version-9 or version-10 primary results folder')
+    parser.add_argument('primary', type=Path, help='Completed version-9, version-10 or version-11 primary results folder')
     parser.add_argument('--output-dir', required=True, type=Path, help='New folder for the alternative SCS step rule')
     args = parser.parse_args(argv)
     print(f'Control results: {run(args.primary, args.output_dir)}')

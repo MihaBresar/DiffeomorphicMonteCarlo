@@ -2,7 +2,7 @@
 
 Research software accompanying *Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions*, by Miha Brešar and Aleksandar Mijatović.
 
-The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. It includes corrected manuscript experiments and subsequent sampler comparisons. **The current comparison is protocol version 10; it does not reproduce the original paper figures unchanged.** Billiards and reflected BW are later extensions. The documentation describes the current experiments so they can be independently run and inspected.
+The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. It includes corrected manuscript experiments and subsequent sampler comparisons. **The current comparison is protocol version 11; it does not reproduce the original paper figures unchanged.** Billiards and reflected BW are later extensions. The documentation describes the current experiments so they can be independently run and inspected.
 
 Start with the [reviewer guide](docs/REVIEW_GUIDE.md), [comparison protocol](docs/COMPARISONS.md), or [experiment catalogue](docs/EXPERIMENTS.md). No general performance ranking is assumed; comparisons must be assessed for the functions and budgets measured.
 
@@ -61,7 +61,9 @@ Both support the normal-CDF-skewed Student-t target with ν=3, α=(100,−100,0,
 
 SCS uses its authors' unchanged VI routine; DCS retains its own VI fit. Their fitting recipes differ; both receive the same number of objective/gradient evaluations, with full budgets of 1,000 updates on 2,000 points per update. This compares the fitted sampling procedures; it does not isolate proposal geometry from map fitting. Billiards retain the ball fit's centre, scale and β in post-Möbius coordinates, with zero effective deformation; the other DCS methods retain the original ball map.
 
-DCS-RWM/BW adapt toward acceptance 0.234. Reflected BW uses a ball-movement pilot; billiards use their own production kernel in a bounded radial-movement pilot. SCS defaults to the authors' fixed **h=0.1**, with `--scs-step-rule acceptance` available for sensitivity analysis. Every method receives the same discarded pilot transition budget. All production steps are frozen, and the first third of generated production iterations is discarded.
+All four DCS methods share one fixed move h=0.07: BW, reflected BW and billiard use a uniform-ball increment of radius h; RWM uses Gaussian coordinate standard deviation h/√(d+2). This matches the increments’ coordinate covariances, not their physical endpoints or acceptance rates. Each method uses its own kernel during discarded equilibration, with no separate step adaptation. SCS defaults to the authors' fixed **h=0.1**, with `--scs-step-rule acceptance` available for sensitivity analysis. Every method receives the same discarded warmup-transition budget. All production steps are frozen, and the first third of generated production iterations is discarded.
+
+The shared DCS move can be varied explicitly with `--dcs-fixed-move 0.15`; the historical method-specific calibration (ordinary BW/RWM acceptance target 0.234, reflected-BW ball movement and billiard radial movement) remains a sensitivity control with `--dcs-step-rule acceptance`. Values 0.07 and 0.15 are declared settings, not claims of optimality or guaranteed superiority. Version 11 preserves the version-10 fixed-cloud VI maps and changes all four DCS proposal-step policies, so new sampling is required for a v11 comparison. Fresh-cloud VI studies remain experimental and do not change the public fitting default.
 
 The fixed SCS choice followed a documented 100D development study; it was frozen before the planned full-paper seed-batch-8 assessment. It is not a demonstrated optimum for 500D. See [all sensitivity results and the selection rule](docs/AUTHOR_SCS_CALIBRATION.md).
 
@@ -79,6 +81,9 @@ python run_experiment.py sampler-comparison --preset paper --dry-run
 
 # Smaller 100D comparison with fitted maps.
 python run_experiment.py sampler-comparison --target skew-t-100d --preset reproduce --workers 2 --output-dir results/jax-100d-vi
+
+# Prespecified shared-DCS move-size sensitivity, retaining every method.
+python run_experiment.py sampler-comparison --target skew-t-100d --preset reproduce --dcs-fixed-move 0.15 --workers 2 --output-dir results/jax-100d-move-015
 
 # Full 500D comparison with the frozen default and a fresh sampling batch.
 python run_experiment.py sampler-comparison --target skew-t-500d --preset paper --workers 2 --seed-batch 8 --output-dir results/jax-500d-batch-8
@@ -109,7 +114,7 @@ Displayed estimates use two decimals or scientific notation, while integer sampl
 
 The repository also includes 200D skew-t comparisons with NUTS and random-walk baselines, a fixed-iteration 50D t(0.5) experiment, logistic regression, Eight Schools and GARCH. Only the two posterior examples use PosteriorDB. Empirical targets need not satisfy the manuscript's sufficient theorem assumptions. See [target definitions](docs/TARGETS.md) and the [figure-by-figure rerun guide](docs/RERUN.md).
 
-Every VI-enabled SCS fit uses the same pinned author routine, including logistic regression and the 50D t(0.5) experiment. Their SCS production kernels remain the checked Numba implementation with acceptance-target 0.234 step tuning. SCS fitting has its own recorded budget: 1,000 updates on 2,000 fixed draws for Full paper settings, 400 on 500 for Smaller reproduction, and 20 on 128 for Quick check. Experiments containing SCS use fixed clouds and matching per-family evaluation budgets. The full logistic DCS budget is now 1,000 updates too; experiments without SCS keep their recorded fitting policy. Rerun the 100D/500D comparisons with all five methods at every preset after this change: DCS now reuses a fixed cloud instead of fresh draws, so even Smaller results change.
+Every VI-enabled SCS fit uses the same pinned author routine, including logistic regression and the 50D t(0.5) experiment. Their SCS production kernels remain the checked Numba implementation with acceptance-target 0.234 step tuning. SCS fitting has its own recorded budget: 1,000 updates on 2,000 fixed draws for Full paper settings, 400 on 500 for Smaller reproduction, and 20 on 128 for Quick check. Experiments containing SCS use fixed clouds and matching per-family evaluation budgets. Version 10 established that fitting policy, including the full logistic DCS budget of 1,000 updates; version 11 leaves it unchanged. The v11 shared fixed DCS move applies to the two five-method comparisons, not the other six experiments. Rerun all five compared methods together to measure the new step policy.
 
 The all-experiments runner includes the JAX 100D comparison and those six experiments; it does not expand every target/backend combination. The [manuscript relationship](docs/MANUSCRIPT_CHANGES.md) explains the corrections and scope of current experiments. The current billiard variant is distinct from the original paper's BW sampler. New results cannot retrospectively validate the original figures.
 

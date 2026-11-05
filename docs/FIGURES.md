@@ -26,8 +26,8 @@ its parameter meaning. The two PosteriorDB targets keep their identity maps.
 | `SuperInfiniteFirstTest` | Linear MSE bars for tail probability, mean log norm, then average runtime at equal iterations |
 | `QQ-regresssion` | Two-by-two marginal Q–Q plots for β₁, with ν=4 and ν=6 |
 
-Current reports identify `timed-sampler-comparison-v10` or
-`timed-numba-comparison-v10`. They retain `VsSCS`, `scs_100d_estimates`,
+Current reports identify `timed-sampler-comparison-v11` or
+`timed-numba-comparison-v11`. They retain `VsSCS`, `scs_100d_estimates`,
 `scs_100d_runtime` and `scs_100d_bias_variance`, and add `scs_100d_ess` for
 mean functional ESS per chain and ESS/s. The filenames remain the same in
 500D; titles identify the target. New comparisons report only radial-tail
@@ -35,22 +35,28 @@ probability and mean norm, with analytic references. Coordinate plots are no
 longer generated. CSV/JSON preserve exact counts and full precision.
 
 All methods have equal production-time and discarded pilot transition budgets.
-Billiards tune their own kernel using a bounded physical radial-movement score.
+All four DCS variants share the same fixed move parameter.
 SCS defaults to the authors' fixed h=0.1, with acceptance-target 0.234 tuning
-available as a sensitivity option. RWM/BW use acceptance-target 0.234 calibration;
-reflected BW uses ball-movement pilots without a geometric ceiling of 2.
+available as a sensitivity option. BW, reflected BW and billiard use fixed
+increment radius h=0.07; RWM uses coordinate standard deviation h/√(d+2).
+Each uses its own kernel during discarded warmup without step adaptation. The recorded `--dcs-fixed-move`
+alternative or historical method-specific calibration control must be
+identified in each report.
 Every step freezes before production and the first third is discarded. Effective
-maps and histories are recorded; `radial_tuning.csv` contains the billiard trials,
-while `reflected_tuning.csv` contains the reflected-BW trials. See the
+maps and fixed steps are recorded. Adaptive historical controls additionally
+export their billiard and reflected-BW pilot histories. See the
 [current protocol](COMPARISONS.md) and [SCS step-policy study](AUTHOR_SCS_CALIBRATION.md).
+Version 10 reports retain their recorded method-specific calibration rules;
+replotting does not turn them into v11 fixed-move results. The fitted maps are
+unchanged by the v11 step-policy update, but sampling must be rerun.
 Functional ESS uses unthinned post-burn-in scalar histories, including
 rejections. Any unavailable chain makes that method aggregate unavailable.
 See [ESS definitions and limits](ESS.md). Replotting uses recorded measurements;
 it cannot reconstruct unrecorded transitions.
 
 The All seven sequence uses the five-method JAX comparison on 100D skewed t
-with the chosen VI policy; the other six experiments retain their existing
-map options.
+with VI fitted for both map families; the other six experiments retain their
+specified fitted or identity-map policies.
 
 The compact **200D random-walk baselines** report keeps just `VsRWM_NUTS`
 (two MSE panels), `VsRWM_NUTS_ergodic_averages` (tail and norm estimates), and

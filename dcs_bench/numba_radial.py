@@ -278,7 +278,7 @@ def _inputs(mapping_dict, config):
 
 
 class NumbaRadial:
-    """Native production initialized from the identical JAX pretuning result.
+    """Native production initialized from the identical JAX discarded-warmup result.
 
     The caller supplies the already-calibrated JAX backend. Its compile cost
     (including an unused JAX production program) remains in recorded setup cost.
@@ -330,7 +330,7 @@ class NumbaRadial:
         self.numba_compile_seconds = time.perf_counter() - started
         self.compile_seconds = float(calibration.compile_seconds) + self.numba_compile_seconds
         self.rng = np.random.default_rng(np.random.SeedSequence([int(seed), PRODUCTION_DOMAIN]))
-        self.implementation = ('Optimized Numba DCS production; unchanged JAX pretuning; cached current '
+        self.implementation = ('Optimized Numba DCS production; unchanged JAX discarded warmup; cached current '
                                'density and norm; fused300-transition all-state radial accumulation; float64 without fast-math')
         self.tuning_metadata.update(
             native_compile_seconds=self.numba_compile_seconds,

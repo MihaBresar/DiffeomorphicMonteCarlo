@@ -87,15 +87,16 @@ Every new comparison fits both map families: SCS uses its authors' fixed-cloud V
 fixed-cloud fit. Both full fits use 1,000 updates on their own 2,000-point fixed clouds. Update counts, cloud size and evaluation counts match; reference distributions, parameterizations and clipping rules differ;
 the recorded fitting costs are outside production time. Billiards retain the fitted
 centre/R/β and use zero production deformation, as explained in
-[the construction](BILLIARD.md). Billiards tune their own moves using a
-bounded radial-movement score; RWM/BW retain acceptance-target 0.234 tuning,
-and reflected BW retains ball-movement pilots with no geometric ceiling of 2.
+[the construction](BILLIARD.md). All four DCS variants share fixed h=0.07:
+BW/reflected-BW/billiard use a uniform-ball increment of that radius and
+RWM uses coordinate standard deviation h/√(d+2). Each uses its own kernel
+during discarded equilibration, without separate step adaptation.
 SCS defaults to the authors' fixed h=0.1; acceptance tuning toward 0.234
 remains available as a sensitivity option.
 Both SCS step rules receive the same discarded warmup-transition budget; the fixed setting
 does not adapt. The [SCS study](AUTHOR_SCS_CALIBRATION.md) documents the
 default-selection rule and sensitivity results. All production steps are
-frozen. Billiard trials and scores are saved in `radial_tuning.csv`.
+frozen. Historical adaptive controls retain their recorded pilot histories.
 The first third of production is discarded in every case.
 
 SCS uses its authors' original map-fitting routine in the other experiments
@@ -103,7 +104,7 @@ too, including logistic regression and the 50D infinite-first-moment example.
 Their SCS sampling implementation and acceptance-target 0.234 step tuning
 remain unchanged. Run those experiments again in fresh folders to obtain
 figures with the updated SCS fits. The current 100D/500D comparisons already
-used author fitting. See [the rerun guide](RERUN.md#scs-fitting-update).
+used author fitting. See [the rerun guide](RERUN.md#earlier-version-10-fitting-update).
 
 ESS is computed after sampling from unthinned scalar histories, including
 rejections. The log reports this stage. FFT work is limited to one chain at a
@@ -111,11 +112,18 @@ time to keep memory bounded; diagnostic time is separate. Temporary unthinned
 histories are discarded after diagnostics. An unavailable ESS has a reason;
 it is not replaced by the iteration count. See [ESS interpretation](ESS.md).
 
-Use a fresh seed batch to check repeatability conditional on the fitted maps.
-The same batch reuses random streams, but time stopping can change counts.
+Use **Repeat run** to choose **Run 1 (default)** through **Run 9**. The same
+choice reuses the sampling random streams, but time stopping can change counts.
+A different choice changes only those sampling streams; the algorithms, fitting
+rules and fitting seeds stay the same.
 Run each target separately and rerun all five methods together. VI fitting is mandatory.
-Version 10 matches fitting budgets and uses fixed clouds for both families. Rerun every method at every preset, including Smaller, because DCS's fitting draws are now reused; saved reports retain their original policy. Smaller runs use
-abbreviated VI; full VI fitting can change the performance ordering.
+Version 11 changes all four DCS step policies and requires new sampling
+of all five methods together at every preset. It keeps version 10's matched
+fixed-cloud VI budgets and fitted maps. Saved reports retain their original
+policy. Smaller runs use abbreviated VI; full fitting can change the performance
+ordering. For a command-line sensitivity check, `--dcs-fixed-move 0.15` selects
+the declared alternative shared DCS move; neither fixed setting is claimed
+optimal. Fresh-cloud fitting experiments do not change the public defaults.
 
 ## Stop or finish
 

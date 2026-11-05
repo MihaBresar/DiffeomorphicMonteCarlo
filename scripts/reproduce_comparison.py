@@ -1,7 +1,8 @@
-"""Current comparisons with author SCS VI and method-specific calibration."""
+"""Current comparisons with author SCS VI and shared fixed DCS move scales."""
 import argparse
 from datetime import datetime, timezone
 import json
+import math
 import os
 from pathlib import Path
 import sys
@@ -24,6 +25,15 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         raise ValueError('New sampler comparisons require VI for both map families; VI-off runs are no longer offered.')
     selected = comparison_target(target)
     supplied = dict(overrides or {})
+    dcs_step_rule = supplied.pop('dcs_step_rule', None) or 'fixed'
+    dcs_fixed_move = supplied.pop('dcs_fixed_move', None)
+    if dcs_step_rule not in ('fixed', 'acceptance'):
+        raise ValueError('dcs_step_rule must be fixed or acceptance')
+    if dcs_fixed_move is not None and dcs_step_rule != 'fixed':
+        raise ValueError('dcs_fixed_move is only used with fixed DCS steps')
+    dcs_fixed_move = .07 if dcs_fixed_move is None else dcs_fixed_move
+    if isinstance(dcs_fixed_move, bool) or not isinstance(dcs_fixed_move, (int, float)) or not math.isfinite(dcs_fixed_move) or dcs_fixed_move <= 0:
+        raise ValueError('dcs_fixed_move must be finite and positive')
     scs_step_rule = supplied.pop('scs_step_rule', None) or 'fixed'
     if scs_step_rule not in ('acceptance', 'fixed'):
         raise ValueError('scs_step_rule must be acceptance or fixed')
@@ -41,7 +51,7 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         raise ValueError('reference_seed must be an integer from 0 to 2**32-1')
     spec = selected['target']
     config.update(experiment='sampler-comparison' if comparison == 'jax' else 'sampler-comparison-numba',
-        protocol='timed-sampler-comparison-v10' if comparison == 'jax' else 'timed-numba-comparison-v10',
+        protocol='timed-sampler-comparison-v11' if comparison == 'jax' else 'timed-numba-comparison-v11',
         comparison=comparison, dcs_backend=comparison, target_id=target, target_title=selected['title'],
         target=spec, dimension=spec['dimension'], nu=spec.get('nu'), alpha=spec.get('alpha', {}),
         beta=selected['beta'],
@@ -53,12 +63,12 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         scs_vi=dict(optimizer_steps=config['optimizer_steps'],
                     optimizer_samples=config['optimizer_samples']),
         algorithms=list(METHODS[comparison]),
-        implementation_revision='jax-matched-fixed-vi-v10' if comparison == 'jax' else 'numba-matched-fixed-vi-v10',
-        step_policy='separate_method_specific_pretuning_then_frozen',
+        implementation_revision='jax-fixed-shared-dcs-moves-v11' if comparison == 'jax' else 'numba-fixed-shared-dcs-moves-v11',
+        step_policy='separate_method_specific_discarded_warmup_then_frozen',
         step_tuning_policies={'DCS-BW-reflect': 'ball_esjd_pilot_v1',
             'DCS-Billiard': 'own_kernel_radial_pilot_v1',
             'SCS': 'indicator_dual_averaging_0234' if scs_step_rule == 'acceptance' else 'author_scs_fixed_01'},
-        scs_step_rule=scs_step_rule,
+        scs_step_rule=scs_step_rule, dcs_step_rule=dcs_step_rule, dcs_fixed_move=float(dcs_fixed_move),
         fitting_policy=(f'DCS: fixed-cloud reverse KL, seed {config["fit_seed"]}, gradient-norm cap 10, no coordinate/CDF clipping. '
                         'SCS: unchanged author VI, fixed base batch, seed 0, coordinate clip 1000, no gradient clipping. '
                         'Both use Adam 0.01, fixed reference clouds, equal update counts and equal cloud sizes; '
@@ -71,6 +81,22 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
             'SCS uses acceptance-target 0.234 dual averaging; this follows the paper\'s general acceptance guidance, '
             'not the fixed h=0.1 used in its skew-t experiment. '
             'The final pilot state and selected step initialize production; all steps freeze before sampling.')
+    ordinary_policy = 'fixed_dcs_move_v1' if dcs_step_rule == 'fixed' else 'indicator_dual_averaging_0234'
+    for method in ('DCS-RWM', 'DCS-BW'):
+        config['step_tuning_policies'][method] = ordinary_policy
+    if dcs_step_rule == 'fixed':
+        for method in ('DCS-BW-reflect', 'DCS-Billiard'):
+            config['step_tuning_policies'][method] = 'fixed_dcs_move_v1'
+        config['tuning_note'] = (
+            'Every method receives the same separate discarded warmup-transition budget. '
+            f'DCS-BW, reflected BW and DCS-Billiard use the shared fixed ball-proposal radius h={dcs_fixed_move:g}; '
+            'DCS-RWM uses Gaussian coordinate standard deviation h/sqrt(d+2). '
+            'This matches unreflected proposal coordinate variances, not accepted movement or mixing. '
+            'All four DCS methods use their actual production kernels during warmup without adaptation. '
+            + ('SCS uses the paper skew-t fixed h=0.1 with no step adaptation. '
+               if scs_step_rule == 'fixed' else
+               'SCS uses acceptance-target 0.234 dual averaging during its separate warmup. ')
+            + 'The final warmup state initializes production; every production step stays frozen.')
     config['billiard_map_policy'] = 'post_mobius_retained_joint_fit_centre_scale_beta_delta_zero'
     if scs_step_rule == 'fixed':
         config['tuning_note'] = config['tuning_note'].replace(
@@ -83,7 +109,7 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         ('All methods use JAX full-state scans.' if comparison == 'jax' else
          'DCS uses optimized Numba density/radius caching and fused summaries; SCS uses the unmodified author '
          'JAX transition and full-state processing. This is an implementation-efficiency comparison, '
-         'not a common-framework comparison. JAX pretuning is shared with the other comparison.'))
+         'not a common-framework comparison. JAX discarded warmup and any step selection are shared with the other comparison.'))
     config['reference_policy'] = 'Analytic Student-t radial references; no coordinate-reference simulation'
     return config
 
@@ -94,6 +120,8 @@ def main(argv=None):
     parser.add_argument('--target', choices=TARGET_IDS, default='skew-t-100d')
     parser.add_argument('--vi', choices=('on',), default='on', help=argparse.SUPPRESS)
     parser.add_argument('--scs-step-rule', choices=('acceptance', 'fixed'))
+    parser.add_argument('--dcs-step-rule', choices=('fixed', 'acceptance'))
+    parser.add_argument('--dcs-fixed-move', type=float)
     parser.add_argument('--preset', choices=runner.PRESETS, default='quick')
     parser.add_argument('--workers', type=int, default=1)
     parser.add_argument('--output-dir', type=Path)

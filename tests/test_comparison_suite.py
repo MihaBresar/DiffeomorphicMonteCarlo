@@ -36,6 +36,29 @@ class ComparisonSuiteTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'scs_step_rule'):
             suite.configuration('quick',overrides={'scs_step_rule':'best-MSE'})
 
+    def test_fixed_dcs_controls_are_explicit_and_do_not_change_scs(self):
+        default = suite.configuration('quick')
+        self.assertEqual(default['dcs_fixed_move'], .07)
+        larger = suite.configuration('quick', overrides={'dcs_fixed_move': .15})
+        control = suite.configuration('quick', overrides={'dcs_step_rule': 'acceptance'})
+        historical = {'DCS-RWM': 'indicator_dual_averaging_0234',
+                      'DCS-BW': 'indicator_dual_averaging_0234',
+                      'DCS-BW-reflect': 'ball_esjd_pilot_v1',
+                      'DCS-Billiard': 'own_kernel_radial_pilot_v1'}
+        for method in historical:
+            self.assertEqual(default['step_tuning_policies'][method], 'fixed_dcs_move_v1')
+            self.assertEqual(larger['step_tuning_policies'][method], 'fixed_dcs_move_v1')
+            self.assertEqual(control['step_tuning_policies'][method], historical[method])
+        self.assertEqual(larger['dcs_fixed_move'], .15)
+        self.assertIn('without adaptation', default['tuning_note'])
+        self.assertEqual(default['step_tuning_policies']['SCS'], control['step_tuning_policies']['SCS'])
+        for overrides in ({'dcs_fixed_move': 0}, {'dcs_fixed_move': -1},
+                {'dcs_fixed_move': True}, {'dcs_fixed_move': float('nan')},
+                {'dcs_fixed_move': float('inf')}, {'dcs_step_rule': 'best-MSE'},
+                {'dcs_step_rule': 'acceptance', 'dcs_fixed_move': .15}):
+            with self.subTest(overrides=overrides), self.assertRaises(ValueError):
+                suite.configuration('quick', overrides=overrides)
+
     def test_fit_seed_override_matches_reported_and_executed_dcs_fit(self):
         config = suite.configuration('quick', overrides={'fit_seed': 73})
         self.assertIn('DCS: fixed-cloud reverse KL, seed 73,', config['fitting_policy'])
@@ -51,11 +74,11 @@ class ComparisonSuiteTests(unittest.TestCase):
         self.assertEqual(fitting['sphere']['seed'], 0)
         self.assertNotIn('fit_seed', scs_fit.call_args.args[0])
 
-    def test_reflected_bw_retains_existing_pilot_defaults(self):
+    def test_explicit_calibration_control_retains_reflected_bw_pilots(self):
         from scripts import reproduce_boundary_100d as boundary
         previous = boundary.configuration('paper')
         for backend in ('jax', 'numba'):
-            config = suite.configuration('paper', comparison=backend)
+            config = suite.configuration('paper', comparison=backend, overrides={'dcs_step_rule': 'acceptance'})
             method_config = dict(config, algorithm='DCS-BW-reflect')
             self.assertEqual(timed_radial.resolve_step_tuning(method_config),
                              'ball_esjd_pilot_v1')
@@ -80,7 +103,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertEqual(config['beta'], beta)
                         self.assertEqual(config['dcs_backend'], backend)
                         self.assertEqual(config['vi_enabled'], vi == 'on')
-                        self.assertEqual(config['step_tuning_policies'], {'DCS-BW-reflect': 'ball_esjd_pilot_v1', 'DCS-Billiard': 'own_kernel_radial_pilot_v1', 'SCS': 'author_scs_fixed_01'})
+                        self.assertEqual(config['step_tuning_policies'], {method: 'author_scs_fixed_01' if method == 'SCS' else 'fixed_dcs_move_v1' for method in methods})
                         self.assertNotIn('mixture_probability', config)
                         self.assertNotIn('initial_angular_scale', config)
                         self.assertNotIn('step_scale_ceilings', config)
@@ -96,7 +119,7 @@ class ComparisonSuiteTests(unittest.TestCase):
                         self.assertNotIn('coordinate_threshold', config)
                         self.assertTrue(config['ess_enabled'])
                         self.assertEqual(config['reference_samples'], 5_000_000)
-                        self.assertTrue(config['protocol'].endswith('-v10'))
+                        self.assertTrue(config['protocol'].endswith('-v11'))
 
     def test_vi_off_bypasses_fitting_for_both_map_families_without_skipping_warmup(self):
         for target_id in ('skew-t-100d', 'skew-t-500d'):

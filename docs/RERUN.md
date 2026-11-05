@@ -1,6 +1,6 @@
 # Running the experiments
 
-Current version-10 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
+Current version-11 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
 in both JAX and optimized Numba modes, with fitted maps and 100D/500D targets.
 VI is mandatory for new comparisons; the launcher has no VI-off option.
 New reports contain only radial estimates/MSE/counts/time plus functional ESS
@@ -18,13 +18,29 @@ the final measured iteration count; thinning keeps its original iteration grid.
 For 500,000 iterations, discard 166,667 and use the remaining 333,333 before
 thinning. At thinning 10 this stores 33,334 post-burn-in states.
 
-## Version-10 fitting update
+## Version-11 sampling update
+
+Rerun all five methods together for each 100D/500D target and implementation
+mode used in a new comparison. All four DCS methods share h=0.07:
+BW/reflected-BW/billiard use that increment radius; Gaussian RWM uses
+coordinate standard deviation h/√(d+2). Each uses its own kernel during
+discarded warmup without step adaptation. SCS retains author h=0.1. All methods still receive the same
+warmup-transition budget and first-third production burn-in.
+
+The version-10 fixed-cloud VI settings and fitted maps are unchanged. New v11
+results require fresh sampling; replotting old chains cannot apply a new step
+policy. The alternative `--dcs-fixed-move 0.15` and historical
+`--dcs-step-rule acceptance` control are explicit sensitivity settings. Neither
+fixed value is claimed optimal. Fresh-cloud VI studies remain experimental.
+The other six experiments do not change under this sampling update.
+
+## Earlier version-10 fitting update
 
 Rerun the **100D and 500D five-method comparisons**, in either implementation
-mode, in fresh folders. Version 10 makes VI mandatory and matches the map
+mode, in fresh folders if upgrading from version 9 or earlier. Version 10 made VI mandatory and matched the map
 fitting resources: both families use 1,000 updates on their own fixed
 2,000-point cloud for Full paper settings, 400 × 500 for Smaller reproduction,
-and 20 × 128 for Quick check. DCS now reuses its cloud instead of drawing a
+and 20 × 128 for Quick check. DCS began reusing its cloud instead of drawing a
 fresh batch at each update, so **all preset sizes need new runs**. Run all five
 methods together under the same execution conditions.
 
@@ -44,7 +60,7 @@ apply a new fit.
 ## Current sampler comparisons
 
 Choose **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)** or
-**Five samplers: optimized Numba DCS versus SCS**. Both version-10 suites
+**Five samplers: optimized Numba DCS versus SCS**. Both version-11 suites
 contain the same methods, with 100D/500D and VI fitted for both map families. Numba production differs
 in implementation and recording costs; author SCS remains in JAX.
 
@@ -55,12 +71,12 @@ are omitted. Both radial references are analytic. Keep the configuration,
 manifest and saved data with the report to identify the experiment.
 
 Billiards retain jointly fitted centre/R/β after Möbius with effective δ=0.
-Billiards tune their own production kernel with a bounded physical
-radial-movement score. SCS defaults to the authors' fixed h=0.1 and also
+All four DCS methods share fixed h=0.07, with Gaussian RWM converted to
+coordinate standard deviation h/√(d+2). SCS defaults to the authors' fixed h=0.1 and also
 supports acceptance-target 0.234 tuning, with a discarded pilot under either policy.
-RWM/BW retain acceptance-target 0.234 pilots; reflected BW retains its
-ball-movement pilot in the shared fitted ball map with no geometric ceiling
-of 2. All steps freeze and the first third of production is discarded.
+BW, reflected BW and billiard use identical uniform-ball increment scales.
+Each DCS method uses its own production kernel during fixed-step discarded
+equilibration; reflection and billiard receive no separate step optimization. All steps freeze and the first third of production is discarded.
 Every method receives the same number of pilot transitions. Use
 `--scs-step-rule acceptance` or `--scs-step-rule fixed` to select the SCS
 policy explicitly; the [matched-map sensitivity helper](AUTHOR_SCS_CALIBRATION.md#reproduction)
@@ -128,6 +144,7 @@ untuned-map reports remain readable; they are not relabelled as fitted runs.
 ```bash
 python scripts/reproduce_all.py --preset paper --workers 2 --output-root results/paper-new
 python run_experiment.py sampler-comparison --target skew-t-100d --preset paper --workers 2 --output-dir results/comparison-100d-vi
+python run_experiment.py sampler-comparison --target skew-t-100d --preset paper --dcs-fixed-move 0.15 --workers 2 --output-dir results/comparison-100d-move-015
 python run_experiment.py sampler-comparison-numba --target skew-t-100d --preset paper --workers 2 --output-dir results/numba-100d-vi
 python run_experiment.py sampler-comparison --target skew-t-500d --preset paper --workers 2 --output-dir results/comparison-500d-vi
 python run_experiment.py skew-t-50d-nu-0.5 --preset paper --workers 2 --output-dir results/superheavy-new

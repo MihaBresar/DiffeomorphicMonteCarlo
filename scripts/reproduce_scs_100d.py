@@ -388,7 +388,7 @@ def run(config, output):
                 or config.get('ball_map_policy') != 'mobius'
                 or config.get('sphere_map_policy') != 'author-paper-vi'):
             raise ValueError('New sampler comparisons require VI for both map families.')
-        if config.get('protocol') in ('timed-sampler-comparison-v10', 'timed-numba-comparison-v10'):
+        if config.get('protocol') in ('timed-sampler-comparison-v10', 'timed-numba-comparison-v10', 'timed-sampler-comparison-v11', 'timed-numba-comparison-v11'):
             from dcs_bench.tuning import validate_matched_vi
             validate_matched_vi(config)
     output = Path(output).resolve()

@@ -12,16 +12,16 @@ Extract the latest repository ZIP and open **Start.bat** on Windows. Choose:
 
 1. **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)** or **Five samplers: optimized Numba DCS versus SCS**.
 2. **100D** or **500D** under Target distribution.
-3. **Full paper settings**, a sampling seed batch, and CPU workers.
+3. **Full paper settings**, a **Repeat run** choice, and CPU workers.
 4. **Start run**. VI fitting is automatic for both map families.
 
 Full settings use 50 chains per method, 20.00 production seconds per chain,
-and 1,500 separate pilot transitions. The first third of production is discarded.
+and 1,500 separate discarded warmup transitions. The first third of production is discarded.
 Reports show mean norm, radial-tail probability, MSE, sample counts, timing,
 functional ESS and ESS per second. They omit coordinate statistics. See
 [the comparison protocol](COMPARISONS.md) and [ESS definitions](ESS.md).
 
-Both implementations use the same own-kernel JAX pilot state and frozen step. Numba
+Both implementations use the same own-kernel JAX warmup state and fixed step. Numba
 production uses an independent PCG64 stream and fused density/radius summaries;
 it is not a bitwise replay of JAX. Its endpoint follows the same invariant-chord
 rule below, without fast-math approximations. The author SCS code stays in JAX.
@@ -50,20 +50,30 @@ introduces a reverse/forward proposal ratio
 `J_M(z) / J_M(z')`, which cancels the Möbius determinants in the transformed
 target ratio. No additional Möbius correction is applied when running in w.
 
-The pilot starts afresh at the w coordinate corresponding to the common
-physical all-ones point. Versions 8–10 calibrate **billiard moves themselves**,
-using exactly the preset's warmup budget. The pilot scores bounded changes in
-physical log(1 + norm), with rejections contributing zero, then freezes the
-selected scale before production from its last pilot state. No production
-MSE or known reference value enters this per-chain calibration.
+Warmup starts afresh at the w coordinate corresponding to the common
+physical all-ones point. Versions 8–10 calibrated **billiard moves themselves**,
+using exactly the preset's warmup budget. Those pilots scored bounded changes in
+physical log(1 + norm), with rejections contributing zero, then froze the
+selected scale before production from the last pilot state. No production
+MSE or known reference value entered that per-chain calibration. The current
+fixed-step default instead uses its own billiard kernel without a selection pilot.
 
 Version 8 gave SCS the same radial-pilot policy and transition budget. Versions
-9 and 10 instead use the authors' SCS VI and default to fixed h=0.1 during
+9–11 instead use the authors' SCS VI and default to fixed h=0.1 during
 its discarded pilot and production. Acceptance-target 0.234 adaptation remains
 an explicit SCS sensitivity option. Both SCS policies keep the same number of
 discarded pilot transitions as DCS. Their global default was selected in the
 separately reported [development study](AUTHOR_SCS_CALIBRATION.md); it was not
 selected within any retained production chain. See [the full protocol](COMPARISONS.md).
+
+Version 11 uses one shared DCS move: BW, reflected BW and billiard all draw
+uniform-ball increments with radius h=0.07; Gaussian RWM uses coordinate
+standard deviation h/√(d+2). All four use their own kernel during discarded
+equilibration without separate step optimization. SCS h=0.1 and the
+version-10 fixed-cloud VI maps are unchanged. The shared h=0.15 alternative
+is available for sensitivity checks; neither value is claimed optimal.
+`--dcs-step-rule acceptance` explicitly restores the historical mixed policy,
+including the billiard radial pilot described above.
 
 The version-6/7 runs instead calibrated reflected BW in the active coordinates
 and transferred its step to billiards. Their saved reports retain that rule.

@@ -1,13 +1,37 @@
 # Validation
 
-## Version-10 scope
+## Current version-11 scope
 
-Current comparisons require VI for both map families and match fixed-cloud
+Version 11 uses one shared DCS move: fixed BW/reflected-BW/billiard increment
+radius h=0.07 and Gaussian RWM coordinate standard deviation h/√(d+2).
+All four keep these steps during discarded equilibration. SCS retains h=0.1.
+The declared h=0.15 sensitivity setting and historical mixed-policy control
+do not imply optimality. The latter uses acceptance-target 0.234 for ordinary
+RWM/BW, ball-movement pilots for reflected BW and radial-movement pilots for
+billiards. Version-10 fixed-cloud VI budgets and
+maps remain unchanged. Fresh sampling is needed to evaluate the new step
+policy. Experimental fresh-cloud VI studies do not change this public default.
+
+Local validation covered **386 regression checks**: the full suite plus a
+successful targeted rerun after updating a historical calibration fixture.
+Four Quick comparisons completed in JAX/Numba at 100D/500D, covering **40
+production chains**. All four DCS variants kept the shared fixed move,
+including during their own discarded warmup. Cross-backend fitted maps,
+warmup endpoints and chain seeds agreed; exact burn-in, MSE recomputation,
+author SCS hashes and fixed-step report provenance were checked. These
+execution checks do not establish convergence or comparative performance.
+
+Inspect the exact revision's GitHub Actions results separately. The version-10
+results below retain their original validation scope and are not v11
+sampling-performance evidence.
+
+## Historical version-10 validation
+
+Version-10 comparisons required VI for both map families and matched fixed-cloud
 sizes and optimizer update counts. Full fits use 1,000 updates on 2,000 fixed
-points per family; smaller presets reduce both counts equally. DCS's cloud
-reuse policy changes at every preset, so previous comparison outcomes do not
-validate version-10 performance. Run all methods together with fresh sampling
-seeds under the frozen current protocol.
+points per family; smaller presets reduced both counts equally. DCS's cloud
+reuse policy changed at every preset, so preceding comparison outcomes did not
+validate version-10 performance.
 
 The automated suite includes new-request policy enforcement, fitting-budget
 provenance and saved-report compatibility. Inspect GitHub Actions for the exact
@@ -44,7 +68,8 @@ checks validate fitting and execution; they are not new performance rankings.
 
 The preceding version-9 comparisons used the SCS authors' VI implementation and
 fixed h=0.1, with an acceptance-tuned sensitivity control. Billiards calibrated
-their own production kernel, as they continue to do in version 10. The associated development study completed
+their own production kernel in that historical release; version 11 instead
+uses the shared fixed DCS move by default. The associated development study completed
 **280 study chains** and **48 Quick-check chains**, historically covering VI on/off, both
 SCS step policies and a separate check with the full author VI budget. See the
 [protocol](COMPARISONS.md), [calibration study](AUTHOR_SCS_CALIBRATION.md) and

@@ -8,6 +8,7 @@ from __future__ import annotations
 import csv
 import html
 import json
+from numbers import Real
 from pathlib import Path
 
 import numpy as np
@@ -86,6 +87,10 @@ def _table(rows):
 
 def _policy(name, timed=False, matched=False, ball_esjd=False, own_kernel=False, tuning_policies=None):
     selected = (tuning_policies or {}).get(name)
+    if selected == 'fixed_dcs_move_v1':
+        return ('Prespecified fixed DCS move: BW, reflected-BW and billiard proposal radius h; '
+                'RWM Gaussian coordinate sigma=h/sqrt(d+2); '
+                'separate discarded equilibration, no step adaptation')
     if selected == 'author_scs_fixed_01':
         return 'Author skew-t setting: fixed h = 0.1 with separate discarded equilibration; no step adaptation'
     if selected == 'indicator_dual_averaging_0234':
@@ -106,6 +111,57 @@ def _policy(name, timed=False, matched=False, ball_esjd=False, own_kernel=False,
         return ('Author SCS: fixed h = 0.10 with separate untimed equilibration' if name == 'SCS' else
                 'Separate proposal-step tuning, then frozen during timed sampling')
     return 'Paper-date SCS: fixed h = 0.1' if name == 'SCS' else 'Continuous smoothed dual averaging; target acceptance 0.234'
+
+
+def _validate_v11_dcs(config, cases):
+    """Never relabel saved acceptance-tuned chains as fixed-move comparisons."""
+    methods = set(cases).intersection(('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', 'DCS-Billiard'))
+    if not methods:
+        return
+    rule = config.get('dcs_step_rule')
+    if rule not in ('fixed', 'acceptance'):
+        raise ValueError('Version-11 reports require the recorded DCS step rule')
+    historical_policies = {'DCS-RWM': 'indicator_dual_averaging_0234',
+                          'DCS-BW': 'indicator_dual_averaging_0234',
+                          'DCS-BW-reflect': 'ball_esjd_pilot_v1',
+                          'DCS-Billiard': 'own_kernel_radial_pilot_v1'}
+    policies = config.get('step_tuning_policies', {})
+    radius = config.get('dcs_fixed_move')
+    if rule == 'fixed' and (isinstance(radius, bool) or not isinstance(radius, Real)
+                            or not np.isfinite(radius) or radius <= 0.):
+        raise ValueError('Version-11 fixed DCS reports require a positive finite move radius')
+    dimension = config['target']['dimension']
+    for method in methods:
+        expected_policy = 'fixed_dcs_move_v1' if rule == 'fixed' else historical_policies[method]
+        if policies.get(method) != expected_policy:
+            raise ValueError('Version-11 DCS step policies disagree with the recorded rule')
+        records = cases[method].get('records', [])
+        if not records:
+            raise ValueError('Version-11 reports require actual DCS step-policy records')
+        scale = (radius / np.sqrt(dimension+2.) if method == 'DCS-RWM' else radius) if rule == 'fixed' else None
+        for record in records:
+            if record.get('tuning_policy') != expected_policy:
+                raise ValueError('Version-11 reports require actual DCS step-policy records')
+            if rule != 'fixed':
+                if method in ('DCS-RWM', 'DCS-BW') and record.get('target_acceptance') != .234:
+                    raise ValueError('Version-11 acceptance controls require recorded target 0.234')
+                continue
+            required = {'fixed_move_radius': radius, 'fixed_step': scale,
+                        'initial_scale': scale, 'final_scale': scale, 'frozen_scale': scale,
+                        'proposal_coordinate_variance': radius**2/(dimension+2.)}
+            if (record.get('step_size_adapted') is not False
+                    or record.get('adaptation_during_sampling') is not False
+                    or 'target_acceptance' not in record or record['target_acceptance'] is not None
+                    or record.get('warmup_iterations') != config['warmup']
+                    or record.get('tuning_history') or record.get('radial_tuning_history')):
+                raise ValueError('Version-11 fixed DCS reports require discarded warmup without adaptation')
+            for field, value in required.items():
+                actual = record.get(field)
+                if (isinstance(actual, bool) or not isinstance(actual, Real)
+                        or not np.isfinite(actual) or not np.isclose(actual, value, rtol=1e-12, atol=0.)):
+                    raise ValueError('Version-11 fixed DCS scale provenance is inconsistent: '+field)
+        if rule == 'fixed' and not np.allclose(cases[method]['final_scales'], scale, rtol=1e-12, atol=0.):
+            raise ValueError('Version-11 fixed DCS final scales disagree with their records')
 
 
 def _counts(case, config, timed):
@@ -149,19 +205,25 @@ def render_report(root, summary):
                                       'timed-sampler-comparison-v6', 'timed-sampler-comparison-v7', 'timed-numba-comparison-v7',
                                       'timed-sampler-comparison-v8', 'timed-numba-comparison-v8',
                                       'timed-sampler-comparison-v9', 'timed-numba-comparison-v9',
-                                      'timed-sampler-comparison-v10', 'timed-numba-comparison-v10')
+                                      'timed-sampler-comparison-v10', 'timed-numba-comparison-v10',
+                                      'timed-sampler-comparison-v11', 'timed-numba-comparison-v11')
     optimized = config.get('protocol') in ('timed-numba-comparison-v1', 'timed-numba-comparison-v2',
-                                          'timed-numba-comparison-v3', 'timed-numba-comparison-v4', 'timed-numba-comparison-v5', 'timed-numba-comparison-v7', 'timed-numba-comparison-v8', 'timed-numba-comparison-v9', 'timed-numba-comparison-v10')
+                                          'timed-numba-comparison-v3', 'timed-numba-comparison-v4', 'timed-numba-comparison-v5', 'timed-numba-comparison-v7', 'timed-numba-comparison-v8', 'timed-numba-comparison-v9', 'timed-numba-comparison-v10', 'timed-numba-comparison-v11')
     radial_ess = config.get('protocol') in ('timed-sampler-comparison-v7', 'timed-numba-comparison-v7',
                                             'timed-sampler-comparison-v8', 'timed-numba-comparison-v8',
                                       'timed-sampler-comparison-v9', 'timed-numba-comparison-v9',
-                                      'timed-sampler-comparison-v10', 'timed-numba-comparison-v10')
+                                      'timed-sampler-comparison-v10', 'timed-numba-comparison-v10',
+                                      'timed-sampler-comparison-v11', 'timed-numba-comparison-v11')
     own_kernel = config.get('protocol') in ('timed-sampler-comparison-v8', 'timed-numba-comparison-v8',
                                       'timed-sampler-comparison-v9', 'timed-numba-comparison-v9',
-                                      'timed-sampler-comparison-v10', 'timed-numba-comparison-v10')
+                                      'timed-sampler-comparison-v10', 'timed-numba-comparison-v10',
+                                      'timed-sampler-comparison-v11', 'timed-numba-comparison-v11')
     author_vi_protocol = config.get('protocol') in ('timed-sampler-comparison-v9', 'timed-numba-comparison-v9',
-                                      'timed-sampler-comparison-v10', 'timed-numba-comparison-v10')
-    matched_vi = config.get('protocol') in ('timed-sampler-comparison-v10', 'timed-numba-comparison-v10')
+                                      'timed-sampler-comparison-v10', 'timed-numba-comparison-v10',
+                                      'timed-sampler-comparison-v11', 'timed-numba-comparison-v11')
+    matched_vi = config.get('protocol') in ('timed-sampler-comparison-v10', 'timed-numba-comparison-v10',
+                                      'timed-sampler-comparison-v11', 'timed-numba-comparison-v11')
+    v11 = config.get('protocol') in ('timed-sampler-comparison-v11', 'timed-numba-comparison-v11')
     author_fitting = (author_vi_protocol or config.get('sphere_map_policy') == 'author-paper-vi'
                       or config.get('scs_fitting_revision') == 'author-vi-v1'
                       or summary.get('fitting', {}).get('sphere', {}).get('map_policy') == 'SCS-paper-VI')
@@ -182,10 +244,14 @@ def render_report(root, summary):
     names = [name for name in (config.get('algorithms', METHODS) if suite else METHODS) if name in cases]
     if len(names) != len(cases) or len(set(names)) != len(names):
         raise ValueError('Configured methods must list every completed case exactly once')
+    if v11:
+        _validate_v11_dcs(config, cases)
+    fixed_dcs = {name for name in names if tuning_policies.get(name) == 'fixed_dcs_move_v1'}
     if author_vi_protocol:
         if 'SCS' in names and tuning_policies.get('SCS') not in ('indicator_dual_averaging_0234', 'author_scs_fixed_01'):
             raise ValueError('Author-VI SCS reports require the recorded acceptance or fixed-author step policy')
-        if 'DCS-Billiard' in names and tuning_policies.get('DCS-Billiard') != 'own_kernel_radial_pilot_v1':
+        if ('DCS-Billiard' in names and tuning_policies.get('DCS-Billiard') != 'own_kernel_radial_pilot_v1'
+                and not (v11 and 'DCS-Billiard' in fixed_dcs)):
             raise ValueError('Author-VI billiard reports require own-kernel radial calibration')
     if matched_vi:
         steps, draws = config.get('optimizer_steps'), config.get('optimizer_samples')
@@ -194,14 +260,14 @@ def render_report(root, summary):
                 or not isinstance(steps, int) or isinstance(steps, bool) or steps < 1
                 or not isinstance(draws, int) or isinstance(draws, bool) or draws < 1
                 or config.get('scs_vi') != dict(optimizer_steps=steps, optimizer_samples=draws)):
-            raise ValueError('Version-10 reports require matched fixed-cloud VI budgets')
+            raise ValueError('Version-10/11 reports require matched fixed-cloud VI budgets')
         for family in ('ball', 'sphere'):
             fit = summary.get('fitting', {}).get(family, {})
             if (fit.get('steps') != steps or fit.get('training_draws') != draws
                     or fit.get('batch_policy') != 'fixed' or fit.get('total_training_draws') != draws
                     or fit.get('gradient_updates') != steps or fit.get('unique_reference_draws') != draws
                     or fit.get('objective_point_evaluations') != steps*draws):
-                raise ValueError('Version-10 reports require actual matched fixed-cloud fitting records')
+                raise ValueError('Version-10/11 reports require actual matched fixed-cloud fitting records')
     has_rotation = any(name in names for name in ROTATION_METHODS)
     has_rwm_rotation = 'DCS-RWM-rotate' in names
     has_billiard = 'DCS-Billiard' in names
@@ -302,6 +368,16 @@ def render_report(root, summary):
         tuning_note = ('VI '+str(vi_mode)+'. SCS uses author fixed h=0.1; '+
                        ('DCS proposal scales are pretuned. ' if any(name != 'SCS' for name in names) else '')+
                        'Equal discarded warmup; production steps stay fixed.')
+    if fixed_dcs:
+        tuning_note = ('VI '+str(vi_mode)+'. All four DCS methods use fixed moves h='+number(config['dcs_fixed_move'])+
+                       ' (RWM sigma=h/sqrt(d+2)); no step adaptation. '+
+                       ('SCS uses author fixed h=0.1. ' if scs_fixed else 'SCS uses acceptance calibration. ')+
+                       'Equal discarded warmup; all production steps frozen.')
+    if v11 and names == ['SCS']:
+        tuning_note = ('VI '+str(vi_mode)+'. SCS '+
+                       ('uses author fixed h=0.1 without adaptation. ' if scs_fixed else
+                        'uses acceptance-target 0.234 calibration. ')+
+                       'Recorded discarded warmup; production step stays frozen.')
     if matched_vi:
         tuning_note += ' Matched fixed-cloud VI budgets for both maps.'
     if author_fitting and not author_vi_protocol:
@@ -622,6 +698,18 @@ def render_report(root, summary):
         if suite:
             row.update(target=target_title, dimension=dimension, vi=vi_mode, dcs_beta=config.get('beta'),
                        execution_backend='Numba' if optimized and name != 'SCS' else 'JAX')
+        if v11 and name in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', 'DCS-Billiard'):
+            row.update(dcs_step_rule=config['dcs_step_rule'])
+            if name in fixed_dcs:
+                radius = config['dcs_fixed_move']
+                row.update(dcs_fixed_move=radius, step_size_adapted=False, target_acceptance=None,
+                           fixed_step=radius/np.sqrt(dimension+2.) if name == 'DCS-RWM' else radius,
+                           scale_parameter='Gaussian coordinate standard deviation' if name == 'DCS-RWM'
+                               else 'uniform-ball proposal radius',
+                           fixed_move_normalization='BW, reflected BW and billiard radius h; RWM coordinate sigma=h/sqrt(d+2)',
+                           proposal_coordinate_variance=radius**2/(dimension+2.))
+            else:
+                row.update(target_acceptance=.234 if name in ('DCS-RWM', 'DCS-BW') else None)
         if name in ROTATION_METHODS:
             records = case.get('records', [])
             row.update(mixture_probability=config.get('mixture_probability', .5),
@@ -678,7 +766,7 @@ def render_report(root, summary):
                     'frozen_step': row.get('frozen_scale', row.get('final_scale')),
                     'selected_radial_score': row.get('radial_tuning_selected_score'),
                     'search_status': row.get('radial_tuning_search_status')})
-            elif ball_esjd and name in ('DCS-BW-reflect', 'DCS-Billiard', *ROTATION_METHODS):
+            elif ball_esjd and name not in fixed_dcs and name in ('DCS-BW-reflect', 'DCS-Billiard', *ROTATION_METHODS):
                 for pilot in history or []:
                     tuning_rows.append(dict(method=name, chain=row['chain'], seed=row.get('seed'),
                         **{key: pilot.get(key) for key in ('round', 'candidate', 'scale', 'iterations',
@@ -921,7 +1009,7 @@ def render_report(root, summary):
                          'JAX calibration state and step as its JAX counterpart. The previous reflected-BW billiard '
                          'pilot remains part of the historical version-6/7 protocols only.')
         if author_vi_protocol:
-            if has_billiard:
+            if 'DCS-Billiard' in radial_pilot_methods:
                 notes.append('Billiard pilots score bounded squared changes of physical log(1 + norm), including '
                          'zero after rejection. Five coarse and three refinement trials share the pilot budget; '
                          'all trial scores are saved in radial_tuning.csv. This is a movement proxy, not MSE or ESS. '
@@ -972,8 +1060,9 @@ def render_report(root, summary):
                                  'DCS-BW and reflected BW')
             notes.append('Implementation comparison: '+optimized_methods+' use optimized Numba loops with cached '
                          'current density and radius, fused radial accumulation and no full physical-state recording. '
-                         'SCS uses its unmodified author JAX transition and full-state scan. DCS uses the same JAX pilot '
-                         'calibration as the common-framework mode, then hands its frozen state and step to Numba. '
+                         'SCS uses its unmodified author JAX transition and full-state scan. DCS uses the same JAX '
+                         'discarded warmup and recorded step policy as the common-framework mode, then hands '
+                         'its frozen state and step to Numba. '
                          'The 300-transition timing batches, statistic definitions and first-third discard are common. '
                          'This compares the recorded implementations; it does not isolate the geometric algorithm alone.')
         else:
@@ -981,7 +1070,9 @@ def render_report(root, summary):
                          'the same 300-transition timing batches and radial reduction. Outside-ball rejections can skip '
                          'density evaluation in ordinary BW/RWM; this is part of their specified transition cost.')
         if 'DCS-BW-reflect' in names:
-            notes.append('Reflected BW keeps the reversible chord-fold proposal and its Metropolis correction. Its '
+            notes.append('Reflected BW keeps the reversible chord-fold proposal and its Metropolis correction.')
+        if 'DCS-BW-reflect' in names and 'DCS-BW-reflect' not in fixed_dcs:
+            notes.append('Its '
                      'ball-movement pilot search uses up to eight rotating h/2, h, 2h rounds with no special bound of 2. '
                      'A finite noisy local search does not certify an optimal step or optimal radial MSE. '
                      'Every trial is recorded in reflected_tuning.csv; a final-round edge winner is reported explicitly.')
@@ -1051,6 +1142,24 @@ def render_report(root, summary):
                     'and fitting time is recorded separately. The production target is not clipped. '
                     'Billiard retains the ball fit’s centre/R/beta and runs after Mobius with effective delta=0; '
                     'other DCS methods retain the fitted ball map. All effective maps are recorded.')
+    if fixed_dcs:
+        notes[1] = ('DCS-BW, reflected BW and DCS-Billiard use the shared fixed ball-proposal radius h='+number(config['dcs_fixed_move'])+
+                    '; DCS-RWM uses Gaussian coordinate standard deviation sigma=h/sqrt(d+2). '
+                    'This matches the unreflected proposal coordinate variance h²/(d+2), not accepted '
+                    'movement or mixing. All four DCS methods use their actual production kernels throughout the separate '
+                    'discarded warmup without step adaptation. '+
+                    ('SCS retains the authors’ fixed h=0.1 with discarded equilibration. ' if scs_fixed else
+                     'SCS uses its recorded acceptance-target 0.234 calibration. ')+
+                    'All methods receive the same discarded warmup-transition budget; every production '
+                    'step is frozen and the first third of production iterations is additionally discarded. '
+                    'The fixed DCS move is a benchmark setting, not a claim of optimality.')
+    if v11 and names == ['SCS']:
+        notes[1] = (('SCS uses the authors’ fixed h=0.1 throughout discarded equilibration and production, '
+                     'without step adaptation. ' if scs_fixed else
+                    'SCS uses acceptance-target 0.234 calibration during its separate discarded warmup, '
+                     'then freezes the selected step throughout production. ')+
+                    'This report contains only SCS; it does not rerun or change the primary DCS controls. '
+                    'The first third of generated production iterations is additionally discarded.')
     if author_fitting and not author_vi_protocol:
         if vi_mode == 'on':
             dcs_fit_seed = summary.get('fitting', {}).get('ball', {}).get('seed', config.get('fit_seed', 42))

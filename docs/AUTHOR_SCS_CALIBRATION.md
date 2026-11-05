@@ -3,10 +3,11 @@
 This development study predates the removal of the VI-off option. Its tables
 and saved settings remain unchanged. New public comparisons require VI for
 both map families; the earlier no-VI outcomes document the selection process,
-not a currently selectable experiment. Version 10 additionally uses matched
-fixed-cloud fitting budgets for both families. The version-9 table below
+not a currently selectable experiment. Version 10 introduced matched
+fixed-cloud fitting budgets for both families; version 11 preserves those
+fits and changes all four DCS variants to a shared fixed-move default. The version-9 table below
 retains its original fresh-draw DCS recipe and 1,500-update full DCS budget;
-its outcomes are not version-10 performance results.
+its outcomes are not version-10 or version-11 performance results.
 
 Version 9 uses the SCS authors' unchanged VI implementation and production
 transition, applied to the same target as DCS. DCS fitting, proposals and
@@ -224,14 +225,15 @@ That release preserves the main comparison's fitting recipe. The saved
 source hashes identify the actual generating sources of the original study;
 a new timed run can have different counts and MSE even with the same seeds.
 
-The explicit `--scs-step-rule acceptance` reproduces the study's primary
-policy despite the fixed-step global default. Use `--scs-step-rule fixed`
+The explicit `--scs-step-rule acceptance` reproduces the study's SCS primary
+step policy despite the fixed-step global default. Current DCS fitting and
+DCS proposal-step settings differ from that historical study. Use `--scs-step-rule fixed`
 to run a five-method primary with SCS h=0.1. The control helper automatically
 runs the **opposite** SCS policy: fixed h=0.1 after an acceptance-tuned primary,
 or acceptance tuning after a fixed-step primary. Thus either primary policy
 can supply the same fitted maps and resources for its sensitivity check.
 
-Use fresh output folders. The current control requires a complete version-10 primary
+Use fresh output folders. The current control accepts a complete version-11 primary
 and checks its scientific sources, maps and allocation before reuse. It
 records original fitting costs separately from zero new fitting work.
 These controls assess the step policy conditional on the primary fitted

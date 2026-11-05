@@ -11,7 +11,7 @@ production steps are frozen. Native kernels use float64 without fast-math,
 cache target/map constants, and call the actual SciPy normal log-CDF routine.
 SCS and ordinary random-walk baselines receive the same compilation treatment.
 The first third of actual generated sampling iterations is discarded for every
-current experiment. Ordinary BW and DCS-RWM use separate per-chain acceptance-target 0.234 calibration. Reflected BW uses squared ball movement within the same warmup budget, without a special bound of 2; billiards use their own production kernel and a bounded radial-movement pilot. The current 100D/500D comparisons default to author SCS h=0.1, with acceptance-target 0.234 tuning available as a sensitivity option. Generic logistic and ν=0.5 SCS production retains acceptance-target 0.234 tuning. Every VI-enabled SCS fit uses the pinned author optimizer, independent of production backend. All production steps freeze.
+current experiment. In the version-11 100D/500D comparisons, all four DCS variants share fixed h=0.07: BW/reflected-BW/billiard use a uniform-ball increment of radius h and Gaussian RWM uses coordinate standard deviation h/√(d+2). Their discarded warmup uses each actual kernel without step adaptation. Author SCS remains fixed at h=0.1 by default, with acceptance-target 0.234 tuning available as a sensitivity option. The shared DCS h=0.15 alternative and historical acceptance-tuned control are recorded explicitly when selected. The generic experiments retain their recorded step policies, including acceptance-target 0.234 for logistic and ν=0.5 SCS. Every public VI-enabled SCS fit uses the pinned author optimizer; v11 retains v10 fixed-cloud maps and budgets. All production steps remain fixed.
 
 Fixed-count runs use bounded chunks. Timed general kernels check the clock
 after batches of 256 transitions, and record elapsed time and overshoot. The
@@ -29,11 +29,11 @@ always use compiled paths for the methods listed above.
 
 `numba_radial.py` fuses transformed density, physical radius and coordinate summaries for BW/reflect on skew-t targets. It caches the current density, radius and first three coordinates through rejections, reuses scratch buffers, and stores only cumulative sums plus thinned functionals. Every repeated post-Metropolis state still enters the estimates. It uses float64, no fast-math and uniform-ball displacements from d+2 Gaussian variables. Arbitrary β remains supported; β=2 uses the exact boundary-gap simplification.
 
-Native production starts at the identical JAX-calibrated state and frozen step used in the shared-framework mode. PCG64 production streams are independent of the calibration stream, so parity means matching proposal and target laws, not identical seeded trajectories. Controlled-increment tests compare Metropolis decisions, density/Jacobian formulas, reflected chords and all-state cumulative statistics, including d=500.
+Native production starts at the identical final JAX warmup state and fixed production step used in the shared-framework mode. PCG64 production streams are independent of the calibration stream, so parity means matching proposal and target laws, not identical seeded trajectories. Controlled-increment tests compare Metropolis decisions, density/Jacobian formulas, reflected chords and all-state cumulative statistics, including d=500.
 
 `numba_rwm.py` and `numba_billiard.py` provide the current native ordinary RWM
-and billiard kernels, with corresponding JAX-calibrated starts and frozen
-steps. The rotation-mixture modules remain for compatibility and regression
+and billiard kernels, with corresponding JAX warmup starts and fixed
+production steps. The rotation-mixture modules remain for compatibility and regression
 checks; they are not part of the current five-method comparison. The
 implementation measurements below concern their recorded kernels and settings.
 

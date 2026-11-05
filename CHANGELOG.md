@@ -1,5 +1,13 @@
 # Changes
 
+## 2026-11-05 — shared fixed DCS moves, version 11
+
+- Share h=0.07 across all four DCS variants: BW, reflected BW and billiard use that uniform-ball increment radius; Gaussian RWM uses coordinate standard deviation h/√(d+2). Every variant runs its own kernel during discarded warmup without separate step optimization.
+- Keep author SCS h=0.1. Preserve the former reflected-BW and billiard pilot policies as explicit historical controls. Keep the same five methods, targets, sampling budgets, timing and first-third production burn-in.
+- Preserve version-10 matched fixed-cloud VI: Full 1,000 × 2,000, Smaller 400 × 500, Quick 20 × 128. Fresh-cloud VI studies remain separate experiments, not public defaults.
+- Add `--dcs-fixed-move 0.15` as an explicit shared-move sensitivity setting; retain the historical method-specific calibration with `--dcs-step-rule acceptance`. Neither fixed value is claimed optimal or guaranteed to improve performance. Saved v10 results retain their original method-specific calibration; new v11 comparisons require fresh sampling of all methods together.
+- Simplify launcher seed choices to Run 1 (default) through Run 9 without changing their underlying seed mapping.
+
 ## 2026-11-05 — fixed-cloud, matched-budget comparisons, version 10
 
 - Require VI for both map families in every new 100D/500D five-method comparison. Remove the launcher VI-off choice and reject new off requests at public comparison entry points. Remove the generic untuned-map selection from the launcher and public command line; posterior identity maps remain unchanged.
