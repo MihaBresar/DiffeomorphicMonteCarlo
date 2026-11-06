@@ -13,7 +13,7 @@ It uses different DCS maps and h=0.07; its results are not replications of this 
 1. Download and extract the updated repository. Open **Start.bat** on Windows,
    **Start.command** on macOS, or open **START_HERE.py** in IDLE and choose
    **Run → Run Module**.
-2. Choose **Reported study: zero-centre DCS vs original SCS (JAX)**, then select
+2. Choose **DCS vs original SCS**, then select
    **100D** or **500D**. There are no map, radius or step-size choices to make.
 3. Run **Quick check** first. Then choose **Smaller reproduction** or
    **Full paper settings**, select the worker count, and click **Start run**.
@@ -110,3 +110,42 @@ Their MSE and ESS do not establish angular or marginal mixing. The 40-chain
 results repeat sampling conditional on one frozen fit per family and dimension;
 they do not assess variation across independently fitted maps. Small observed
 MSE differences should not be described as decisive, especially with ν=3 norm errors.
+
+## Potential advantages for DCS in this comparison
+
+The active DCS settings use a radius/step pilot with 16 candidates, 4,096 exact
+independent target starts per candidate and eight transitions per start:
+524,288 transitions per dimension. DCS also uses the subsequent zero-centre
+and zero-deformation choices. Original SCS retains its fitted map and h=0.1.
+Matching the original VI budgets therefore does not match the preparation
+used by the two active procedures. Exact target draws are an additional resource
+available for this synthetic example, not a general-purpose tuning assumption.
+
+The archive contains an **SCS jointly calibrated** control that used the same
+524,288-transition pilot budget and retained its author-fitted centre and
+observer while selecting R and h. Its settings were frozen before assessment.
+In the recorded pooled 100D results:
+
+| Method | Radial-tail MSE | Mean-norm MSE |
+|---|---:|---:|
+| Original SCS | 2.27e-7 | 5.21e-3 |
+| SCS jointly calibrated | 1.60e-7 | 2.80e-3 |
+| Ordinary DCS-BW | 2.03e-7 | 1.59e-3 |
+
+The calibrated SCS control has 29.84% lower tail MSE and 46.14% lower norm MSE
+than original SCS. Its tail-MSE ordering against ordinary BW reverses, while
+BW retains lower norm MSE. These are recorded sensitivity results, not new
+confirmatory runs or a claim that this is the best possible SCS tuning. The
+[complete calibration archive](../studies/zero_centre/results/historical_calibration_archive.json)
+retains both batches, all controls and full precision; the active menu continues
+to use only original SCS.
+
+The pilot's radial objective is aligned with the reported radial functions.
+For this sign-skewed target, radial functions have the same distribution as
+under symmetric Student-t; these measurements do not expose asymmetric
+marginal or angular mixing. They therefore support radial-efficiency claims
+on this target, not overall dominance. Production time also excludes
+preparation, so it is not total time to obtain a tuned sampler. Finally, the
+frozen maps assess conditional sampling variability, and the Numba extension
+includes framework differences relative to author JAX SCS. Neither establishes
+universal sampler superiority.

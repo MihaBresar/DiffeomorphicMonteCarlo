@@ -60,9 +60,9 @@ rejections. Any unavailable chain makes that method aggregate unavailable.
 See [ESS definitions and limits](ESS.md). Replotting uses recorded measurements;
 it cannot reconstruct unrecorded transitions.
 
-The All seven sequence uses the five-method JAX comparison on 100D skewed t
-with VI fitted for both map families; the other six experiments retain their
-specified fitted or identity-map policies.
+The All seven sequence uses the current five-method JAX comparison on the selected
+100D/500D skewed t, loading its bundled maps without refitting. The other six
+experiments retain their specified fitted or identity-map policies.
 
 The compact **200D random-walk baselines** report keeps just `VsRWM_NUTS`
 (two MSE panels), `VsRWM_NUTS_ergodic_averages` (tail and norm estimates), and

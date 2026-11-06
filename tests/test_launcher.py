@@ -33,7 +33,7 @@ class LauncherTests(unittest.TestCase):
             with self.subTest(experiment=experiment), self.assertRaises(ValueError):
                 launcher.commands_for_run('quick', experiment, Path('results/test'))
 
-    def test_visible_menu_defaults_reported_and_retains_earlier_comparisons(self):
+    def test_visible_menu_uses_short_names_and_removes_earlier_comparisons(self):
         from html.parser import HTMLParser
         class ExperimentMenu(HTMLParser):
             def __init__(self):
@@ -58,10 +58,8 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual({x['value'] for x in menu.options}, set(launcher.EXPERIMENTS))
         self.assertEqual([x['value'] for x in menu.options if 'selected' in x], ['reported-zero-centre'])
         self.assertEqual(menu.options[0]['value'], 'reported-zero-centre')
-        self.assertTrue(any('Reported study:' in label for label in menu.labels))
-        self.assertTrue(any('Numba extension' in label for label in menu.labels))
-        self.assertTrue(any('Earlier fitted-map comparison:' in label for label in menu.labels))
-        self.assertIn('sampler-comparison-numba', {x['value'] for x in menu.options})
+        self.assertEqual(menu.labels[:3], ['DCS vs original SCS', 'Numba extension', 'All seven experiments + posterior table'])
+        self.assertTrue(set(launcher.COMPARISONS).isdisjoint(x['value'] for x in menu.options))
         self.assertTrue(set(launcher.LEGACY_SCS_COMPARISONS).isdisjoint(x['value'] for x in menu.options))
         target_menu = ExperimentMenu()
         target_menu.feed((launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8')
@@ -86,7 +84,7 @@ class LauncherTests(unittest.TestCase):
                         self.assertNotIn('--seed-batch', command)
                     self.assertNotIn('--seed', command)
                     self.assertNotIn('--fit-seed', command)
-        for experiment in set(launcher.EXPERIMENTS)-set(launcher.SCS_COMPARISONS):
+        for experiment in set(launcher.EXPERIMENTS)-set(launcher.SEED_BATCH_EXPERIMENTS):
             with self.subTest(experiment=experiment):
                 commands = launcher.commands_for_run('quick', experiment, Path('results/test'))
                 self.assertTrue(all('--seed-batch' not in command for command in commands))
@@ -205,10 +203,14 @@ class LauncherTests(unittest.TestCase):
         self.assertNotIn(str(launcher.ROOT/'prepare_reference.py'), command)
 
     def test_all_uses_complete_pipeline(self):
-        command, = launcher.commands_for_run('paper', 'all', Path('results/test'), resume=True)
+        command, = launcher.commands_for_run('paper', 'all', Path('results/test'), comparison_target='skew-t-500d')
         self.assertIn(str(launcher.ROOT/'scripts/reproduce_all.py'), command)
-        self.assertIn('--resume', command)
+        self.assertNotIn('--resume', command)
+        self.assertEqual(command[command.index('--seed-batch')+1], '22')
+        self.assertEqual(command[command.index('--target')+1], 'skew-t-500d')
         self.assertEqual(command[command.index('--preset')+1], 'paper')
+        with self.assertRaisesRegex(ValueError, 'starts from scratch'):
+            launcher.commands_for_run('paper', 'all', Path('results/test'), resume=True)
 
     def test_unknown_options_are_rejected(self):
         for preset, experiment in [('unknown', 'all'), ('quick', '../anything.py')]:

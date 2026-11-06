@@ -110,8 +110,37 @@ class LauncherMoveTests(unittest.TestCase):
             commands = [call.args[0] for call in execute.call_args_list]
             self.assertTrue(all('--dcs-fixed-move' not in command for command in commands))
             self.assertTrue(all('--dcs-step-rule' not in command for command in commands))
-            self.assertEqual(sum('sampler-comparison' in command for command in commands), 1)
+            self.assertEqual(sum('reported-zero-centre' in command for command in commands), 1)
+            self.assertFalse(any('sampler-comparison' in command for command in commands))
+            comparison, = [command for command in commands if 'reported-zero-centre' in command]
+            self.assertEqual(comparison[comparison.index('--seed-batch')+1], '22')
+            self.assertEqual(comparison[comparison.index('--target')+1], 'skew-t-100d')
+            for unused in ('--reference-dir', '--vi', '--ball-map-policy'):
+                self.assertNotIn(unused, comparison)
             self.assertEqual(len(commands), 9)
+
+    def test_all_seven_forwards_selected_target_and_batch_to_comparison_only(self):
+        with tempfile.TemporaryDirectory() as temp, patch.object(reproduce_all.subprocess, 'run') as execute, \
+                patch('sys.argv', ['reproduce_all.py', '--output-root', temp, '--target', 'skew-t-500d', '--seed-batch', '23']):
+            reproduce_all.main()
+            commands = [call.args[0] for call in execute.call_args_list]
+            comparison, = [command for command in commands if 'reported-zero-centre' in command]
+            self.assertEqual(comparison[comparison.index('--seed-batch')+1], '23')
+            self.assertEqual(comparison[comparison.index('--target')+1], 'skew-t-500d')
+            self.assertTrue(all('--seed-batch' not in command for command in commands if command is not comparison))
+
+    def test_all_seven_replots_current_and_historical_comparisons_without_sampling(self):
+        for comparison in ('reported-zero-centre', 'sampler-comparison', 'skew-t-100d-fixed'):
+            with self.subTest(comparison=comparison), tempfile.TemporaryDirectory() as temp:
+                (Path(temp)/comparison).mkdir()
+                with patch.object(reproduce_all.subprocess, 'run') as execute, \
+                        patch('sys.argv', ['reproduce_all.py', '--output-root', temp, '--plot-only']):
+                    reproduce_all.main()
+                commands = [call.args[0] for call in execute.call_args_list]
+                replot = commands[2]
+                self.assertEqual(replot[replot.index('--plot-only')+1], str(Path(temp).resolve()/comparison))
+                self.assertEqual(len(commands), 8)
+                self.assertTrue(all('--plot-only' in command for command in commands[:-1]))
 
     def test_all_seven_rejects_removed_flags_before_reference_preparation(self):
         for argument in ('--dcs-fixed-move=.07', '--dcs-fixed-move=.15', '--dcs-fixed-move=nan',

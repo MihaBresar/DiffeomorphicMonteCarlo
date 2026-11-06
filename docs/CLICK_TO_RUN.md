@@ -52,7 +52,7 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 
 1. Click **Set up environment** and wait for **Environment ready**. This installs
    the pinned packages inside this project and can take several minutes.
-2. Leave **Reported study: zero-centre DCS vs original SCS (JAX)** and
+2. Leave **DCS vs original SCS** and
    **Quick check** selected. Choose **100D** or **500D** and **CPU workers**
    (start with one or two), then click **Start run**. The study loads its exact
    bundled maps and preset parameters; no manual step-size choice is needed.
@@ -65,7 +65,7 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
    PNG and PDF figures are available; CSV and JSON retain full precision.
    Files stay in **results → click-runs → dated folder**.
 
-## Reported study and previous comparison
+## Comparison settings
 
 The reported study contains DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and
 DCS-Billiard. All four DCS methods use zero centre and zero deformation,
@@ -88,13 +88,10 @@ The study uses additional DCS calibration from its development stage. It is
 not equal total tuning effort against original SCS, and its radial results
 are not a guarantee of overall mixing or a guaranteed ranking on another run.
 
-The **Previous fitted-map comparison** options retain the older version-11
-protocol: maps are fitted anew at the selected VI budget, physical centres
-remain fitted, and the shared DCS h is 0.07. Billiards use zero effective
-Möbius deformation; other DCS variants retain the fitted map. These are
-different experiments from the reported zero-centre study. **All seven**
-continues to run this previous comparison plus the manuscript experiments;
-choose the reported study explicitly to reproduce its configuration.
+**All seven experiments + posterior table** runs the current JAX comparison
+at the selected 100D/500D target plus the other six experiments. The two earlier
+fitted-map options have been removed from the launcher. Their compatibility
+commands and saved-report readers remain available for historical reproduction.
 
 All comparisons show mean norm, radial-tail probability, MSE, exact counts,
 time, functional ESS and ESS per second. They use analytic radial references.
@@ -107,8 +104,8 @@ The reported study defaults to fresh seed batch **22**. The repeat selector
 also labels recorded batches **20** and **21** explicitly. Reusing one of these
 batches matches its random-stream inputs; different hardware and time stopping
 can still change the number of samples and resulting errors. Other fresh
-batches keep the same maps and parameters. The previous fitted-map recipe
-retains its earlier sampling-batch choices.
+batches keep the same maps and parameters. The same repeat selector applies
+to the comparison within All seven; the other six retain their recorded seeds.
 
 Run each target separately and compare all five methods together. Keep the
 worker count and computer load comparable. Full paper runs extend sampling

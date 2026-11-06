@@ -1,7 +1,6 @@
 # Running the experiments
 
-To run the reported results' configuration, choose **Reported study: zero-centre
-DCS vs original SCS (JAX)**. Its bundled maps and parameters are fixed, with no
+To run the reported results' configuration, choose **DCS vs original SCS**. Its bundled maps and parameters are fixed, with no
 manual step choices or refitting. Use **Smaller reproduction** for one reported
 20-chain × 3-second batch, or **Full paper settings** for 50 chains × 20 seconds.
 See [the study instructions](REPORTED_STUDY.md), including the recorded seed batches.
@@ -65,8 +64,9 @@ apply a new fit.
 
 ## Earlier fitted-map sampler comparisons
 
-Choose **Earlier fitted-map comparison: five samplers (JAX)** or
-**Earlier fitted-map comparison: Numba DCS vs SCS**. Both version-11 suites
+The compatibility commands `sampler-comparison` and
+`sampler-comparison-numba` retain both version-11 suites. These options are
+no longer present in the launcher. Both suites
 contain the same methods, with 100D/500D and VI fitted for both map families. Numba production differs
 in implementation and recording costs; author SCS remains in JAX.
 
@@ -102,10 +102,8 @@ integers, and CSV/JSON retain full precision.
 
 | Launcher experiment | Comparison recipe | Outputs |
 |---|---|---|
-| Reported study: zero-centre DCS vs original SCS (JAX) | Default: bundled maps, recorded zero-centre DCS settings, original author SCS; equal sampling time, extra prior DCS calibration | `VsSCS`, radial estimates, counts, runtime, bias/variance, functional ESS |
-| Reported-study parameters: Numba extension | Same bundled settings; Numba DCS versus author JAX SCS; implementation extension | Same comparison figure families and exact-value tables |
-| Earlier fitted-map comparison: five samplers (JAX) | Version 11, fitted maps and h=0.07 for DCS; equal time, JAX | Same comparison figure families and exact-value tables |
-| Earlier fitted-map comparison: Numba DCS vs SCS | Version 11, fitted maps and h=0.07 for DCS; equal time, mixed implementations | Same comparison figure families and exact-value tables |
+| DCS vs original SCS | Default: bundled maps, recorded zero-centre DCS settings, original author SCS; equal sampling time, extra prior DCS calibration | `VsSCS`, radial estimates, counts, runtime, bias/variance, functional ESS |
+| Numba extension | Same bundled settings; Numba DCS versus author JAX SCS; implementation extension | Same comparison figure families and exact-value tables |
 | 50D t: infinite first moment, equal samples | 50 chains/method, 500,000 iterations/chain | `SuperInfiniteFirstTest`, tail/log-norm and quantiles |
 | 200D skew-t: DCS versus NUTS | Equal sampling time | `NUTS_PBW_vs` |
 | 200D skew-t: random-walk baselines | Equal sampling time | `VsRWM_NUTS` |
@@ -134,11 +132,11 @@ The super-heavy-tail experiment retains equal iteration counts. Its mean norm
 does not exist at ν=0.5, so use its tail probability, finite mean log norm and
 marginal quantiles. These plots cannot be reconstructed by rescaling timed MSE.
 
-**Earlier seven experiments + posterior table** runs the earlier version-11 five-method JAX comparison
-on the 100D skewed-t target and the other six experiments,
-and prepares independent logistic references. It fits both comparison maps
-by VI and uses the specified maps for the other experiments.
-The reported study, optimized Numba and 500D comparisons are separate selections.
+**All seven experiments + posterior table** runs **DCS vs original SCS**
+on the selected 100D/500D target and the other six experiments,
+and prepares independent logistic references. It loads the bundled comparison
+maps and uses the specified maps for the other experiments.
+The current JAX and Numba comparisons can also be run separately for either dimension.
 Quick check only verifies that
 execution works. Use Smaller reproduction first to estimate resource needs;
 use Full paper settings for the recorded full benchmark budgets. This does not

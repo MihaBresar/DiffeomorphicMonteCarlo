@@ -2,7 +2,7 @@
 
 Research software accompanying *Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions*, by Miha Brešar and Aleksandar Mijatović.
 
-The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. **The default launcher experiment now reproduces the reported zero-centre DCS study**, using its bundled maps and frozen parameters. The previous fitted-centre version-11 comparison remains separately available. Neither reproduces the original paper figures unchanged; billiards and reflected BW are later extensions.
+The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. **The default launcher experiment now reproduces the reported zero-centre DCS study**, using its bundled maps and frozen parameters. The previous fitted-centre version-11 recipe remains available only through its compatibility commands and saved reports. Neither reproduces the original paper figures unchanged; billiards and reflected BW are later extensions.
 
 Start with the [reported study instructions](docs/REPORTED_STUDY.md), [reviewer guide](docs/REVIEW_GUIDE.md), or [experiment catalogue](docs/EXPERIMENTS.md). No general performance ranking is assumed; comparisons must be assessed for the functions and budgets measured.
 
@@ -18,7 +18,7 @@ Use **64-bit Python 3.12** and the pinned CPU dependencies in `requirements-cpu.
 | macOS | Double-click `Start.command`. If the downloaded script cannot open, use IDLE as below. |
 | Linux desktop, Windows or macOS with IDLE | In IDLE, open `START_HERE.py`, then select **Run → Run Module**. |
 
-Click **Set up environment**, then leave **Reported study: zero-centre DCS vs original SCS (JAX)** and **Quick check** selected. Start with one or two CPU workers. After it completes, the launcher links to the report and figures. Keep its console or IDLE window open while it runs. Open the Python launcher, rather than opening `launcher/index.html` directly. See [click-to-run instructions](docs/CLICK_TO_RUN.md) for details.
+Click **Set up environment**, then leave **DCS vs original SCS** and **Quick check** selected. Start with one or two CPU workers. After it completes, the launcher links to the report and figures. Keep its console or IDLE window open while it runs. Open the Python launcher, rather than opening `launcher/index.html` directly. See [click-to-run instructions](docs/CLICK_TO_RUN.md) for details.
 
 ### Terminal
 
@@ -66,50 +66,13 @@ The original 40-chain pooled result combines two 20-chain batches; a fresh
 Smaller run is one batch. Time budgets do not imply identical sample counts
 or outcomes on another computer.
 
-## Previous fitted-map comparison (version 11)
+## Earlier recipe compatibility
 
-Both modes contain **DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard**.
-
-| Command identifier | Production implementation |
-|---|---|
-| `sampler-comparison` | All five methods in the same JAX timing and recording framework |
-| `sampler-comparison-numba` | Optimized Numba DCS kernels versus the unchanged author SCS transition in JAX |
-
-The second mode measures implementation efficiency, including different framework and output costs. It does not isolate transition geometry.
-
-Both support the normal-CDF-skewed Student-t target with ν=3, α=(100,−100,0,…), dimension **100 or 500**, and DCS exponent β=2. Select `--target skew-t-100d` or `--target skew-t-500d`. Both map families are fitted by VI in every new comparison. The 500D target is an extension. These targets differ from the Student-t-CDF-skewed target in the SCS paper.
-
-SCS uses its authors' unchanged VI routine; DCS retains its own VI fit. Their fitting recipes differ; both receive the same number of objective/gradient evaluations, with full budgets of 1,000 updates on 2,000 points per update. This compares the fitted sampling procedures; it does not isolate proposal geometry from map fitting. Billiards retain the ball fit's centre, scale and β in post-Möbius coordinates, with zero effective deformation; the other DCS methods retain the original ball map.
-
-All four DCS methods share one fixed move h=0.07: BW, reflected BW and billiard use a uniform-ball increment of radius h; RWM uses Gaussian coordinate standard deviation h/√(d+2). This matches the increments’ coordinate covariances, not their physical endpoints or acceptance rates. Each method uses its own kernel during discarded equilibration, with no separate step adaptation. The single SCS baseline uses the authors' fixed **h=0.1** and unchanged author VI/transition; alternative SCS calibration is not offered in new five-method comparisons. Every method receives the same discarded warmup-transition budget. All production steps are frozen, and the first third of generated production iterations is discarded.
-
-These earlier fitted-map launcher entries and commands use preset DCS h=0.07 automatically; there is no manual step-size or calibration-policy choice. This preset is not a claim of optimality or guaranteed superiority. Internal configuration helpers retain historical settings for study reproduction. Version 11 preserves the version-10 fixed-cloud VI maps and changes all four DCS proposal-step policies, so new sampling is required for a v11 comparison. These previous version-11 recipes retain fitted physical centres and do not apply the zero-centre study overrides. Select the separately named reported study to use its bundled maps and calibration.
-
-The current suite retains only this original SCS baseline. Historical alternative-step results remain recorded for reproducibility. The fixed SCS choice followed a documented 100D development study; it was frozen before the planned full-paper seed-batch-8 assessment. It is not a demonstrated optimum for 500D. See [all sensitivity results and the selection rule](docs/AUTHOR_SCS_CALIBRATION.md).
-
-| Preset | Chains per method | Production seconds per chain | Separate pilot transitions |
-|---|---:|---:|---:|
-| `quick` | 2 | 0.05 | 100 |
-| `reproduce` | 20 | 2 | 1,000 |
-| `paper` | 50 | 20 | 1,500 |
-
-Smaller presets also reduce VI training. Full VI uses 1,000 updates and 2,000 objective/gradient evaluation points per update for each family. Each family reuses its own fixed reference cloud throughout fitting. This matches update counts, cloud size and objective/gradient evaluation counts; the base distributions, parameterizations, seeds and clipping rules remain method-specific. Fitting time need not match. The [protocol](docs/COMPARISONS.md) specifies the complete budgets and [reproducibility guide](docs/REPRODUCIBILITY.md) defines costs, seeds and diagnostics.
-
-```sh
-# Inspect the resolved configuration without sampling.
-python run_experiment.py sampler-comparison --preset paper --dry-run
-
-# Smaller 100D comparison with fitted maps.
-python run_experiment.py sampler-comparison --target skew-t-100d --preset reproduce --workers 2 --output-dir results/jax-100d-vi
-
-# Full 500D comparison with the frozen default and a fresh sampling batch.
-python run_experiment.py sampler-comparison --target skew-t-500d --preset paper --workers 2 --seed-batch 8 --output-dir results/jax-500d-batch-8
-
-# Regenerate a completed report without sampling.
-python run_experiment.py --plot-only results/jax-100d-vi
-```
-
-Choose a fresh output directory for each comparison. Set the worker count to the available CPU allocation and keep it fixed across comparisons. Timed counts vary with hardware and system load even when seeds agree. Run the complete method set together; do not mix timing results from different code or execution policies.
+The earlier fitted-map comparisons have been removed from the launcher. Their
+`sampler-comparison` and `sampler-comparison-numba` command identifiers and
+saved-report readers remain available for reproducibility. They use different
+maps and h=0.07, and are not replications of the current zero-centre study.
+See the [archived recipe specification](docs/COMPARISONS.md).
 
 ## Measurements and saved outputs
 
@@ -133,7 +96,7 @@ The repository also includes 200D skew-t comparisons with NUTS and random-walk b
 
 Every VI-enabled SCS fit uses the same pinned author routine, including logistic regression and the 50D t(0.5) experiment. Their SCS production kernels remain the checked Numba implementation with acceptance-target 0.234 step tuning. SCS fitting has its own recorded budget: 1,000 updates on 2,000 fixed draws for Full paper settings, 400 on 500 for Smaller reproduction, and 20 on 128 for Quick check. Experiments containing SCS use fixed clouds and matching per-family evaluation budgets. Version 10 established that fitting policy, including the full logistic DCS budget of 1,000 updates; version 11 leaves it unchanged. The v11 shared fixed DCS move applies to the two five-method comparisons, not the other six experiments. Rerun all five compared methods together to measure the new step policy.
 
-The all-experiments runner includes the JAX 100D comparison and those six experiments; it does not expand every target/backend combination. The [manuscript relationship](docs/MANUSCRIPT_CHANGES.md) explains the corrections and scope of current experiments. The current billiard variant is distinct from the original paper's BW sampler. New results cannot retrospectively validate the original figures.
+The all-experiments runner includes the current JAX comparison (100D by default, or the selected 500D target) and those six experiments; it does not expand every target/backend combination. The [manuscript relationship](docs/MANUSCRIPT_CHANGES.md) explains the corrections and scope of current experiments. The current billiard variant is distinct from the original paper's BW sampler. New results cannot retrospectively validate the original figures.
 
 ## Citation, attribution and contributions
 

@@ -1,5 +1,11 @@
 # Changes
 
+## 2026-11-06 — simpler comparison menu
+
+- Rename the current launcher choices to **DCS vs original SCS** and **Numba extension**. Remove both earlier fitted-map comparison options from the menu; preserve their compatibility commands and saved-report support.
+- Make All seven use the current JAX comparison with the selected target and sampling batch. Keep the other six experiments unchanged.
+- Preserve every current map, step size, sampling budget and estimator. Clarify how additional DCS calibration, radial measurements and excluded preparation costs limit fairness claims.
+
 ## 2026-11-06 — runnable reported zero-centre study
 
 - Add the reported JAX experiment as a clearly named default launcher choice, with the exact bundled original VI artifacts, their checksums and histories, and separately recorded DCS production overrides. All four DCS maps have zero centre/deformation; their dimension-specific R and h are frozen. Original SCS retains its author-fitted map and h=0.1.

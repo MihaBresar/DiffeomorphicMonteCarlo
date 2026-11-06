@@ -22,20 +22,21 @@ from dcs_bench.cpu import cpu_info, validate_workers
 ROOT = Path(__file__).resolve().parent
 RUNS = ROOT/'results'/'click-runs'
 PRESETS = ('quick', 'reproduce', 'paper')
-EXPERIMENTS = ('all', 'skew-t-200d-nuts', 'skew-t-200d-baselines', 'sampler-comparison',
-               'sampler-comparison-numba', 'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression',
+EXPERIMENTS = ('all', 'skew-t-200d-nuts', 'skew-t-200d-baselines',
+               'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression',
                'reported-zero-centre', 'reported-zero-centre-numba')
 COMPARISONS = ('sampler-comparison', 'sampler-comparison-numba')
 REPORTED_COMPARISONS = ('reported-zero-centre', 'reported-zero-centre-numba')
 LEGACY_SCS_COMPARISONS = ('skew-t-100d-fixed', 'skew-t-100d-boundary')
 SCS_COMPARISONS = REPORTED_COMPARISONS + COMPARISONS + LEGACY_SCS_COMPARISONS
+SEED_BATCH_EXPERIMENTS = SCS_COMPARISONS + ('all',)
 COMPARISON_TARGETS = ('skew-t-100d', 'skew-t-500d')
 STEP_PRESET_MESSAGE = 'New launcher runs use the protocol preset step sizes; manual DCS move or step-rule overrides are not available.'
 _DEFAULT_SEED_BATCH = object()
 
 
 def default_seed_batch(experiment):
-    return 22 if experiment in REPORTED_COMPARISONS else 0
+    return 22 if experiment in REPORTED_COMPARISONS + ('all',) else 0
 
 
 def environment_python():
@@ -84,13 +85,13 @@ def environment_ready():
 
 
 def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=_DEFAULT_SEED_BATCH, comparison_target='skew-t-100d', vi='on', dcs_fixed_move=None, dcs_step_rule=None):
-    if preset not in PRESETS or experiment not in EXPERIMENTS + LEGACY_SCS_COMPARISONS:
+    if preset not in PRESETS or experiment not in EXPERIMENTS + COMPARISONS + LEGACY_SCS_COMPARISONS:
         raise ValueError('Choose a listed preset and experiment')
     if seed_batch is _DEFAULT_SEED_BATCH:
         seed_batch = default_seed_batch(experiment)
     if type(seed_batch) is not int or not 0 <= seed_batch <= 999:
         raise ValueError('Seed batch must be an integer from 0 to 999')
-    if seed_batch and experiment not in SCS_COMPARISONS:
+    if seed_batch and experiment not in SEED_BATCH_EXPERIMENTS:
         raise ValueError('Seed batches are available only for the sampler comparisons')
     if not plot_only:
         if dcs_fixed_move is not None or dcs_step_rule is not None:
@@ -137,13 +138,18 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
             command += ['--seed-batch', str(seed_batch)]
         return [command]
     if experiment == 'all':
+        if comparison_target not in COMPARISON_TARGETS:
+            raise ValueError('Choose a listed comparison target')
+        if resume and not plot_only:
+            raise ValueError('The comparison in All seven starts from scratch; choose a fresh output folder.')
         command = [py, '-u', str(ROOT/'scripts/reproduce_all.py'), '--preset', preset, '--output-root', str(directory)]
         if plot_only:
             command.append('--plot-only')
         elif resume:
             command.append('--resume')
         if not plot_only:
-            command += ['--workers', str(workers), '--ball-map-policy', ball_map_policy, '--vi', vi]
+            command += ['--workers', str(workers), '--ball-map-policy', ball_map_policy, '--vi', vi,
+                        '--target', comparison_target, '--seed-batch', str(seed_batch)]
         return [command]
     result = directory/experiment
     if plot_only:
