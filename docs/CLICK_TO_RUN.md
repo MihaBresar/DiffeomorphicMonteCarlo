@@ -23,7 +23,7 @@ Open the Python launcher rather than opening `launcher/index.html` directly.
 
 The main comparison loads frozen maps and steps. Smaller uses 20 chains × 3 seconds per method and Full uses 50 × 20 seconds. Both have 1,500 separate warmup transitions, followed by first-third production discard. No manual fitting or step selection is required.
 
-Original SCS keeps author VI and h=0.1. Calibrated zero-SCS keeps R/h selected before its centre/observer were zeroed, without a new calibration on that map. See [the exact protocol](REPORTED_STUDY.md).
+Original SCS keeps author VI and h=0.1. DCS and calibrated zero-SCS use radius and step values selected on their final zero maps with the same pilot policy and budgets. These settings load automatically; see [the exact protocol](REPORTED_STUDY.md). The optional [preparation replay](PREPARATION.md) is available for inspecting and reproducing the fitting and selection.
 
 **Numba extension** runs the same comparison with Numba DCS production against original JAX SCS. Other choices are listed in [the experiment catalogue](EXPERIMENTS.md). The additional experiments use Numba DCS/random-walk production and retain their compiled NUTS backend.
 

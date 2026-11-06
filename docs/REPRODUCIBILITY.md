@@ -6,16 +6,13 @@ Preserve a run's configuration, manifest, maps, summaries and chain metadata tog
 
 The [protocol](REPORTED_STUDY.md) fixes targets, maps and steps. Both implementation modes load the same map assets; SCS source is pinned by revision and checksum.
 
-This package supports sampling reproduction from the supplied frozen inputs.
-It does not yet provide a standalone replay of all preparation: the joint
-radius/step pilot and centre-choice diagnostic are recorded by hashes and
-selected values, but their complete executable recipes and pilot seed are not
-bundled. Relative `review/...` paths in the immutable manifest identify source
-provenance; they are not required files for running the current comparisons.
+This package supports sampling from frozen inputs and [replaying their preparation](PREPARATION.md). The public driver records the complete fitting recipes, seeds, candidate grids, common exact-target starts, selection score and deterministic tie rule. It sets both optimized maps' centres and deformations to zero before calibration, then freezes both selections before the separate diagnostic stream. The zero-map policy is a declared setting, not an additional selection from production results.
+
+Original fit assets remain intact for attribution. Their relative `review/...` provenance paths identify the earlier source of those assets; no local review files are needed for preparation or sampling.
 
 **Seed 1–Seed 8** change sampling streams, not fitting. Exact internal seeds remain in saved configurations and chain metadata. Repeating a seed on another machine need not reproduce timed counts or long floating-point trajectories.
 
-DCS and calibrated SCS received equal VI evaluation and R/h selection-transition budgets. SCS's selected R/h preceded zeroing its centre and observer. Original SCS keeps its author fit and h=0.1. Original fits and production overrides remain distinct; equal budgets do not imply identical map-preparation procedures.
+DCS and calibrated SCS receive equal VI evaluation and R/h selection-transition budgets. Both R/h pilots use their final zero maps, the same physical starts and score. The native VI routines and step units differ; equal counts do not imply equal elapsed cost. Original SCS keeps its author fit and h=0.1 as a separate baseline. Original fit histories and production overrides remain distinct.
 
 ## Clocks and allocation
 

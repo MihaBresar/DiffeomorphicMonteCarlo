@@ -54,11 +54,11 @@ class ReportedCalibratedSCSTests(unittest.TestCase):
                     original = prepared['provenance']['original_fitted_maps']['sphere']
                     self.assertEqual(maps['SCS'], original)
                     chosen = copy.deepcopy(original)
-                    chosen['scale'] = study.CALIBRATED_SCS[dimension]['R']
+                    chosen['scale'] = study.MATCHED[dimension]['SCS']['R']
                     chosen.update(mu=[0.] * dimension, observer=[0.] * dimension)
                     self.assertEqual(maps['SCS-calibrated'], chosen)
                     for method, scale, policy in [('SCS', .1, 'author_scs_fixed_01'),
-                            ('SCS-calibrated', study.CALIBRATED_SCS[dimension]['h'], 'fixed_scs_move_v1')]:
+                            ('SCS-calibrated', study.MATCHED[dimension]['SCS']['h'], 'fixed_scs_move_v1')]:
                         execution = runner.method_execution_config(config, method)
                         self.assertEqual(execution['algorithm'], 'SCS')
                         self.assertEqual(timed_radial.resolve_step_tuning(execution), policy)
@@ -98,7 +98,7 @@ class ReportedCalibratedSCSTests(unittest.TestCase):
             runner.run(original, Path(temp) / 'must-not-exist', prepared_inputs=prepared)
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
-            for name in ('manifest.json', 'full_budget_100d.json', 'joint_calibration.json'):
+            for name in ('manifest.json', 'full_budget_100d.json', 'joint_calibration.json', 'matched_calibration.json'):
                 (directory/name).write_bytes((study.ASSETS/name).read_bytes())
             with (directory/'joint_calibration.json').open('ab') as stream:
                 stream.write(b' ')
@@ -118,7 +118,7 @@ class ReportedCalibratedSCSTests(unittest.TestCase):
             record = runner.chain_job(job)
             self.assertEqual(run.call_args.args[0], maps['sphere_calibrated'])
             self.assertEqual(run.call_args.args[1]['algorithm'], 'SCS')
-            self.assertEqual(run.call_args.args[1]['scs_fixed_move'], .05)
+            self.assertEqual(run.call_args.args[1]['scs_fixed_move'], config['scs_calibrated_move'])
             self.assertEqual(record['algorithm'], 'SCS-calibrated')
             self.assertEqual(record['kernel_algorithm'], 'SCS')
             self.assertTrue(Path(job['output']).exists())
@@ -129,7 +129,7 @@ class ReportedCalibratedSCSTests(unittest.TestCase):
         config = study.configuration()
         legacy = study.legacy_configuration()
         maps = study.load_prepared(config)['maps']
-        for label, expected_step in [('SCS', .1), ('SCS-calibrated', .05)]:
+        for label, expected_step in [('SCS', .1), ('SCS-calibrated', config['scs_calibrated_move'])]:
             actual = runner.method_execution_config(config, label)
             reference = dict(legacy, algorithm='SCS')
             mapping = maps['sphere' if label == 'SCS' else 'sphere_calibrated']

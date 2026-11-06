@@ -90,7 +90,7 @@ def _table(rows, labels=None):
     return '<div class="table-wrap"><table><thead><tr>'+header+'</tr></thead><tbody>'+body+'</tbody></table></div>'
 
 
-def _policy(name, timed=False, matched=False, ball_esjd=False, own_kernel=False, tuning_policies=None, zero_scs=False):
+def _policy(name, timed=False, matched=False, ball_esjd=False, own_kernel=False, tuning_policies=None, zero_scs=False, matched_preparation=False):
     selected = (tuning_policies or {}).get(name)
     if selected == 'fixed_dcs_move_v1':
         return ('Prespecified fixed DCS move: BW, reflected-BW and billiard proposal radius h; '
@@ -99,6 +99,9 @@ def _policy(name, timed=False, matched=False, ball_esjd=False, own_kernel=False,
     if selected == 'author_scs_fixed_01':
         return 'Author skew-t setting: fixed h = 0.1 with separate discarded equilibration; no step adaptation'
     if selected == 'fixed_scs_move_v1':
+        if matched_preparation:
+            return ('Equal-budget R/h pilot on the final zero-centre, zero-observer map; '
+                    'unchanged author transition; frozen production step without adaptation')
         if zero_scs and name == 'SCS-calibrated':
             return ('Prior joint radius/step pilot selected R and h on the author-fitted map; '
                     'production centre and observer now zero; unchanged author transition; '
@@ -233,18 +236,11 @@ def render_report(root, summary):
     figures = root/'figures'
     figures.mkdir(exist_ok=True)
     cases, config = summary['cases'], summary['config']
-    reported_study = config.get('protocol') in ('timed-reported-zero-centre-v1',
-                                               'timed-reported-zero-centre-numba-v1',
-                                               'timed-reported-zero-centre-v2',
-                                               'timed-reported-zero-centre-numba-v2',
-                                               'timed-reported-zero-centre-v3',
-                                               'timed-reported-zero-centre-numba-v3')
-    calibrated_scs = config.get('protocol') in ('timed-reported-zero-centre-v2',
-                                              'timed-reported-zero-centre-numba-v2',
-                                              'timed-reported-zero-centre-v3',
-                                              'timed-reported-zero-centre-numba-v3')
-    zero_scs = config.get('protocol') in ('timed-reported-zero-centre-v3',
-                                        'timed-reported-zero-centre-numba-v3')
+    from dcs_bench import reported_study as reported_protocol
+    reported_study = config.get('protocol') in reported_protocol.SUPPORTED_PROTOCOLS
+    calibrated_scs = reported_study and config.get('protocol') not in reported_protocol.LEGACY_PROTOCOLS.values()
+    matched_preparation = config.get('protocol') in reported_protocol.PROTOCOLS.values()
+    zero_scs = matched_preparation or config.get('protocol') in reported_protocol.ZERO_PROTOCOLS.values()
     if reported_study:
         from dcs_bench.reported_study import validate_reported_summary
         validate_reported_summary(summary)
@@ -260,7 +256,7 @@ def render_report(root, summary):
                                       'timed-sampler-comparison-v9', 'timed-numba-comparison-v9',
                                       'timed-sampler-comparison-v10', 'timed-numba-comparison-v10',
                                       'timed-sampler-comparison-v11', 'timed-numba-comparison-v11')
-    optimized = config.get('protocol') in ('timed-reported-zero-centre-numba-v1', 'timed-reported-zero-centre-numba-v2', 'timed-reported-zero-centre-numba-v3', 'timed-numba-comparison-v1', 'timed-numba-comparison-v2',
+    optimized = config.get('protocol') in ('timed-reported-zero-centre-numba-v1', 'timed-reported-zero-centre-numba-v2', 'timed-reported-zero-centre-numba-v3', 'timed-reported-zero-centre-numba-v5', 'timed-numba-comparison-v1', 'timed-numba-comparison-v2',
                                           'timed-numba-comparison-v3', 'timed-numba-comparison-v4', 'timed-numba-comparison-v5', 'timed-numba-comparison-v7', 'timed-numba-comparison-v8', 'timed-numba-comparison-v9', 'timed-numba-comparison-v10', 'timed-numba-comparison-v11')
     radial_ess = reported_study or config.get('protocol') in ('timed-sampler-comparison-v7', 'timed-numba-comparison-v7',
                                             'timed-sampler-comparison-v8', 'timed-numba-comparison-v8',
@@ -450,6 +446,10 @@ def render_report(root, summary):
     if zero_scs:
         tuning_note = ('Frozen maps; DCS centre/deformation zero; calibrated SCS centre/observer zero; '
                        'prior R/h retained without recalibration. Original SCS map and h=0.1 unchanged.')
+    if matched_preparation:
+        tuning_note = ('Final zero maps; equal-budget R/h calibration for DCS and calibrated SCS. '
+                       'Shared DCS h='+str(config['dcs_fixed_move'])+'; calibrated SCS h='+
+                       str(config['scs_calibrated_move'])+'. Original SCS map and h=0.1 unchanged.')
     display_names = [display_name(name) for name in names]
     x = np.arange(1, len(names)+1)
     colors = [COLORS[name] for name in names]
@@ -752,7 +752,7 @@ def render_report(root, summary):
         count = counts[name]
         per_chain = count['generated'][0] if len(set(count['generated'])) == 1 else 'varies; see chain table'
         retained = (count['retained'][0] if len(set(count['retained'])) == 1 else 'varies; see chain table')
-        row = {'method': name, 'production_step_policy': _policy(name, timed, matched, ball_esjd, own_kernel, tuning_policies, zero_scs), 'chains': case['chains'],
+        row = {'method': name, 'production_step_policy': _policy(name, timed, matched, ball_esjd, own_kernel, tuning_policies, zero_scs, matched_preparation), 'chains': case['chains'],
                'iterations_per_chain': per_chain, 'mean_iterations': count['mean_generated'],
                'total_iterations': case['total_iterations'],
                'mean_estimation_iterations': count['mean_used'], 'total_estimation_iterations': sum(count['used']),
@@ -775,6 +775,8 @@ def render_report(root, summary):
         if zero_scs and name == 'SCS-calibrated':
             row.update(centre_norm=0., observer_norm=0.,
                        radius_step_preparation='prior pilot on author-fitted map; centre/observer zeroed afterward; no recalibration')
+        if matched_preparation and name == 'SCS-calibrated':
+            row['radius_step_preparation'] = 'equal-budget pilot on final zero centre/observer map; no map change after selection'
         if v11 and name in ('DCS-RWM', 'DCS-BW', 'DCS-BW-reflect', 'DCS-Billiard'):
             row.update(dcs_step_rule=config['dcs_step_rule'])
             if name in fixed_dcs:
@@ -828,7 +830,7 @@ def render_report(root, summary):
             history = row.pop('tuning_history', None)
             angular_history = row.pop('angular_tuning_history', None)
             radial_history = row.pop('radial_tuning_history', None)
-            row.update(method=name, production_step_policy=_policy(name, timed, matched, ball_esjd, own_kernel, tuning_policies, zero_scs))
+            row.update(method=name, production_step_policy=_policy(name, timed, matched, ball_esjd, own_kernel, tuning_policies, zero_scs, matched_preparation))
             if name in radial_pilot_methods:
                 for pilot in radial_history or []:
                     radial_tuning_rows.append(dict(method=name, chain=row['chain'], seed=row.get('seed'),
@@ -919,6 +921,10 @@ def render_report(root, summary):
                            ('Sphere: centre=0, observer=0, prior pilot R retained without recalibration' if zero_scs else
                             'Author-fitted sphere centre/observer with pilot-calibrated R') if name == 'SCS-calibrated' else
                            'Frozen study ball: centre=0, delta=0, prior calibrated R, beta=2')
+        if matched_preparation and name != 'SCS':
+            coordinates = ('Sphere: centre=0, observer=0, R selected on this final map'
+                           if name == 'SCS-calibrated' else
+                           'Ball: centre=0, delta=0, beta=2, R selected on this final map')
         effective_rows.append(dict(method=name, coordinates=coordinates, **parameters))
         effective_summaries.append(dict(method=name, coordinates=coordinates,
             scale_R=parameters.get('scale'), centre_norm=float(np.linalg.norm(parameters.get('mu', []))),
@@ -972,12 +978,17 @@ def render_report(root, summary):
                 selected_candidate=selected['candidate_id'], selected_R=selected['R'],
                 selected_h=selected['h'], selected_score=selected['score'],
                 R_grid_edge=selected['R_grid_edge'], step_grid_edge=selected['step_grid_edge'],
-                **{'historical_'+key: value for key, value in costs.items()}))
+                **{('preparation_' if matched_preparation else 'historical_')+key: value for key, value in costs.items()}))
             if zero_scs:
                 joint_calibration_rows[-1].update(
                     pilot_map_policy='post-Mobius DCS with fitted centre' if family == 'DCS-BW' else 'author-fitted SCS centre and observer',
                     production_map_change_after_pilot='centre zero' if family == 'DCS-BW' else 'centre and observer zero',
                     parameters_reselected_after_map_change=False)
+            if matched_preparation:
+                joint_calibration_rows[-1].update(
+                    pilot_map_policy=calibration['final_map_policy'][family],
+                    production_map_change_after_pilot='none', parameters_reselected_after_map_change=True,
+                    preparation_seed=calibration['seed'])
         csvs['joint_calibration.csv'] = joint_calibration_rows
     if ess_rows:
         csvs['functional_ess.csv'] = ess_rows
@@ -1348,6 +1359,27 @@ def render_report(root, summary):
                     'not a score for this changed map and does not establish its optimality. '
                     'DCS settings and original SCS remain unchanged. Equal total development effort '
                     'or identical map-preparation procedures are not claimed.')
+    if matched_preparation:
+        notes[0] = ('Current zero-centre comparison with original SCS and SCS calibrated (zero). '
+                    'Frozen VI fits and equal-budget final-map R/h selections are bundled. '
+                    'The public preparation script reproduces fitting and calibration with recorded seeds. '
+                    'No fitting or calibration is repeated during this sampling invocation.')
+        notes[1] = ('All four DCS variants share the DCS-BW pilot-selected R and h on centre=0, '
+                    'delta=0, beta=2. Gaussian RWM uses sigma=h/sqrt(d+2). The map is unchanged '
+                    'between calibration and production; reflected BW and billiard do not receive '
+                    'separate parameter searches.')
+        notes[2] = ('Original SCS retains the exact author-fitted map and h=0.1. SCS calibrated (zero) '
+                    'uses centre=0, observer=0 and latitude=1.1 during both calibration and production. '
+                    'Both SCS controls use the unchanged author transition. The calibrated control '
+                    'is a declared map/step modification, not the unchanged author recipe.')
+        notes[3] = ('VI uses 1,000 updates and 2,000 fixed reference points per family, with the '
+                    'original SCS optimizer and the DCS optimizer. The final zero-map R/h pilots '
+                    'share the same 4,096 exact target starts, 16 candidates, eight transitions per '
+                    'start, radial objective and selection rule: 524,288 transitions per family and '
+                    'dimension. Geometry-specific step grids are declared. Choices are frozen before '
+                    'an independent holdout. Equal pilot counts do not imply equal seconds or identical '
+                    'VI optimizers. Exact starts and analytic radial CDFs supply oracle information '
+                    'equally to both families; preparation is excluded from production timing.')
     if radial_ess:
         notes.append('Functional ESS is computed for the unthinned post-burn-in radial-tail indicator and norm, '
                      'including repeated states after rejection. It uses raw mean ESS with split-chain '
@@ -1390,6 +1422,8 @@ def render_report(root, summary):
                            if reported_study else 'VI '+str(vi_mode)+' for both map families')
         if zero_scs:
             fit_description = 'frozen VI provenance with recorded DCS and calibrated-SCS map overrides; no refitting'
+        if matched_preparation:
+            fit_description = 'frozen VI inputs with equal-budget calibration on final zero maps; no refitting'
         page += '<p>Target: '+html.escape(target_title)+'; '+html.escape(fit_description)+'; DCS β = '+number(config.get('beta', 2.))+'.</p>'
     if reported_study:
         page += '<p><strong>Comparison protocol.</strong> This uses the bundled zero-centre DCS settings. Full parameters and preparation provenance are saved with this run.</p>'
@@ -1402,7 +1436,10 @@ def render_report(root, summary):
         seed_index = seed_batch-22 if reported_study and isinstance(seed_batch, int) else seed_batch
         seed_label = ('Seed '+str(seed_index+1) if isinstance(seed_index, int) and 0 <= seed_index < 8
                       else 'Custom seed' if seed_batch is not None else 'Unrecorded seed choice')
-        page += '<p>'+html.escape(seed_label)+'; first chain seed: '+str(config['seed'])+'; map-fitting seed: '+str(config.get('fit_seed', 'unrecorded'))+'. Repeating a seed choice reuses its random streams; timed sample counts may still differ.</p>'
+        fitting_seeds = ('DCS fit seed: '+str(config['preparation_fit_seeds']['ball'])+'; SCS author fit seed: '+
+                         str(config['preparation_fit_seeds']['sphere'])+'; calibration seed: '+str(config['preparation_seed'])
+                         if matched_preparation else 'map-fitting seed: '+str(config.get('fit_seed', 'unrecorded')))
+        page += '<p>'+html.escape(seed_label)+'; first chain seed: '+str(config['seed'])+'; '+html.escape(fitting_seeds)+'. Repeating a seed choice reuses its random streams; timed sample counts may still differ.</p>'
     page += '<p>'+' · '.join('<a href="'+filename+'">'+html.escape(filename)+'</a>' for filename in csvs)+'</p>'
     for filename in figure_names:
         page += '<figure><a href="figures/'+filename+'.pdf"><img src="figures/'+filename+'.png" alt="'+html.escape(filename.replace('_', ' '))+'"></a><figcaption>Click the figure to open its PDF.</figcaption></figure>'
@@ -1430,7 +1467,14 @@ def render_report(root, summary):
                  'score belongs to the prior fitted map and must not be interpreted as current-map '
                  'performance. Original SCS and all DCS settings are unchanged. Matching those historical '
                  'counts does not establish equal total development effort or optimal current steps.')
-        page += ('<h2>Archived joint radius/step calibration</h2><p>'+calibration_description+'</p>'+table(joint_calibration_rows)+
+        if matched_preparation:
+            calibration_description = ('Both families select R/h on their final zero maps using the same '
+                'starting cloud, candidate count, transition budget, radial objective and tie rule. '
+                'The selected maps and steps are used unchanged in production. Original SCS remains '
+                'the author-fitted h=0.1 baseline. The table records preparation performed before '
+                'sampling; the public preparation script reproduces the complete procedure.')
+        calibration_heading = 'Final-map joint radius/step calibration' if matched_preparation else 'Archived joint radius/step calibration'
+        page += ('<h2>'+calibration_heading+'</h2><p>'+calibration_description+'</p>'+table(joint_calibration_rows)+
                  '<p>Shared exact-state generation took '+number(calibration_case['shared_exact_state_generation_seconds'])+
                  ' seconds on the original computer, recorded once for both families. '+
                  html.escape(calibration_case['cost_scope'])+'</p>')
@@ -1445,6 +1489,11 @@ def render_report(root, summary):
                 'map; original SCS retains its author-fitted map. SCS calibrated (zero) uses centre=0 '
                 'and observer=0, latitude 1.1, and the previous R/h selection without recalibration. '
                 'The original VI parameters and losses remain fitting provenance, not a fit of this changed map.')
+        if matched_preparation:
+            map_description = ('All four DCS methods use the same frozen zero-centre, zero-deformation '
+                'ball map. SCS calibrated (zero) uses centre=0, observer=0 and latitude=1.1. '
+                'Both families select R/h on these final maps before production; there is no later '
+                'map intervention. Original SCS retains the exact author-fitted map and h=0.1.')
         page += '<h2>Effective maps used by each sampler</h2><p>'+map_description+' Full vectors are in <a href="effective_maps.csv">effective_maps.csv</a> and the saved summary.</p>'+table(effective_summaries)
     if tuning_summaries:
         reflected_heading = 'Reflected-step pilot tuning and frozen steps' if has_rwm_rotation else 'Reflected BW pilot tuning and frozen steps'

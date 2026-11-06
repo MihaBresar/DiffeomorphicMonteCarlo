@@ -17,7 +17,8 @@ from scripts.scs_100d_figures import render_report
 
 def reported_summary(dimension=100, backend='jax', legacy=False, version=None):
     configure = (study.legacy_configuration if legacy else
-                 study.calibrated_configuration if version == 'v2' else study.configuration)
+                 study.calibrated_configuration if version == 'v2' else
+                 study.zero_configuration if version == 'v3' else study.configuration)
     config = configure(target=f'skew-t-{dimension}d', comparison=backend)
     prepared = study.load_prepared(config)
     _, truth, _ = radial_truth(Target(config['target']), config['threshold'])
@@ -59,8 +60,8 @@ class ReportedStudyReportTests(unittest.TestCase):
                 page = (root/'paper_values.html').read_text(encoding='utf-8')
                 self.assertIn('<p>Seed 1;', page)
                 self.assertNotIn('Seed batch:', page)
-                self.assertIn('Reported zero-centre study', page)
-                self.assertIn('equal total development effort', page)
+                self.assertIn('Current zero-centre comparison', page)
+                self.assertIn('Equal pilot counts do not imply equal seconds', page)
                 self.assertIn('maps reused without refitting', page)
                 self.assertIn('All four DCS methods use the same frozen zero-centre', page)
                 self.assertNotIn('other DCS methods retain the fitted ball map', page)
@@ -69,16 +70,16 @@ class ReportedStudyReportTests(unittest.TestCase):
                 with (root/'paper_values.csv').open(encoding='utf-8', newline='') as stream:
                     rows = {r['method']: r for r in csv.DictReader(stream)}
                 self.assertEqual(set(rows), set(study.METHODS))
-                self.assertEqual(float(rows['DCS-BW']['dcs_fixed_move']), study.FROZEN[dimension]['h'])
+                self.assertEqual(float(rows['DCS-BW']['dcs_fixed_move']), study.MATCHED[dimension]['DCS-BW']['h'])
                 self.assertIn('fixed h = 0.1', rows['SCS']['production_step_policy'])
                 calibrated = summary['config']['reported_calibrated_scs_parameters']
                 self.assertIn('SCS calibrated', page)
                 self.assertIn('All six methods' if backend == 'jax' else 'Numba extension', page)
-                self.assertIn('Archived joint radius/step calibration', page)
+                self.assertIn('Final-map joint radius/step calibration', page)
                 self.assertIn('Equal pilot counts do not imply equal seconds', page)
                 self.assertIn('SCS calibrated (zero)', page)
-                self.assertIn('production centre and observer now zero', rows['SCS-calibrated']['production_step_policy'])
-                self.assertIn('no recalibration', rows['SCS-calibrated']['radius_step_preparation'])
+                self.assertIn('final zero-centre, zero-observer map', rows['SCS-calibrated']['production_step_policy'])
+                self.assertIn('no map change after selection', rows['SCS-calibrated']['radius_step_preparation'])
                 self.assertEqual(float(rows['SCS-calibrated']['centre_norm']), 0.)
                 self.assertEqual(float(rows['SCS-calibrated']['observer_norm']), 0.)
                 self.assertEqual(float(rows['SCS-calibrated']['fixed_step']), calibrated['h'])
@@ -103,11 +104,11 @@ class ReportedStudyReportTests(unittest.TestCase):
                 self.assertEqual(len(pilot_rows), 2)
                 self.assertEqual({int(r['total_pilot_transitions']) for r in pilot_rows}, {524288})
                 self.assertEqual({int(r['shared_exact_target_starts']) for r in pilot_rows}, {4096})
-                self.assertTrue(all(float(r['historical_transition_evaluation_seconds']) > 0 for r in pilot_rows))
-                self.assertTrue(all(r['parameters_reselected_after_map_change'] == 'False' for r in pilot_rows))
+                self.assertTrue(all(float(r['preparation_transition_evaluation_seconds']) > 0 for r in pilot_rows))
+                self.assertTrue(all(r['parameters_reselected_after_map_change'] == 'True' for r in pilot_rows))
                 scs_pilot = next(r for r in pilot_rows if r['method'] == 'SCS calibrated')
-                self.assertEqual(scs_pilot['pilot_map_policy'], 'author-fitted SCS centre and observer')
-                self.assertEqual(scs_pilot['production_map_change_after_pilot'], 'centre and observer zero')
+                self.assertEqual(scs_pilot['pilot_map_policy'], 'zero_mu_zero_observer')
+                self.assertEqual(scs_pilot['production_map_change_after_pilot'], 'none')
                 self.assertEqual(summary, before)
 
     def test_historical_five_method_reports_remain_readable_without_new_control(self):
@@ -145,7 +146,7 @@ class ReportedStudyReportTests(unittest.TestCase):
 
     def test_calibrated_step_records_cannot_silently_revert_to_original_scs(self):
         summary = reported_summary()
-        summary['cases']['SCS-calibrated']['records'][0]['final_scale'] = .1
+        summary['cases']['SCS-calibrated']['records'][0]['final_scale'] = 123.
         with tempfile.TemporaryDirectory() as temp, self.assertRaisesRegex(ValueError, 'Calibrated SCS step records'):
             render_report(Path(temp), summary)
 

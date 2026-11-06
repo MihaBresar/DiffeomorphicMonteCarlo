@@ -14,7 +14,7 @@ from dcs_bench.reported_study import PRESETS, TARGETS, configuration, run
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, epilog='Maps and steps are bundled and frozen. '
         'The current six-method comparison uses zero centre/observer for the calibrated SCS control, '
-        'retaining its prior radius/step selection without recalibration; original SCS stays unchanged. '
+        'with radius and step calibrated on that final map by the same pilot policy as DCS; original SCS stays unchanged. '
         'Numba is a separately labelled implementation extension. '
         'Timed counts and results depend on hardware. No manual fitting or step-size choice is required.')
     parser.add_argument('--preset', choices=PRESETS, default='quick')

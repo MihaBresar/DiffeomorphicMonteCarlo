@@ -20,9 +20,7 @@ import sys
 from dcs_bench.engine import ALIASES, experiment_names, load_config, run
 
 REPORTED_COMPARISONS = ('reported-zero-centre', 'reported-zero-centre-numba')
-REPORTED_PROTOCOLS = ('timed-reported-zero-centre-v1', 'timed-reported-zero-centre-numba-v1',
-                      'timed-reported-zero-centre-v2', 'timed-reported-zero-centre-numba-v2',
-                      'timed-reported-zero-centre-v3', 'timed-reported-zero-centre-numba-v3')
+from dcs_bench.reported_study import SUPPORTED_PROTOCOLS as REPORTED_PROTOCOLS
 
 
 def named_experiments():

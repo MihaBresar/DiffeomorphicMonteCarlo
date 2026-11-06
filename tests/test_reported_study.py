@@ -47,7 +47,7 @@ class ReportedStudyTests(unittest.TestCase):
                 for method, mapping in runner.effective_method_maps(config, prepared['maps']).items():
                     if method not in ('SCS', 'SCS-calibrated'):
                         self.assertEqual(mapping, prepared['maps']['ball'])
-                        self.assertEqual(mapping['scale'], study.FROZEN[d]['scale'])
+                        self.assertEqual(mapping['scale'], study.MATCHED[d]['DCS-BW']['R'])
                         self.assertEqual(mapping['beta'], 2.)
                         np.testing.assert_array_equal(mapping['mu'], np.zeros(d))
                         np.testing.assert_array_equal(mapping['delta'], np.zeros(d))
@@ -56,7 +56,7 @@ class ReportedStudyTests(unittest.TestCase):
     def test_asset_tampering_is_rejected_without_fitting(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
-            for name in ('manifest.json', 'full_budget_100d.json', 'joint_calibration.json'):
+            for name in ('manifest.json', 'full_budget_100d.json', 'joint_calibration.json', 'matched_calibration.json'):
                 (directory / name).write_bytes((study.ASSETS / name).read_bytes())
             with patch.object(study, 'ASSETS', directory):
                 study.configuration()
@@ -88,8 +88,8 @@ class ReportedStudyTests(unittest.TestCase):
                             policy = ('author_scs_fixed_01' if method == 'SCS' else 'fixed_scs_move_v1'
                                       if method == 'SCS-calibrated' else 'fixed_dcs_move_v1')
                             self.assertEqual(resolve_step_tuning(settings), policy)
-                            scale = (.1 if method == 'SCS' else study.CALIBRATED_SCS[dimension]['h']
-                                     if method == 'SCS-calibrated' else study.FROZEN[dimension]['h'] /
+                            scale = (.1 if method == 'SCS' else study.MATCHED[dimension]['SCS']['h']
+                                     if method == 'SCS-calibrated' else study.MATCHED[dimension]['DCS-BW']['h'] /
                                      (math.sqrt(dimension + 2) if method == 'DCS-RWM' else 1))
                             self.assertEqual(_initial_proposal_scale(settings), scale)
 

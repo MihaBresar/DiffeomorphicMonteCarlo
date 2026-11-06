@@ -39,9 +39,9 @@ The six methods are **DCS-RWM, DCS-BW, original SCS, SCS calibrated (zero), DCS-
 - Every preset loads the same maps, uses 1,500 separate warmup transitions, and discards the first third of production iterations.
 - **Seed 1–Seed 8** select repeatable sampling streams without changing maps or steps.
 
-Original SCS retains its author-fitted map and h=0.1. All DCS methods share a zero-centre, zero-deformation map and dimension-specific radius and step. The additional SCS control uses zero physical centre and observer, with R/h selected **before** those coordinates were zeroed. Its R/h have not been recalibrated for the zero map and are not claimed optimal.
+Original SCS retains its author-fitted map and h=0.1. DCS and the additional calibrated SCS control use zero centres and zero deformation/observer displacement. Both receive the same radius/step calibration protocol **on those final maps**, with equal candidate counts, common physical starting points, transition budgets and radial selection score. All four DCS variants share the settings selected for DCS-BW.
 
-The [protocol](docs/REPORTED_STUDY.md) gives exact settings and preparation budgets. Equal pilot counts do not make the map choices or complete preparation procedures identical.
+The [protocol](docs/REPORTED_STUDY.md) gives exact settings. The public [preparation recipe](docs/PREPARATION.md) reproduces both full-budget fits and the matched calibration, including seeds, all candidates, frozen selections and separate preparation costs. Sampling uses the verified bundled settings without requiring another calibration.
 
 ## Other experiments
 

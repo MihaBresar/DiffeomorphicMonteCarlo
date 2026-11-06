@@ -41,10 +41,10 @@ class ReportedZeroSCSTests(unittest.TestCase):
             for dimension in (100, 500):
                 for preset in study.PRESETS:
                     with self.subTest(backend=backend, dimension=dimension, preset=preset):
-                        config = study.configuration(preset, comparison=backend, target=f'skew-t-{dimension}d')
+                        config = study.zero_configuration(preset, comparison=backend, target=f'skew-t-{dimension}d')
                         legacy = study.calibrated_configuration(preset, comparison=backend, target=f'skew-t-{dimension}d')
                         prepared, before = study.load_prepared(config), study.load_prepared(legacy)
-                        self.assertEqual(config['protocol'], study.PROTOCOLS[backend])
+                        self.assertEqual(config['protocol'], study.ZERO_PROTOCOLS[backend])
                         self.assertEqual(config['scs_calibrated_move'], legacy['scs_calibrated_move'])
                         self.assertEqual(config['calibration_budget_per_family'], legacy['calibration_budget_per_family'])
                         self.assertEqual(prepared['maps']['ball'], before['maps']['ball'])
@@ -66,7 +66,7 @@ class ReportedZeroSCSTests(unittest.TestCase):
         import jax.numpy as jnp
         core = scs_paper._author()
         for dimension in (100, 500):
-            config = study.configuration(target=f'skew-t-{dimension}d')
+            config = study.zero_configuration(target=f'skew-t-{dimension}d')
             mapping = study.load_prepared(config)['maps']['sphere_calibrated']
             model = core.SCP(dimension, 1.1)
             params = scs_paper._parameters(model, mapping)
@@ -89,7 +89,7 @@ class ReportedZeroSCSTests(unittest.TestCase):
         import jax.numpy as jnp
         core = scs_paper._author()
         for dimension in (100, 500):
-            config = study.configuration(target=f'skew-t-{dimension}d')
+            config = study.zero_configuration(target=f'skew-t-{dimension}d')
             mapping = study.load_prepared(config)['maps']['sphere_calibrated']
             execution = runner.method_execution_config(config, 'SCS-calibrated')
             driver = timed_radial._Matched(mapping, execution, 617)
@@ -118,7 +118,7 @@ class ReportedZeroSCSTests(unittest.TestCase):
             np.testing.assert_allclose(saved, norms[config['thin'] - 1::config['thin']], rtol=1e-12)
 
     def test_zero_override_cannot_be_silently_restored_or_mislabelled(self):
-        config = study.configuration()
+        config = study.zero_configuration()
         for change in ({'calibrated_scs_map_intervention': {}},
                        {'production_calibrated_scs_map_policy': 'original author VI'},
                        {'reported_calibrated_scs_parameters': study.calibrated_configuration()['reported_calibrated_scs_parameters']}):

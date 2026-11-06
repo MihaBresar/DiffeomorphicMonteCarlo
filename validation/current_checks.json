@@ -1,59 +1,65 @@
 {
   "date": "2026-11-06",
-  "scope": "Current public experiments, required Numba backends for standard benchmarks, eight repeat labels and current-only documentation",
+  "scope": "Matched final-map DCS/SCS preparation, portable replay, current JAX and Numba comparisons",
   "unit_tests": {
     "command": "python -m unittest discover -s tests -q",
-    "passed": 382,
+    "passed": 391,
     "failures": 0,
     "errors": 0
   },
-  "launcher_checks": {
-    "actual_javascript_experiment_seed_combinations": 72,
-    "seed_labels": [
-      "Seed 1",
-      "Seed 2",
-      "Seed 3",
-      "Seed 4",
-      "Seed 5",
-      "Seed 6",
-      "Seed 7",
-      "Seed 8"
+  "preparation_replay": {
+    "dimensions": [
+      100,
+      500
     ],
-    "default_streams_preserved": true,
-    "repeat_changes_sampling_only": true
-  },
-  "standard_quick_checks": {
-    "experiments": [
-      "skew-t-200d-nuts",
-      "skew-t-200d-baselines",
-      "skew-t-50d-nu-0.5",
-      "eight-schools",
-      "garch11",
-      "logistic-regression"
+    "families": [
+      "DCS-BW",
+      "SCS"
     ],
-    "completed_production_chains": 34,
-    "numba_backend_verified_for_applicable_samplers": true,
-    "nuts_native_jax_backend_verified": true,
-    "production_adaptation_off": true
+    "updates_per_family": 1000,
+    "fixed_reference_points_per_family": 2000,
+    "fit_seeds": {
+      "ball": 42,
+      "sphere": 0
+    },
+    "pilot_seed": 842901174,
+    "selection_transitions_per_family_per_dimension": 524288,
+    "all_original_map_fields_and_1000_losses_reproduced_exactly": true,
+    "all_64_pilot_and_6_diagnostic_scores_independently_recomputed": true,
+    "fresh_and_bundled_input_pilot_arrays_identical": true,
+    "frozen_before_diagnostic_stream": true,
+    "original_author_scs_unchanged": true
   },
-  "unchanged_scientific_files": [
-    "dcs_bench/reported_study.py",
+  "current_quick_checks": {
+    "comparisons": [
+      "jax-100d",
+      "jax-500d",
+      "numba-100d",
+      "numba-500d"
+    ],
+    "completed_production_chains": 48,
+    "all_six_methods_present": true,
+    "actual_backend_and_frozen_step_verified": true,
+    "first_third_discard_verified": true,
+    "production_adaptation_off": true,
+    "complete_reports": true
+  },
+  "unchanged_implementations": [
     "dcs_bench/timed_radial.py",
     "dcs_bench/scs_paper.py",
     "dcs_bench/numba_radial.py",
     "dcs_bench/numba_billiard.py",
     "dcs_bench/numba_rwm.py",
     "dcs_bench/transforms.py",
-    "studies/zero_centre/maps/full_budget_100d.json",
-    "studies/zero_centre/maps/full_budget_500d.json",
-    "studies/zero_centre/maps/joint_calibration.json",
-    "studies/zero_centre/maps/manifest.json",
+    "dcs_bench/tuning.py",
     "third_party/scs_paper/src/scp_core.py",
-    "third_party/scs_paper/src/train.py"
+    "third_party/scs_paper/src/train.py",
+    "studies/zero_centre/maps/full_budget_100d.json",
+    "studies/zero_centre/maps/full_budget_500d.json"
   ],
   "limitations": [
-    "These checks establish execution and numerical/interface consistency, not convergence or sampler rankings.",
-    "The standard experiments already used optimized Numba kernels; this release makes that requirement explicit rather than claiming a new speedup.",
-    "Local validation does not substitute for the exact commit Linux/Windows CI results."
+    "Execution checks and radial calibration do not establish a sampler ranking or global optimality.",
+    "Equal calibration resources and final-map policy do not make native VI routines, proposal units or elapsed costs identical.",
+    "Local validation is separate from Linux/Windows CI for the uploaded commit."
   ]
 }

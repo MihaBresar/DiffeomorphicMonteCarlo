@@ -26,14 +26,9 @@ Quick verifies execution. Use Smaller or Full settings for assessment. Eight see
 
 ## Scope
 
-Original SCS keeps author VI and h=0.1. Calibrated zero-SCS keeps R/h selected before its centre and observer were zeroed; those values have not been retuned for the effective map. DCS methods share their fixed map and step convention. These preparation procedures differ.
+Original SCS keeps author VI and h=0.1 as the author baseline. DCS and calibrated zero-SCS select R/h on their final zero-centre/deformation maps using the same number of candidates, common exact physical starts, transition budgets and score. The DCS-BW selection is shared across the four DCS variants.
 
-Equal VI evaluation and pilot-transition counts do not establish equal elapsed preparation cost, identical choices or optimal parameters. The pilot uses exact target starts, analytic radial information and a lag-eight movement proxy rather than production MSE or ESS.
-
-Sampling from the frozen inputs is self-contained. Replaying their complete
-preparation is not: the public assets include pilot selections and hashes,
-but not a standalone pilot/centre-selection reproducer or its seed. This is a
-remaining preparation-reproducibility limitation, not a sampling dependency.
+The [public preparation driver](PREPARATION.md) reproduces both full-budget source fits and calibration. It records seeds, candidate outcomes, selection freeze, source hashes and preparation costs. Native VI routines and proposal units remain different. Equal counts do not imply equal elapsed cost or globally optimal parameters. The pilot uses exact target starts, analytic radial information and a lag-eight movement proxy rather than production MSE or ESS.
 
 The common target is normal-CDF-skewed t(3), not the SCS paper's skew family. JAX provides a common execution framework; the Numba extension changes DCS implementation while retaining author JAX SCS.
 

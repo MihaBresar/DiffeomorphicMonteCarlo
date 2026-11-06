@@ -2,11 +2,13 @@
 
 Automated tests check mathematical kernels, experiment settings, saved outputs and public interfaces. Passing tests and Quick checks do not establish a performance ranking.
 
-Local validation on 6 November 2026 passed **382 tests**, all six standard
-Quick experiments (**34 production chains**) and **72 launcher seed-control
-checks**. The records verify the required Numba/native NUTS backends and
-unchanged published DCS/SCS settings. See the
-[current validation receipt](../validation/current_checks.json).
+Local validation on 6 November 2026 passed **391 tests** and all four current
+DCS/SCS Quick comparisons: 100D/500D in JAX and the Numba extension (**48 production chains**).
+Both full-budget VI fits were replayed exactly, including every loss value.
+All 64 pilot and six diagnostic scores were recomputed independently, and
+fresh-fit and bundled-fit preparation produced identical arrays and selections.
+The checks verify the actual backends, frozen steps, first-third discard and complete reports.
+See the [current validation receipt](../validation/current_checks.json).
 
 ```sh
 python -m pip check
