@@ -52,87 +52,78 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 
 1. Click **Set up environment** and wait for **Environment ready**. This installs
    the pinned packages inside this project and can take several minutes.
-2. Leave **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)** and
-   **Quick check** selected. Choose a **Target distribution**; both map families
-   are fitted by VI automatically. Proposal steps come from the protocol;
-   no manual step-size choice is needed. Choose **CPU workers**
-   (start with 2–4), then click **Start run**. Quick-check graphs verify
-   execution; they are not publication results.
-3. After the quick check succeeds, choose **Smaller reproduction** or **Full
-   paper settings** and click **Use all CPU threads**, then **Start run** again.
-   This selects the logical CPU capacity available to the process. Reduce the
-   worker count if memory is limited; more workers do not guarantee faster runs.
-4. After completion, links to figures and tables appear automatically below the
-   progress log. Click a PNG or PDF link to view a graph. All files remain in
-   **results → click-runs → dated folder**. Under **Exact numbers and tables**,
-   open `paper_values.html` to read estimates, MSE, sample counts and timing
-   values. The page uses two decimals; its CSV downloads retain full precision.
+2. Leave **Reported study: zero-centre DCS vs original SCS (JAX)** and
+   **Quick check** selected. Choose **100D** or **500D** and **CPU workers**
+   (start with one or two), then click **Start run**. The study loads its exact
+   bundled maps and preset parameters; no manual step-size choice is needed.
+   Quick-check graphs verify execution, not sampler performance.
+3. After the check succeeds, choose **Smaller reproduction** or **Full paper
+   settings**. Select the desired worker count or click **Use all CPU threads**,
+   then **Start run**. More workers use more memory and do not guarantee faster runs.
+4. When the run finishes, links appear below the log. Open **paper_values.html**
+   for figures, MSE, exact sample counts, measured time and functional ESS.
+   PNG and PDF figures are available; CSV and JSON retain full precision.
+   Files stay in **results → click-runs → dated folder**.
 
-The two current comparisons contain the same five methods: DCS-RWM, DCS-BW,
-SCS, DCS-BW-reflect and DCS-Billiard. The JAX option runs all five in the same framework;
-the Numba option uses optimized native DCS loops against the unchanged author
-SCS JAX transition. Both offer 100D/500D and always fit both maps by VI. Rotation mixtures
-are no longer active choices.
+## Reported study and previous comparison
 
-The five-method comparison automatically uses the protocol's shared DCS
-h=0.07: BW, reflected BW and billiard use that increment radius; Gaussian
-RWM uses coordinate standard deviation h/√(d+2). Original SCS stays at h=0.1.
-The launcher has no manual step-size field. Resolved steps are saved in the
-experiment configuration. **All seven** uses the same preset for this comparison;
-other experiments retain their own specified step rules. Rebuilding an older
-report preserves its saved settings and samples.
+The reported study contains DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and
+DCS-Billiard. All four DCS methods use zero centre and zero deformation,
+with frozen radius and step values from the reported experiment. Their common
+h is 0.025 in 100D and 1/√500 in 500D. Gaussian RWM uses coordinate standard
+deviation h/√(d+2). SCS retains the original author-fitted sphere map and h=0.1.
+Every preset reuses the same full-budget maps without refitting or retuning.
+See [the exact protocol and preparation history](REPORTED_STUDY.md).
 
-For these two comparisons, **Full paper settings** selects the full benchmark
-budget: 50 chains per method, 20.00 seconds per chain and 1,500 separate
-discarded warmup transitions. The preset name does not imply an exact reproduction
-of previously published figures; the saved protocol version defines the
-experiment. Both modes report mean norm, radial-tail
-probability, MSE, exact counts, time, functional ESS and ESS per second.
-Coordinate measurements and their long reference simulation are omitted;
-radial references are analytic. The original radial figures remain, with a new
-ESS figure and `functional_ess.csv`. Displayed numbers use two decimals.
+**Smaller reproduction** runs 20 chains per method for 3.00 seconds each,
+matching one reported batch's budget. **Full paper settings** runs 50 chains
+for 20.00 seconds each. Both use 1,500 separate discarded warmup transitions
+and additionally discard the first third of production iterations. The original
+pooled result combined two 20-chain batches, using two workers and JAX.
+The separately labelled **Numba extension** keeps the same study maps and steps
+but changes DCS's production implementation; it is not the backend used for
+those reported results.
 
-Every new comparison fits both map families: SCS uses its authors' fixed-cloud VI and DCS retains its
-fixed-cloud fit. Both full fits use 1,000 updates on their own 2,000-point fixed clouds. Update counts, cloud size and evaluation counts match; reference distributions, parameterizations and clipping rules differ;
-the recorded fitting costs are outside production time. Billiards retain the fitted
-centre/R/β and use zero production deformation, as explained in
-[the construction](BILLIARD.md). All four DCS variants share the selected h
-(default 0.07):
-BW/reflected-BW/billiard use a uniform-ball increment of that radius and
-RWM uses coordinate standard deviation h/√(d+2). Each uses its own kernel
-during discarded equilibration, without separate step adaptation.
-The single SCS baseline uses the authors' fixed h=0.1 with no adaptation
-and the same discarded warmup-transition budget as DCS. New five-method
-comparisons do not offer alternative SCS tuning or recentering. The [SCS study](AUTHOR_SCS_CALIBRATION.md) documents the
-default-selection rule and sensitivity results. All production steps are
-frozen. Historical adaptive controls retain their recorded pilot histories.
-The first third of production is discarded in every case.
+The study uses additional DCS calibration from its development stage. It is
+not equal total tuning effort against original SCS, and its radial results
+are not a guarantee of overall mixing or a guaranteed ranking on another run.
 
-SCS uses its authors' original map-fitting routine in the other experiments
-too, including logistic regression and the 50D infinite-first-moment example.
-Their SCS sampling implementation and acceptance-target 0.234 step tuning
-remain unchanged. Run those experiments again in fresh folders to obtain
-figures with the updated SCS fits. The current 100D/500D comparisons already
-used author fitting. See [the rerun guide](RERUN.md#earlier-version-10-fitting-update).
+The **Previous fitted-map comparison** options retain the older version-11
+protocol: maps are fitted anew at the selected VI budget, physical centres
+remain fitted, and the shared DCS h is 0.07. Billiards use zero effective
+Möbius deformation; other DCS variants retain the fitted map. These are
+different experiments from the reported zero-centre study. **All seven**
+continues to run this previous comparison plus the manuscript experiments;
+choose the reported study explicitly to reproduce its configuration.
+
+All comparisons show mean norm, radial-tail probability, MSE, exact counts,
+time, functional ESS and ESS per second. They use analytic radial references.
+Coordinate measurements are omitted. Original radial figures and ESS figures
+remain available. Saved reports retain their original parameters when rebuilt.
+
+## Repeated runs and diagnostics
+
+The reported study defaults to fresh seed batch **22**. The repeat selector
+also labels recorded batches **20** and **21** explicitly. Reusing one of these
+batches matches its random-stream inputs; different hardware and time stopping
+can still change the number of samples and resulting errors. Other fresh
+batches keep the same maps and parameters. The previous fitted-map recipe
+retains its earlier sampling-batch choices.
+
+Run each target separately and compare all five methods together. Keep the
+worker count and computer load comparable. Full paper runs extend sampling
+under the same reported-study maps; they do not refit those maps.
 
 ESS is computed after sampling from unthinned scalar histories, including
-rejections. The log reports this stage. FFT work is limited to one chain at a
-time to keep memory bounded; diagnostic time is separate. Temporary unthinned
-histories are discarded after diagnostics. An unavailable ESS has a reason;
-it is not replaced by the iteration count. See [ESS interpretation](ESS.md).
+rejected states. The log reports this stage. FFT work is limited to one chain
+at a time to bound memory; diagnostic time is separate. Temporary unthinned
+histories are discarded afterward. An unavailable ESS has a reason and is not
+replaced by the iteration count. See [ESS interpretation](ESS.md).
 
-Use **Repeat run** to choose **Run 1 (default)** through **Run 9**. The same
-choice reuses the sampling random streams, but time stopping can change counts.
-A different choice changes only those sampling streams; the algorithms, fitting
-rules and fitting seeds stay the same.
-Run each target separately and rerun all five methods together. VI fitting is mandatory.
-Version 11 changes all four DCS step policies and requires new sampling
-of all five methods together at every preset. It keeps version 10's matched
-fixed-cloud VI budgets and fitted maps. Saved reports retain their original
-policy. Smaller runs use abbreviated VI; full fitting can change the performance
-ordering. Launcher and command-line runs select the same preset steps
-automatically. The preset is not claimed optimal. Fresh-cloud fitting and
-zero-centre experiments do not change the public defaults.
+Other manuscript experiments retain their own map and step policies. SCS uses
+its authors' VI routine where fitting is enabled, including logistic regression
+and the 50D infinite-first-moment example; their checked Numba production and
+acceptance-target 0.234 calibration remain separately documented.
 
 ## Stop or finish
 

@@ -33,7 +33,7 @@ class LauncherTests(unittest.TestCase):
             with self.subTest(experiment=experiment), self.assertRaises(ValueError):
                 launcher.commands_for_run('quick', experiment, Path('results/test'))
 
-    def test_visible_menu_replaces_old_comparisons_with_two_new_modes(self):
+    def test_visible_menu_defaults_reported_and_retains_earlier_comparisons(self):
         from html.parser import HTMLParser
         class ExperimentMenu(HTMLParser):
             def __init__(self):
@@ -56,8 +56,11 @@ class LauncherTests(unittest.TestCase):
         menu = ExperimentMenu()
         menu.feed((launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8'))
         self.assertEqual({x['value'] for x in menu.options}, set(launcher.EXPERIMENTS))
-        self.assertEqual([x['value'] for x in menu.options if 'selected' in x], ['sampler-comparison'])
-        self.assertEqual(sum('SCS' in label for label in menu.labels), 2)
+        self.assertEqual([x['value'] for x in menu.options if 'selected' in x], ['reported-zero-centre'])
+        self.assertEqual(menu.options[0]['value'], 'reported-zero-centre')
+        self.assertTrue(any('Reported study:' in label for label in menu.labels))
+        self.assertTrue(any('Numba extension' in label for label in menu.labels))
+        self.assertTrue(any('Earlier fitted-map comparison:' in label for label in menu.labels))
         self.assertIn('sampler-comparison-numba', {x['value'] for x in menu.options})
         self.assertTrue(set(launcher.LEGACY_SCS_COMPARISONS).isdisjoint(x['value'] for x in menu.options))
         target_menu = ExperimentMenu()
@@ -69,15 +72,15 @@ class LauncherTests(unittest.TestCase):
         seed_menu = ExperimentMenu()
         seed_menu.feed((launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8')
                        .replace('id="experiment"', 'id="other-menu"').replace('id="seed-batch"', 'id="experiment"'))
-        self.assertEqual([x['value'] for x in seed_menu.options], [str(x) for x in range(9)])
-        self.assertEqual([x['value'] for x in seed_menu.options if 'selected' in x], ['0'])
+        self.assertEqual([x['value'] for x in seed_menu.options], [str(x) for x in range(22,31)]+['20','21'])
+        self.assertEqual([x['value'] for x in seed_menu.options if 'selected' in x], ['22'])
 
-    def test_seed_batches_reach_only_the_two_100d_runners(self):
+    def test_seed_batches_route_without_changing_fitting_inputs(self):
         for experiment in launcher.SCS_COMPARISONS:
             for batch in (0, 1, 5, 6, 7, 8, 999):
                 with self.subTest(experiment=experiment, batch=batch):
                     command, = launcher.commands_for_run('quick', experiment, Path('results/test'), seed_batch=batch)
-                    if batch:
+                    if batch or experiment in launcher.REPORTED_COMPARISONS:
                         self.assertEqual(command[command.index('--seed-batch')+1], str(batch))
                     else:
                         self.assertNotIn('--seed-batch', command)
@@ -113,7 +116,7 @@ class LauncherTests(unittest.TestCase):
                         self.assertEqual(metadata['seed_batch'], batch)
                         self.assertEqual(metadata['experiment'], experiment)
                         command = execute.call_args.args[0]
-                        if batch:
+                        if batch or experiment in launcher.REPORTED_COMPARISONS:
                             self.assertEqual(command[command.index('--seed-batch')+1], str(batch))
                         else:
                             self.assertNotIn('--seed-batch', command)

@@ -1,0 +1,1773 @@
+{
+  "schema_version": 1,
+  "study": "Reported zero-centre DCS versus original-author SCS",
+  "active_methods": [
+    "DCS-RWM",
+    "DCS-BW",
+    "DCS-BW-reflect",
+    "DCS-Billiard",
+    "SCS"
+  ],
+  "unique_chains": 400,
+  "metrics": [
+    "tail_probability",
+    "mean_norm"
+  ],
+  "settings": [
+    {
+      "dimension": 100,
+      "target": {
+        "kind": "skew_t",
+        "dimension": 100,
+        "nu": 3.0,
+        "alpha": {
+          "0": 100.0,
+          "1": -100.0
+        }
+      },
+      "threshold": 50.0,
+      "original_fit_asset": "../maps/full_budget_100d.json",
+      "DCS": {
+        "R": 0.6941299233184104,
+        "shared_move_h": 0.025,
+        "mu": 0.0,
+        "delta": 0.0,
+        "beta": 2.0,
+        "rwm_coordinate_sigma": 0.002475368857441686
+      },
+      "SCS": {
+        "R": 1.1048295589441204,
+        "h": 0.1,
+        "latitude": 1.1,
+        "centre_policy": "unchanged original author VI",
+        "observer_policy": "unchanged original author VI"
+      }
+    },
+    {
+      "dimension": 500,
+      "target": {
+        "kind": "skew_t",
+        "dimension": 500,
+        "nu": 3.0,
+        "alpha": {
+          "0": 100.0,
+          "1": -100.0
+        }
+      },
+      "threshold": 111.80339887498948,
+      "original_fit_asset": "../maps/full_budget_500d.json",
+      "DCS": {
+        "R": 1.3882232419648068,
+        "shared_move_h": 0.044721359549995794,
+        "mu": 0.0,
+        "delta": 0.0,
+        "beta": 2.0,
+        "rwm_coordinate_sigma": 0.001996011960139498
+      },
+      "SCS": {
+        "R": 2.2313627251649697,
+        "h": 0.1,
+        "latitude": 1.1,
+        "centre_policy": "unchanged original author VI",
+        "observer_policy": "unchanged original author VI"
+      }
+    }
+  ],
+  "stages": [
+    {
+      "id": "batch20",
+      "title": "Primary batch 20 \u2014 retained unchanged",
+      "scope": "Original 20 chains per retained method and dimension; 200 unique chain files, with every chain retained for each displayed method.",
+      "seed_batches": [
+        20
+      ],
+      "dimensions": [
+        {
+          "dimension": 100,
+          "truth": {
+            "tail_probability": 0.010734615306999934,
+            "mean_norm": 13.785260289025814
+          },
+          "methods": {
+            "DCS-RWM": {
+              "chains": 20,
+              "total_generated": 8640600,
+              "total_postburn_used": 5760400,
+              "total_stored_thinned": 115208,
+              "total_sampling_seconds": 60.0243697879996,
+              "mean_sampling_seconds": 3.0012184893999803,
+              "samples_per_second": 143951.53219463665,
+              "mean_postburn_acceptance": 0.5606725336124568,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 1.2578163100094544e-07,
+                  "mse_empirical_mcse": 3.2346229391729194e-08,
+                  "largest_error_share": 0.18862112451186447,
+                  "largest_three_error_share": 0.4909303345388577,
+                  "leave_one_chain_out_mse_min": 1.0742795612485338e-07,
+                  "leave_one_chain_out_mse_max": 1.323972362061036e-07,
+                  "ess_valid_chains": 20,
+                  "total_ess": 1582268.9681455505,
+                  "ess_per_sampling_second": 26360.442829037187,
+                  "mse_ratio_to_original_scs": 0.4501231045840558
+                },
+                "mean_norm": {
+                  "mse": 0.0024085698300421016,
+                  "mse_empirical_mcse": 0.0011624105118819518,
+                  "largest_error_share": 0.4551303898304716,
+                  "largest_three_error_share": 0.7927105974787725,
+                  "leave_one_chain_out_mse_min": 0.0013814278993275024,
+                  "leave_one_chain_out_mse_max": 0.0025352413033554603,
+                  "ess_valid_chains": 20,
+                  "total_ess": 1234085.5079060232,
+                  "ess_per_sampling_second": 20559.741189531793,
+                  "mse_ratio_to_original_scs": 0.4325956880381248
+                }
+              }
+            },
+            "DCS-BW": {
+              "chains": 20,
+              "total_generated": 8127300,
+              "total_postburn_used": 5418200,
+              "total_stored_thinned": 108364,
+              "total_sampling_seconds": 60.020414749997144,
+              "mean_sampling_seconds": 3.001020737499857,
+              "samples_per_second": 135408.92767656836,
+              "mean_postburn_acceptance": 0.5590039367863098,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 1.7080770439872857e-07,
+                  "mse_empirical_mcse": 4.967354080079416e-08,
+                  "largest_error_share": 0.22636844771062045,
+                  "largest_three_error_share": 0.5381712071580249,
+                  "leave_one_chain_out_mse_min": 1.3909708368102513e-07,
+                  "leave_one_chain_out_mse_max": 1.7978103812875488e-07,
+                  "ess_valid_chains": 20,
+                  "total_ess": 1503413.3312276348,
+                  "ess_per_sampling_second": 25048.36625154621,
+                  "mse_ratio_to_original_scs": 0.611253754455239
+                },
+                "mean_norm": {
+                  "mse": 0.001084585707021823,
+                  "mse_empirical_mcse": 0.0003487770483287661,
+                  "largest_error_share": 0.24138099279013095,
+                  "largest_three_error_share": 0.573836980516791,
+                  "leave_one_chain_out_mse_min": 0.0008660919287314833,
+                  "leave_one_chain_out_mse_max": 0.0011416625270123412,
+                  "ess_valid_chains": 20,
+                  "total_ess": 1178643.233391262,
+                  "ess_per_sampling_second": 19637.372355733645,
+                  "mse_ratio_to_original_scs": 0.19479904394435604
+                }
+              }
+            },
+            "DCS-BW-reflect": {
+              "chains": 20,
+              "total_generated": 6995400,
+              "total_postburn_used": 4663600,
+              "total_stored_thinned": 93272,
+              "total_sampling_seconds": 60.02872249800566,
+              "mean_sampling_seconds": 3.001436124900283,
+              "samples_per_second": 116534.21410446322,
+              "mean_postburn_acceptance": 0.777648027241038,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 4.693672244462192e-08,
+                  "mse_empirical_mcse": 1.584170817372696e-08,
+                  "largest_error_share": 0.33009837669464875,
+                  "largest_three_error_share": 0.5609731620637538,
+                  "leave_one_chain_out_mse_min": 3.309788058766835e-08,
+                  "leave_one_chain_out_mse_max": 4.93782365901435e-08,
+                  "ess_valid_chains": 20,
+                  "total_ess": 3727264.1845708177,
+                  "ess_per_sampling_second": 62091.346100104805,
+                  "mse_ratio_to_original_scs": 0.16796811313103854
+                },
+                "mean_norm": {
+                  "mse": 0.0009596070380766989,
+                  "mse_empirical_mcse": 0.00022276579616626322,
+                  "largest_error_share": 0.173513354374108,
+                  "largest_three_error_share": 0.4081382330483795,
+                  "leave_one_chain_out_mse_min": 0.0008348446337042194,
+                  "leave_one_chain_out_mse_max": 0.0010100517704867105,
+                  "ess_valid_chains": 20,
+                  "total_ess": 2065410.8368897415,
+                  "ess_per_sampling_second": 34407.04301109124,
+                  "mse_ratio_to_original_scs": 0.17235201641455433
+                }
+              }
+            },
+            "DCS-Billiard": {
+              "chains": 20,
+              "total_generated": 6655200,
+              "total_postburn_used": 4436800,
+              "total_stored_thinned": 88736,
+              "total_sampling_seconds": 60.02742770699115,
+              "mean_sampling_seconds": 3.0013713853495574,
+              "samples_per_second": 110869.3184803069,
+              "mean_postburn_acceptance": 0.7646466269597629,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 8.823003631870217e-08,
+                  "mse_empirical_mcse": 2.6920220498910737e-08,
+                  "largest_error_share": 0.2754684622926948,
+                  "largest_three_error_share": 0.552860893925904,
+                  "leave_one_chain_out_mse_min": 6.728994093259019e-08,
+                  "leave_one_chain_out_mse_max": 9.284275177517663e-08,
+                  "ess_valid_chains": 20,
+                  "total_ess": 3216752.9769146265,
+                  "ess_per_sampling_second": 53588.05299164909,
+                  "mse_ratio_to_original_scs": 0.31574068128469174
+                },
+                "mean_norm": {
+                  "mse": 0.0007147022411239918,
+                  "mse_empirical_mcse": 0.00018172687992422254,
+                  "largest_error_share": 0.1658621301897115,
+                  "largest_three_error_share": 0.4414185965960869,
+                  "leave_one_chain_out_mse_min": 0.000627537057852427,
+                  "leave_one_chain_out_mse_max": 0.0007523153206066918,
+                  "ess_valid_chains": 20,
+                  "total_ess": 1890700.757227941,
+                  "ess_per_sampling_second": 31497.28098390161,
+                  "mse_ratio_to_original_scs": 0.12836543241763457
+                }
+              }
+            },
+            "SCS": {
+              "chains": 20,
+              "total_generated": 6076800,
+              "total_postburn_used": 4051200,
+              "total_stored_thinned": 81024,
+              "total_sampling_seconds": 60.02788129099281,
+              "mean_sampling_seconds": 3.0013940645496406,
+              "samples_per_second": 101232.95824055387,
+              "mean_postburn_acceptance": 0.2567376802907108,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 2.7943829081419e-07,
+                  "mse_empirical_mcse": 5.404939411651376e-08,
+                  "largest_error_share": 0.15214898986162578,
+                  "largest_three_error_share": 0.37191214419597723,
+                  "leave_one_chain_out_mse_min": 2.4939161804015977e-07,
+                  "leave_one_chain_out_mse_max": 2.9378276381946726e-07,
+                  "ess_valid_chains": 20,
+                  "total_ess": 825324.5895247032,
+                  "ess_per_sampling_second": 13749.020817906883,
+                  "mse_ratio_to_original_scs": 1.0
+                },
+                "mean_norm": {
+                  "mse": 0.005567715760102152,
+                  "mse_empirical_mcse": 0.0017432631165557552,
+                  "largest_error_share": 0.23985574872451607,
+                  "largest_three_error_share": 0.5876030083753904,
+                  "leave_one_chain_out_mse_min": 0.0044550180292395394,
+                  "leave_one_chain_out_mse_max": 0.0058595563893285895,
+                  "ess_valid_chains": 20,
+                  "total_ess": 607053.7059676872,
+                  "ess_per_sampling_second": 10112.862438454506,
+                  "mse_ratio_to_original_scs": 1.0
+                }
+              }
+            }
+          },
+          "paired_comparisons": [
+            {
+              "method": "DCS-RWM",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -1.5365665981324458e-07,
+              "empirical_mcse": 5.561350260350914e-08,
+              "mse_ratio": 0.4501231045840558
+            },
+            {
+              "method": "DCS-RWM",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.0031591459300600497,
+              "empirical_mcse": 0.0022366166492239527,
+              "mse_ratio": 0.4325956880381248
+            },
+            {
+              "method": "DCS-BW",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -1.0863058641546146e-07,
+              "empirical_mcse": 5.935905649019365e-08,
+              "mse_ratio": 0.611253754455239
+            },
+            {
+              "method": "DCS-BW",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.004483130053080328,
+              "empirical_mcse": 0.001834179626662407,
+              "mse_ratio": 0.19479904394435604
+            },
+            {
+              "method": "DCS-BW-reflect",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -2.3250156836956812e-07,
+              "empirical_mcse": 6.226275721489639e-08,
+              "mse_ratio": 0.16796811313103854
+            },
+            {
+              "method": "DCS-BW-reflect",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.004608108722025453,
+              "empirical_mcse": 0.0017481019857443607,
+              "mse_ratio": 0.17235201641455433
+            },
+            {
+              "method": "DCS-Billiard",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -1.9120825449548785e-07,
+              "empirical_mcse": 5.45399688831194e-08,
+              "mse_ratio": 0.31574068128469174
+            },
+            {
+              "method": "DCS-Billiard",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.0048530135189781606,
+              "empirical_mcse": 0.0017309291688890796,
+              "mse_ratio": 0.12836543241763457
+            }
+          ]
+        },
+        {
+          "dimension": 500,
+          "truth": {
+            "tail_probability": 0.010679932806128877,
+            "mean_norm": 30.886489066165137
+          },
+          "methods": {
+            "DCS-RWM": {
+              "chains": 20,
+              "total_generated": 3131100,
+              "total_postburn_used": 2087400,
+              "total_stored_thinned": 41748,
+              "total_sampling_seconds": 60.05654246000631,
+              "mean_sampling_seconds": 3.0028271230003156,
+              "samples_per_second": 52135.86849567814,
+              "mean_postburn_acceptance": 0.5591246828356399,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 5.124354783875396e-07,
+                  "mse_empirical_mcse": 1.3527935093980966e-07,
+                  "largest_error_share": 0.2320932823073042,
+                  "largest_three_error_share": 0.47670758129239543,
+                  "leave_one_chain_out_mse_min": 4.1421331182932837e-07,
+                  "leave_one_chain_out_mse_max": 5.392412074044011e-07,
+                  "ess_valid_chains": 20,
+                  "total_ess": 376709.7051245555,
+                  "ess_per_sampling_second": 6272.583963277927,
+                  "mse_ratio_to_original_scs": 0.1568173726439224
+                },
+                "mean_norm": {
+                  "mse": 0.023349811563184823,
+                  "mse_empirical_mcse": 0.006036016713301663,
+                  "largest_error_share": 0.22111446678948965,
+                  "largest_three_error_share": 0.47039333290336327,
+                  "leave_one_chain_out_mse_min": 0.019144032031322266,
+                  "leave_one_chain_out_mse_max": 0.02457461188532455,
+                  "ess_valid_chains": 20,
+                  "total_ess": 349893.8699562328,
+                  "ess_per_sampling_second": 5826.074156520732,
+                  "mse_ratio_to_original_scs": 0.1390480822207758
+                }
+              }
+            },
+            "DCS-BW": {
+              "chains": 20,
+              "total_generated": 2646000,
+              "total_postburn_used": 1764000,
+              "total_stored_thinned": 35280,
+              "total_sampling_seconds": 60.08191570798954,
+              "mean_sampling_seconds": 3.004095785399477,
+              "samples_per_second": 44039.874042300915,
+              "mean_postburn_acceptance": 0.5581280758370515,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 4.847513902341998e-07,
+                  "mse_empirical_mcse": 1.379126976930115e-07,
+                  "largest_error_share": 0.2083318687166072,
+                  "largest_three_error_share": 0.520072499063756,
+                  "leave_one_chain_out_mse_min": 4.039602392039323e-07,
+                  "leave_one_chain_out_mse_max": 5.102499491929187e-07,
+                  "ess_valid_chains": 20,
+                  "total_ess": 306554.8735020304,
+                  "ess_per_sampling_second": 5102.281941074418,
+                  "mse_ratio_to_original_scs": 0.14834538709383865
+                },
+                "mean_norm": {
+                  "mse": 0.03238099351020342,
+                  "mse_empirical_mcse": 0.006665165781882668,
+                  "largest_error_share": 0.15689712468333086,
+                  "largest_three_error_share": 0.4003178226440094,
+                  "leave_one_chain_out_mse_min": 0.02873737761480306,
+                  "leave_one_chain_out_mse_max": 0.03407005142804378,
+                  "ess_valid_chains": 20,
+                  "total_ess": 282520.73753933306,
+                  "ess_per_sampling_second": 4702.259144206419,
+                  "mse_ratio_to_original_scs": 0.1928287530635235
+                }
+              }
+            },
+            "DCS-BW-reflect": {
+              "chains": 20,
+              "total_generated": 2358000,
+              "total_postburn_used": 1572000,
+              "total_stored_thinned": 31440,
+              "total_sampling_seconds": 60.07361262300401,
+              "mean_sampling_seconds": 3.0036806311502007,
+              "samples_per_second": 39251.84281487759,
+              "mean_postburn_acceptance": 0.8815614935380495,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 2.0974873417383606e-07,
+                  "mse_empirical_mcse": 4.30378771564141e-08,
+                  "largest_error_share": 0.14902020985508538,
+                  "largest_three_error_share": 0.3960914639297774,
+                  "leave_one_chain_out_mse_min": 1.8788624609517105e-07,
+                  "leave_one_chain_out_mse_max": 2.2071995567135154e-07,
+                  "ess_valid_chains": 20,
+                  "total_ess": 917210.0880284582,
+                  "ess_per_sampling_second": 15268.102715654404,
+                  "mse_ratio_to_original_scs": 0.06418807205158822
+                },
+                "mean_norm": {
+                  "mse": 0.010870866153865174,
+                  "mse_empirical_mcse": 0.002635586786874439,
+                  "largest_error_share": 0.17979543241222626,
+                  "largest_three_error_share": 0.441178779297735,
+                  "leave_one_chain_out_mse_min": 0.00938561481372163,
+                  "leave_one_chain_out_mse_max": 0.01144005192301677,
+                  "ess_valid_chains": 20,
+                  "total_ess": 633033.2969788712,
+                  "ess_per_sampling_second": 10537.62657743782,
+                  "mse_ratio_to_original_scs": 0.06473598669879461
+                }
+              }
+            },
+            "DCS-Billiard": {
+              "chains": 20,
+              "total_generated": 2254500,
+              "total_postburn_used": 1503000,
+              "total_stored_thinned": 30060,
+              "total_sampling_seconds": 60.098612415007665,
+              "mean_sampling_seconds": 3.0049306207503834,
+              "samples_per_second": 37513.345307070886,
+              "mean_postburn_acceptance": 0.8163486854213436,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 3.8738923936380496e-07,
+                  "mse_empirical_mcse": 1.1934632751237397e-07,
+                  "largest_error_share": 0.27837768101942323,
+                  "largest_three_error_share": 0.5717391103158442,
+                  "leave_one_chain_out_mse_min": 2.942618118503481e-07,
+                  "leave_one_chain_out_mse_max": 4.0724665536064126e-07,
+                  "ess_valid_chains": 20,
+                  "total_ess": 668544.3262870081,
+                  "ess_per_sampling_second": 11124.122495048838,
+                  "mse_ratio_to_original_scs": 0.1185502668525549
+                },
+                "mean_norm": {
+                  "mse": 0.023697271255936778,
+                  "mse_empirical_mcse": 0.004578496912707995,
+                  "largest_error_share": 0.14835015421286285,
+                  "largest_three_error_share": 0.36025147414946374,
+                  "leave_one_chain_out_mse_min": 0.0212439762217837,
+                  "leave_one_chain_out_mse_max": 0.02494439973966988,
+                  "ess_valid_chains": 20,
+                  "total_ess": 514993.5040716073,
+                  "ess_per_sampling_second": 8569.141339160178,
+                  "mse_ratio_to_original_scs": 0.14111720401199207
+                }
+              }
+            },
+            "SCS": {
+              "chains": 20,
+              "total_generated": 2125500,
+              "total_postburn_used": 1417000,
+              "total_stored_thinned": 28340,
+              "total_sampling_seconds": 60.08551758100657,
+              "mean_sampling_seconds": 3.0042758790503283,
+              "samples_per_second": 35374.58085693323,
+              "mean_postburn_acceptance": 0.12821073211424575,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 3.2677213611472884e-06,
+                  "mse_empirical_mcse": 8.79454682295752e-07,
+                  "largest_error_share": 0.21524434695952768,
+                  "largest_three_error_share": 0.4841254854215311,
+                  "leave_one_chain_out_mse_min": 2.6993292744436223e-06,
+                  "leave_one_chain_out_mse_max": 3.437063675867788e-06,
+                  "ess_valid_chains": 20,
+                  "total_ess": 62260.62219308011,
+                  "ess_per_sampling_second": 1036.200147716812,
+                  "mse_ratio_to_original_scs": 1.0
+                },
+                "mean_norm": {
+                  "mse": 0.1679261676267551,
+                  "mse_empirical_mcse": 0.037650387684556384,
+                  "largest_error_share": 0.21360670326666586,
+                  "largest_three_error_share": 0.40120567053684064,
+                  "leave_one_chain_out_mse_min": 0.1390063290187352,
+                  "leave_one_chain_out_mse_max": 0.17650239652239372,
+                  "ess_valid_chains": 20,
+                  "total_ess": 43042.77628937402,
+                  "ess_per_sampling_second": 716.3585839357091,
+                  "mse_ratio_to_original_scs": 1.0
+                }
+              }
+            }
+          },
+          "paired_comparisons": [
+            {
+              "method": "DCS-RWM",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -2.7552858827597487e-06,
+              "empirical_mcse": 8.925354321685399e-07,
+              "mse_ratio": 0.1568173726439224
+            },
+            {
+              "method": "DCS-RWM",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.14457635606357028,
+              "empirical_mcse": 0.038563500143674156,
+              "mse_ratio": 0.1390480822207758
+            },
+            {
+              "method": "DCS-BW",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -2.7829699709130884e-06,
+              "empirical_mcse": 8.850995385340071e-07,
+              "mse_ratio": 0.14834538709383865
+            },
+            {
+              "method": "DCS-BW",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.1355451741165517,
+              "empirical_mcse": 0.03625689346562988,
+              "mse_ratio": 0.1928287530635235
+            },
+            {
+              "method": "DCS-BW-reflect",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -3.0579726269734524e-06,
+              "empirical_mcse": 8.787689075217055e-07,
+              "mse_ratio": 0.06418807205158822
+            },
+            {
+              "method": "DCS-BW-reflect",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.15705530147288993,
+              "empirical_mcse": 0.03741575692076815,
+              "mse_ratio": 0.06473598669879461
+            },
+            {
+              "method": "DCS-Billiard",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -2.880332121783483e-06,
+              "empirical_mcse": 8.750001314872936e-07,
+              "mse_ratio": 0.1185502668525549
+            },
+            {
+              "method": "DCS-Billiard",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.14422889637081832,
+              "empirical_mcse": 0.03693490301095852,
+              "mse_ratio": 0.14111720401199207
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "batch21",
+      "title": "Independent batch 21",
+      "scope": "Independent 20 chains per retained method and dimension; 200 unique chain files, with every chain retained for each displayed method.",
+      "seed_batches": [
+        21
+      ],
+      "dimensions": [
+        {
+          "dimension": 100,
+          "truth": {
+            "tail_probability": 0.010734615306999934,
+            "mean_norm": 13.785260289025814
+          },
+          "methods": {
+            "DCS-RWM": {
+              "chains": 20,
+              "total_generated": 8730900,
+              "total_postburn_used": 5820600,
+              "total_stored_thinned": 116412,
+              "total_sampling_seconds": 60.0216980819896,
+              "mean_sampling_seconds": 3.00108490409948,
+              "samples_per_second": 145462.39575017683,
+              "mean_postburn_acceptance": 0.5608761808092239,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 1.5600425496924113e-07,
+                  "mse_empirical_mcse": 4.909355203923953e-08,
+                  "largest_error_share": 0.2662458644111041,
+                  "largest_three_error_share": 0.5538206436701284,
+                  "leave_one_chain_out_mse_min": 1.204934392138371e-07,
+                  "leave_one_chain_out_mse_max": 1.6421474562140912e-07,
+                  "ess_valid_chains": 20,
+                  "total_ess": 1611833.9204380128,
+                  "ess_per_sampling_second": 26854.187268015125,
+                  "mse_ratio_to_original_scs": 0.8899115858334068
+                },
+                "mean_norm": {
+                  "mse": 0.001309305110395822,
+                  "mse_empirical_mcse": 0.0005850969469909709,
+                  "largest_error_share": 0.4560399791091361,
+                  "largest_three_error_share": 0.6421094586286438,
+                  "leave_one_chain_out_mse_min": 0.0007496943528457118,
+                  "leave_one_chain_out_mse_max": 0.0013774019390008889,
+                  "ess_valid_chains": 20,
+                  "total_ess": 1273798.3738297317,
+                  "ess_per_sampling_second": 21222.29817773106,
+                  "mse_ratio_to_original_scs": 0.27001930713126704
+                }
+              }
+            },
+            "DCS-BW": {
+              "chains": 20,
+              "total_generated": 8191500,
+              "total_postburn_used": 5461000,
+              "total_stored_thinned": 109220,
+              "total_sampling_seconds": 60.01988866598913,
+              "mean_sampling_seconds": 3.0009944332994563,
+              "samples_per_second": 136479.75999398672,
+              "mean_postburn_acceptance": 0.5593268887113756,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 2.361288833166792e-07,
+                  "mse_empirical_mcse": 7.56343836300118e-08,
+                  "largest_error_share": 0.25681891277778185,
+                  "largest_three_error_share": 0.6168020625307397,
+                  "leave_one_chain_out_mse_min": 1.8472265287142942e-07,
+                  "leave_one_chain_out_mse_max": 2.485564930528025e-07,
+                  "ess_valid_chains": 20,
+                  "total_ess": 1515311.80323809,
+                  "ess_per_sampling_second": 25246.827958492308,
+                  "mse_ratio_to_original_scs": 1.3469749851044055
+                },
+                "mean_norm": {
+                  "mse": 0.002103946498502997,
+                  "mse_empirical_mcse": 0.0004360303383295313,
+                  "largest_error_share": 0.13941634261748226,
+                  "largest_three_error_share": 0.37690403925587296,
+                  "leave_one_chain_out_mse_min": 0.0019059178659145799,
+                  "leave_one_chain_out_mse_max": 0.0022140683841040845,
+                  "ess_valid_chains": 20,
+                  "total_ess": 1198978.326815272,
+                  "ess_per_sampling_second": 19976.35039757555,
+                  "mse_ratio_to_original_scs": 0.4338989982214977
+                }
+              }
+            },
+            "DCS-BW-reflect": {
+              "chains": 20,
+              "total_generated": 7059600,
+              "total_postburn_used": 4706400,
+              "total_stored_thinned": 94128,
+              "total_sampling_seconds": 60.023688331988524,
+              "mean_sampling_seconds": 3.0011844165994264,
+              "samples_per_second": 117613.56551356267,
+              "mean_postburn_acceptance": 0.7776573401744812,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 4.242486180145492e-08,
+                  "mse_empirical_mcse": 9.004007112311847e-09,
+                  "largest_error_share": 0.1674697517202862,
+                  "largest_three_error_share": 0.4133777235878329,
+                  "leave_one_chain_out_mse_min": 3.717892708294506e-08,
+                  "leave_one_chain_out_mse_max": 4.463183972027178e-08,
+                  "ess_valid_chains": 20,
+                  "total_ess": 3726158.9289532914,
+                  "ess_per_sampling_second": 62078.14002272005,
+                  "mse_ratio_to_original_scs": 0.2420086301616567
+                },
+                "mean_norm": {
+                  "mse": 0.0008404773802974562,
+                  "mse_empirical_mcse": 0.00018388578652985194,
+                  "largest_error_share": 0.1433354717009244,
+                  "largest_three_error_share": 0.3933392738529743,
+                  "leave_one_chain_out_mse_min": 0.000757902272145856,
+                  "leave_one_chain_out_mse_max": 0.0008840828104934744,
+                  "ess_valid_chains": 20,
+                  "total_ess": 2063277.612739486,
+                  "ess_per_sampling_second": 34374.38901334392,
+                  "mse_ratio_to_original_scs": 0.17333249376748613
+                }
+              }
+            },
+            "DCS-Billiard": {
+              "chains": 20,
+              "total_generated": 6693900,
+              "total_postburn_used": 4462600,
+              "total_stored_thinned": 89252,
+              "total_sampling_seconds": 60.02449145799983,
+              "mean_sampling_seconds": 3.0012245728999916,
+              "samples_per_second": 111519.47875616468,
+              "mean_postburn_acceptance": 0.7647887212493362,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 5.162977118097259e-08,
+                  "mse_empirical_mcse": 1.3087352132510532e-08,
+                  "largest_error_share": 0.20189570629131343,
+                  "largest_three_error_share": 0.49778451790055805,
+                  "leave_one_chain_out_mse_min": 4.3374675855506554e-08,
+                  "leave_one_chain_out_mse_max": 5.43462979585197e-08,
+                  "ess_valid_chains": 20,
+                  "total_ess": 3240244.109917573,
+                  "ess_per_sampling_second": 53982.03352018114,
+                  "mse_ratio_to_original_scs": 0.29451716914345866
+                },
+                "mean_norm": {
+                  "mse": 0.0012970581423360566,
+                  "mse_empirical_mcse": 0.00039714240026612847,
+                  "largest_error_share": 0.296922780346669,
+                  "largest_three_error_share": 0.485986074127835,
+                  "leave_one_chain_out_mse_min": 0.0009599284552024726,
+                  "leave_one_chain_out_mse_max": 0.0013648719525626279,
+                  "ess_valid_chains": 20,
+                  "total_ess": 1891191.7617868008,
+                  "ess_per_sampling_second": 31507.001822915907,
+                  "mse_ratio_to_original_scs": 0.26749360261541366
+                }
+              }
+            },
+            "SCS": {
+              "chains": 20,
+              "total_generated": 6143400,
+              "total_postburn_used": 4095600,
+              "total_stored_thinned": 81912,
+              "total_sampling_seconds": 60.02820741699907,
+              "mean_sampling_seconds": 3.0014103708499533,
+              "samples_per_second": 102341.88666210751,
+              "mean_postburn_acceptance": 0.2568107514970043,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 1.7530309465871528e-07,
+                  "mse_empirical_mcse": 4.0497232677754885e-08,
+                  "largest_error_share": 0.2290926790859437,
+                  "largest_three_error_share": 0.41361700078031755,
+                  "leave_one_chain_out_mse_min": 1.422551990013615e-07,
+                  "leave_one_chain_out_mse_max": 1.8451976644292476e-07,
+                  "ess_valid_chains": 20,
+                  "total_ess": 848922.6448305752,
+                  "ess_per_sampling_second": 14142.062229733907,
+                  "mse_ratio_to_original_scs": 1.0
+                },
+                "mean_norm": {
+                  "mse": 0.004848931449777097,
+                  "mse_empirical_mcse": 0.0014703673905210378,
+                  "largest_error_share": 0.2652562695671036,
+                  "largest_three_error_share": 0.54098237794785,
+                  "leave_one_chain_out_mse_min": 0.0037502336652869657,
+                  "leave_one_chain_out_mse_max": 0.005103924232161242,
+                  "ess_valid_chains": 20,
+                  "total_ess": 604489.3655931533,
+                  "ess_per_sampling_second": 10070.088573425752,
+                  "mse_ratio_to_original_scs": 1.0
+                }
+              }
+            }
+          },
+          "paired_comparisons": [
+            {
+              "method": "DCS-RWM",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -1.9298839689474166e-08,
+              "empirical_mcse": 6.451239723351575e-08,
+              "mse_ratio": 0.8899115858334068
+            },
+            {
+              "method": "DCS-RWM",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.003539626339381276,
+              "empirical_mcse": 0.001601556149847075,
+              "mse_ratio": 0.27001930713126704
+            },
+            {
+              "method": "DCS-BW",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": 6.082578865796391e-08,
+              "empirical_mcse": 8.179206244199547e-08,
+              "mse_ratio": 1.3469749851044055
+            },
+            {
+              "method": "DCS-BW",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.002744984951274101,
+              "empirical_mcse": 0.001638279199873209,
+              "mse_ratio": 0.4338989982214977
+            },
+            {
+              "method": "DCS-BW-reflect",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -1.3287823285726037e-07,
+              "empirical_mcse": 4.1690937367830935e-08,
+              "mse_ratio": 0.2420086301616567
+            },
+            {
+              "method": "DCS-BW-reflect",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.004008454069479641,
+              "empirical_mcse": 0.001512210005770233,
+              "mse_ratio": 0.17333249376748613
+            },
+            {
+              "method": "DCS-Billiard",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -1.236733234777427e-07,
+              "empirical_mcse": 4.671077970757017e-08,
+              "mse_ratio": 0.29451716914345866
+            },
+            {
+              "method": "DCS-Billiard",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.003551873307441041,
+              "empirical_mcse": 0.0016010641738610036,
+              "mse_ratio": 0.26749360261541366
+            }
+          ]
+        },
+        {
+          "dimension": 500,
+          "truth": {
+            "tail_probability": 0.010679932806128877,
+            "mean_norm": 30.886489066165137
+          },
+          "methods": {
+            "DCS-RWM": {
+              "chains": 20,
+              "total_generated": 3087600,
+              "total_postburn_used": 2058400,
+              "total_stored_thinned": 41168,
+              "total_sampling_seconds": 60.072450581999874,
+              "mean_sampling_seconds": 3.0036225290999936,
+              "samples_per_second": 51397.936493124675,
+              "mean_postburn_acceptance": 0.5572691417778253,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 5.343641033939565e-07,
+                  "mse_empirical_mcse": 1.9192918332395786e-07,
+                  "largest_error_share": 0.33182845311293346,
+                  "largest_three_error_share": 0.6264673005725011,
+                  "leave_one_chain_out_mse_min": 3.758388311217477e-07,
+                  "leave_one_chain_out_mse_max": 5.623225851847784e-07,
+                  "ess_valid_chains": 20,
+                  "total_ess": 358488.0708735909,
+                  "ess_per_sampling_second": 5967.595252073974,
+                  "mse_ratio_to_original_scs": 0.12439621956911186
+                },
+                "mean_norm": {
+                  "mse": 0.022468359588088252,
+                  "mse_empirical_mcse": 0.00844962288088909,
+                  "largest_error_share": 0.2533713582770651,
+                  "largest_three_error_share": 0.7223611902712982,
+                  "leave_one_chain_out_mse_min": 0.0176584429484177,
+                  "leave_one_chain_out_mse_max": 0.023650464801965875,
+                  "ess_valid_chains": 20,
+                  "total_ess": 338040.2156820807,
+                  "ess_per_sampling_second": 5627.2086856295355,
+                  "mse_ratio_to_original_scs": 0.11685916690289756
+                }
+              }
+            },
+            "DCS-BW": {
+              "chains": 20,
+              "total_generated": 2629800,
+              "total_postburn_used": 1753200,
+              "total_stored_thinned": 35064,
+              "total_sampling_seconds": 60.07543437499771,
+              "mean_sampling_seconds": 3.003771718749886,
+              "samples_per_second": 43774.964382021586,
+              "mean_postburn_acceptance": 0.5579038310642754,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 6.894244658891572e-07,
+                  "mse_empirical_mcse": 1.9038202637829135e-07,
+                  "largest_error_share": 0.18669616873456824,
+                  "largest_three_error_share": 0.5094094923889092,
+                  "leave_one_chain_out_mse_min": 5.902226941850269e-07,
+                  "leave_one_chain_out_mse_max": 7.256897276506785e-07,
+                  "ess_valid_chains": 20,
+                  "total_ess": 305864.5179532626,
+                  "ess_per_sampling_second": 5091.340930537787,
+                  "mse_ratio_to_original_scs": 0.16049318562073756
+                },
+                "mean_norm": {
+                  "mse": 0.06717960424769157,
+                  "mse_empirical_mcse": 0.026221458504854026,
+                  "largest_error_share": 0.3698630557822311,
+                  "largest_three_error_share": 0.6388794333683627,
+                  "leave_one_chain_out_mse_min": 0.044560368983578326,
+                  "leave_one_chain_out_mse_max": 0.07071525388051465,
+                  "ess_valid_chains": 20,
+                  "total_ess": 291024.40898487734,
+                  "ess_per_sampling_second": 4844.316350145215,
+                  "mse_ratio_to_original_scs": 0.3494047954178914
+                }
+              }
+            },
+            "DCS-BW-reflect": {
+              "chains": 20,
+              "total_generated": 2344800,
+              "total_postburn_used": 1563200,
+              "total_stored_thinned": 31264,
+              "total_sampling_seconds": 60.072920789996715,
+              "mean_sampling_seconds": 3.0036460394998357,
+              "samples_per_second": 39032.56191249575,
+              "mean_postburn_acceptance": 0.8814922505185656,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 2.8053117835323187e-07,
+                  "mse_empirical_mcse": 8.06621307280254e-08,
+                  "largest_error_share": 0.2767489733331322,
+                  "largest_three_error_share": 0.5100355316019726,
+                  "leave_one_chain_out_mse_min": 2.1357311869056966e-07,
+                  "leave_one_chain_out_mse_max": 2.9494648364235816e-07,
+                  "ess_valid_chains": 20,
+                  "total_ess": 924192.0327810394,
+                  "ess_per_sampling_second": 15384.503044422221,
+                  "mse_ratio_to_original_scs": 0.06530569294749708
+                },
+                "mean_norm": {
+                  "mse": 0.0213601112244963,
+                  "mse_empirical_mcse": 0.0069838532709238,
+                  "largest_error_share": 0.25280962510001564,
+                  "largest_three_error_share": 0.6022971528288878,
+                  "leave_one_chain_out_mse_min": 0.01680007317235448,
+                  "leave_one_chain_out_mse_max": 0.022452549604854086,
+                  "ess_valid_chains": 20,
+                  "total_ess": 642045.9840883694,
+                  "ess_per_sampling_second": 10687.777049044073,
+                  "mse_ratio_to_original_scs": 0.11109510655914577
+                }
+              }
+            },
+            "DCS-Billiard": {
+              "chains": 20,
+              "total_generated": 2247900,
+              "total_postburn_used": 1498600,
+              "total_stored_thinned": 29972,
+              "total_sampling_seconds": 60.08487658201193,
+              "mean_sampling_seconds": 3.0042438291005964,
+              "samples_per_second": 37412.076513659194,
+              "mean_postburn_acceptance": 0.8164436380029849,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 5.47618614163625e-07,
+                  "mse_empirical_mcse": 1.6900272001903282e-07,
+                  "largest_error_share": 0.23300536601407693,
+                  "largest_three_error_share": 0.5661427158966055,
+                  "leave_one_chain_out_mse_min": 4.4212688266769254e-07,
+                  "leave_one_chain_out_mse_max": 5.76309006763713e-07,
+                  "ess_valid_chains": 20,
+                  "total_ess": 679029.0018034475,
+                  "ess_per_sampling_second": 11301.163294837052,
+                  "mse_ratio_to_original_scs": 0.12748177681652534
+                },
+                "mean_norm": {
+                  "mse": 0.03984575088819096,
+                  "mse_empirical_mcse": 0.013403093329775757,
+                  "largest_error_share": 0.2876721093840696,
+                  "largest_three_error_share": 0.5904543854344839,
+                  "leave_one_chain_out_mse_min": 0.029877094400203048,
+                  "leave_one_chain_out_mse_max": 0.041928242173688304,
+                  "ess_valid_chains": 20,
+                  "total_ess": 522048.37617366243,
+                  "ess_per_sampling_second": 8688.515411379776,
+                  "mse_ratio_to_original_scs": 0.20723992933970023
+                }
+              }
+            },
+            "SCS": {
+              "chains": 20,
+              "total_generated": 2086500,
+              "total_postburn_used": 1391000,
+              "total_stored_thinned": 27820,
+              "total_sampling_seconds": 60.098877417007316,
+              "mean_sampling_seconds": 3.004943870850366,
+              "samples_per_second": 34717.786582308836,
+              "mean_postburn_acceptance": 0.12848432888495614,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 4.295661919991671e-06,
+                  "mse_empirical_mcse": 1.7514141472195103e-06,
+                  "largest_error_share": 0.40400900954295216,
+                  "largest_three_error_share": 0.6259950897692891,
+                  "leave_one_chain_out_mse_min": 2.694921897225747e-06,
+                  "leave_one_chain_out_mse_max": 4.52123246278115e-06,
+                  "ess_valid_chains": 20,
+                  "total_ess": 53888.62709763946,
+                  "ess_per_sampling_second": 896.6661177998905,
+                  "mse_ratio_to_original_scs": 1.0
+                },
+                "mean_norm": {
+                  "mse": 0.19226869558943555,
+                  "mse_empirical_mcse": 0.04718698289897249,
+                  "largest_error_share": 0.22434336990968928,
+                  "largest_three_error_share": 0.4534945491985652,
+                  "leave_one_chain_out_mse_min": 0.15698367209764355,
+                  "leave_one_chain_out_mse_max": 0.2023819153473142,
+                  "ess_valid_chains": 20,
+                  "total_ess": 41758.729723506556,
+                  "ess_per_sampling_second": 694.8337725804059,
+                  "mse_ratio_to_original_scs": 1.0
+                }
+              }
+            }
+          },
+          "paired_comparisons": [
+            {
+              "method": "DCS-RWM",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -3.7612978165977143e-06,
+              "empirical_mcse": 1.7935493143618288e-06,
+              "mse_ratio": 0.12439621956911186
+            },
+            {
+              "method": "DCS-RWM",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.1698003360013473,
+              "empirical_mcse": 0.04781084730049609,
+              "mse_ratio": 0.11685916690289756
+            },
+            {
+              "method": "DCS-BW",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -3.6062374541025134e-06,
+              "empirical_mcse": 1.797015528760501e-06,
+              "mse_ratio": 0.16049318562073756
+            },
+            {
+              "method": "DCS-BW",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.125089091341744,
+              "empirical_mcse": 0.057908270116287366,
+              "mse_ratio": 0.3494047954178914
+            },
+            {
+              "method": "DCS-BW-reflect",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -4.0151307416384396e-06,
+              "empirical_mcse": 1.7723606139919373e-06,
+              "mse_ratio": 0.06530569294749708
+            },
+            {
+              "method": "DCS-BW-reflect",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.17090858436493925,
+              "empirical_mcse": 0.04919019798477922,
+              "mse_ratio": 0.11109510655914577
+            },
+            {
+              "method": "DCS-Billiard",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -3.7480433058280465e-06,
+              "empirical_mcse": 1.7198529785624948e-06,
+              "mse_ratio": 0.12748177681652534
+            },
+            {
+              "method": "DCS-Billiard",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 20,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.1524229447012446,
+              "empirical_mcse": 0.044193170360251575,
+              "mse_ratio": 0.20723992933970023
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "combined40",
+      "title": "Predeclared combined 40-chain analysis",
+      "scope": "All 40 chain estimates per retained method and dimension, with equal chain weights; 400 unique files across both batches.",
+      "seed_batches": [
+        20,
+        21
+      ],
+      "dimensions": [
+        {
+          "dimension": 100,
+          "truth": {
+            "tail_probability": 0.010734615306999934,
+            "mean_norm": 13.785260289025814
+          },
+          "methods": {
+            "DCS-RWM": {
+              "chains": 40,
+              "total_generated": 17371500,
+              "total_postburn_used": 11581000,
+              "total_stored_thinned": 231620,
+              "total_sampling_seconds": 120.0460678699892,
+              "mean_sampling_seconds": 3.00115169674973,
+              "samples_per_second": 144706.94715976424,
+              "mean_postburn_acceptance": 0.5607743572108403,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 1.4089294298509327e-07,
+                  "mse_empirical_mcse": 2.911721586214851e-08,
+                  "largest_error_share": 0.14740088054122913,
+                  "largest_three_error_share": 0.3202146874395485,
+                  "leave_one_chain_out_mse_min": 1.2320533243799522e-07,
+                  "leave_one_chain_out_mse_max": 1.4450545607245337e-07,
+                  "ess_valid_chains": 40,
+                  "total_ess": 3194102.8885835633,
+                  "ess_per_sampling_second": 26607.30955421881,
+                  "mse_ratio_to_original_scs": 0.61966184511037
+                },
+                "mean_norm": {
+                  "mse": 0.0018589374702189618,
+                  "mse_empirical_mcse": 0.0006482855845905198,
+                  "largest_error_share": 0.2948494350247975,
+                  "largest_three_error_share": 0.5829254110995234,
+                  "leave_one_chain_out_mse_min": 0.0013444418537215124,
+                  "leave_one_chain_out_mse_max": 0.0019065560761966712,
+                  "ess_valid_chains": 40,
+                  "total_ess": 2507883.8817357547,
+                  "ess_per_sampling_second": 20891.012310805647,
+                  "mse_ratio_to_original_scs": 0.356916660949394
+                }
+              }
+            },
+            "DCS-BW": {
+              "chains": 40,
+              "total_generated": 16318800,
+              "total_postburn_used": 10879200,
+              "total_stored_thinned": 217584,
+              "total_sampling_seconds": 120.04030341598627,
+              "mean_sampling_seconds": 3.0010075853996567,
+              "samples_per_second": 135944.3414887833,
+              "mean_postburn_acceptance": 0.5591654127488427,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 2.034682938577039e-07,
+                  "mse_empirical_mcse": 4.496520313052835e-08,
+                  "largest_error_share": 0.14902165329806044,
+                  "largest_three_error_share": 0.35790535097980714,
+                  "leave_one_chain_out_mse_min": 1.7758678185978798e-07,
+                  "leave_one_chain_out_mse_max": 2.0868531938404663e-07,
+                  "ess_valid_chains": 40,
+                  "total_ess": 3018725.1344657247,
+                  "ess_per_sampling_second": 25147.596670133946,
+                  "mse_ratio_to_original_scs": 0.8948747589626503
+                },
+                "mean_norm": {
+                  "mse": 0.0015942661027624097,
+                  "mse_empirical_mcse": 0.00028740969671902945,
+                  "largest_error_share": 0.09199359046018037,
+                  "largest_three_error_share": 0.25965457606406434,
+                  "leave_one_chain_out_mse_min": 0.0014847218869952171,
+                  "leave_one_chain_out_mse_max": 0.0016351414867511389,
+                  "ess_valid_chains": 40,
+                  "total_ess": 2377621.560206534,
+                  "ess_per_sampling_second": 19806.860633858545,
+                  "mse_ratio_to_original_scs": 0.30609966347912637
+                }
+              }
+            },
+            "DCS-BW-reflect": {
+              "chains": 40,
+              "total_generated": 14055000,
+              "total_postburn_used": 9370000,
+              "total_stored_thinned": 187400,
+              "total_sampling_seconds": 120.05241082999419,
+              "mean_sampling_seconds": 3.0013102707498547,
+              "samples_per_second": 117073.86717875443,
+              "mean_postburn_acceptance": 0.7776526837077595,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 4.468079212303842e-08,
+                  "mse_empirical_mcse": 9.000558259105723e-09,
+                  "largest_error_share": 0.17338251125530138,
+                  "largest_three_error_share": 0.31613435620322045,
+                  "leave_one_chain_out_mse_min": 3.788094787678967e-08,
+                  "leave_one_chain_out_mse_max": 4.581383086096415e-08,
+                  "ess_valid_chains": 40,
+                  "total_ess": 7453423.113524109,
+                  "ess_per_sampling_second": 62084.7433382981,
+                  "mse_ratio_to_original_scs": 0.19651077975483988
+                },
+                "mean_norm": {
+                  "mse": 0.0009000422091870776,
+                  "mse_empirical_mcse": 0.00014288371656511262,
+                  "largest_error_share": 0.09249823750381563,
+                  "largest_three_error_share": 0.2252281417839323,
+                  "leave_one_chain_out_mse_min": 0.0008377332217007511,
+                  "leave_one_chain_out_mse_max": 0.0009230905447486315,
+                  "ess_valid_chains": 40,
+                  "total_ess": 4128688.449629227,
+                  "ess_per_sampling_second": 34390.71669685875,
+                  "mse_ratio_to_original_scs": 0.17280842694441426
+                }
+              }
+            },
+            "DCS-Billiard": {
+              "chains": 40,
+              "total_generated": 13349100,
+              "total_postburn_used": 8899400,
+              "total_stored_thinned": 177988,
+              "total_sampling_seconds": 120.05191916499098,
+              "mean_sampling_seconds": 3.0012979791247743,
+              "samples_per_second": 111194.39066737391,
+              "mean_postburn_acceptance": 0.7647176741045495,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 6.992990374983738e-08,
+                  "mse_empirical_mcse": 1.5061137712640618e-08,
+                  "largest_error_share": 0.17377824885679197,
+                  "largest_three_error_share": 0.3487702265741078,
+                  "leave_one_chain_out_mse_min": 5.925908464970936e-08,
+                  "leave_one_chain_out_mse_max": 7.172257404066455e-08,
+                  "ess_valid_chains": 40,
+                  "total_ess": 6456997.086832199,
+                  "ess_per_sampling_second": 53785.038437895804,
+                  "mse_ratio_to_original_scs": 0.3075590037933945
+                },
+                "mean_norm": {
+                  "mse": 0.0010058801917300242,
+                  "mse_empirical_mcse": 0.00022054005253958816,
+                  "largest_error_share": 0.19143736652738183,
+                  "largest_three_error_share": 0.31468204651179105,
+                  "leave_one_chain_out_mse_min": 0.0008341714223417132,
+                  "leave_one_chain_out_mse_max": 0.0010316706138012379,
+                  "ess_valid_chains": 40,
+                  "total_ess": 3781892.5190147418,
+                  "ess_per_sampling_second": 31502.14128453184,
+                  "mse_ratio_to_original_scs": 0.1931293575491426
+                }
+              }
+            },
+            "SCS": {
+              "chains": 40,
+              "total_generated": 12220200,
+              "total_postburn_used": 8146800,
+              "total_stored_thinned": 162936,
+              "total_sampling_seconds": 120.05608870799188,
+              "mean_sampling_seconds": 3.001402217699797,
+              "samples_per_second": 101787.42395750336,
+              "mean_postburn_acceptance": 0.2567742158938575,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 2.2737069273645266e-07,
+                  "mse_empirical_mcse": 3.4360077433911016e-08,
+                  "largest_error_share": 0.09349545705373558,
+                  "largest_three_error_share": 0.25942809164807407,
+                  "leave_one_chain_out_mse_min": 2.1139750348557286e-07,
+                  "leave_one_chain_out_mse_max": 2.3319593278716335e-07,
+                  "ess_valid_chains": 40,
+                  "total_ess": 1674247.2343552785,
+                  "ess_per_sampling_second": 13945.542057658484,
+                  "mse_ratio_to_original_scs": 1.0
+                },
+                "mean_norm": {
+                  "mse": 0.005208323604939625,
+                  "mse_empirical_mcse": 0.0011270355375074094,
+                  "largest_error_share": 0.1282033081679139,
+                  "largest_three_error_share": 0.3497738143785586,
+                  "leave_one_chain_out_mse_min": 0.0046570249115664925,
+                  "leave_one_chain_out_mse_max": 0.005341766041361709,
+                  "ess_valid_chains": 40,
+                  "total_ess": 1211543.0715608406,
+                  "ess_per_sampling_second": 10091.47544784366,
+                  "mse_ratio_to_original_scs": 1.0
+                }
+              }
+            }
+          },
+          "paired_comparisons": [
+            {
+              "method": "DCS-RWM",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -8.647774975135938e-08,
+              "empirical_mcse": 4.339229551997906e-08,
+              "mse_ratio": 0.61966184511037
+            },
+            {
+              "method": "DCS-RWM",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.0033493861347206623,
+              "empirical_mcse": 0.0013580419033045205,
+              "mse_ratio": 0.356916660949394
+            },
+            {
+              "method": "DCS-BW",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -2.3902398878748778e-08,
+              "empirical_mcse": 5.16910290509521e-08,
+              "mse_ratio": 0.8948747589626503
+            },
+            {
+              "method": "DCS-BW",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.0036140575021772147,
+              "empirical_mcse": 0.0012217362243633128,
+              "mse_ratio": 0.30609966347912637
+            },
+            {
+              "method": "DCS-BW-reflect",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -1.8268990061341423e-07,
+              "empirical_mcse": 3.783285154785524e-08,
+              "mse_ratio": 0.19651077975483988
+            },
+            {
+              "method": "DCS-BW-reflect",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.004308281395752548,
+              "empirical_mcse": 0.001141804387796613,
+              "mse_ratio": 0.17280842694441426
+            },
+            {
+              "method": "DCS-Billiard",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -1.5744078898661525e-07,
+              "empirical_mcse": 3.585120268345988e-08,
+              "mse_ratio": 0.3075590037933945
+            },
+            {
+              "method": "DCS-Billiard",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.0042024434132096,
+              "empirical_mcse": 0.0011683727791312042,
+              "mse_ratio": 0.1931293575491426
+            }
+          ]
+        },
+        {
+          "dimension": 500,
+          "truth": {
+            "tail_probability": 0.010679932806128877,
+            "mean_norm": 30.886489066165137
+          },
+          "methods": {
+            "DCS-RWM": {
+              "chains": 40,
+              "total_generated": 6218700,
+              "total_postburn_used": 4145800,
+              "total_stored_thinned": 82916,
+              "total_sampling_seconds": 120.12899304200619,
+              "mean_sampling_seconds": 3.003224826050155,
+              "samples_per_second": 51766.85363395556,
+              "mean_postburn_acceptance": 0.5581969123067325,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 5.23399790890748e-07,
+                  "mse_empirical_mcse": 1.1590498994463762e-07,
+                  "largest_error_share": 0.16938984015118624,
+                  "largest_three_error_share": 0.36574624984252013,
+                  "leave_one_chain_out_mse_min": 4.4588839382215376e-07,
+                  "leave_one_chain_out_mse_max": 5.367401284246859e-07,
+                  "ess_valid_chains": 40,
+                  "total_ess": 735197.7759981464,
+                  "ess_per_sampling_second": 6120.069413560019,
+                  "mse_ratio_to_original_scs": 0.1384036142121651
+                },
+                "mean_norm": {
+                  "mse": 0.022909085575636538,
+                  "mse_empirical_mcse": 0.005125541054679169,
+                  "largest_error_share": 0.1242484945175133,
+                  "largest_three_error_share": 0.3593778219978982,
+                  "leave_one_chain_out_mse_min": 0.020577093520093147,
+                  "leave_one_chain_out_mse_max": 0.023496283653873025,
+                  "ess_valid_chains": 40,
+                  "total_ess": 687934.0856383134,
+                  "ess_per_sampling_second": 5726.628253661958,
+                  "mse_ratio_to_original_scs": 0.12720384389205683
+                }
+              }
+            },
+            "DCS-BW": {
+              "chains": 40,
+              "total_generated": 5275800,
+              "total_postburn_used": 3517200,
+              "total_stored_thinned": 70344,
+              "total_sampling_seconds": 120.15735008298725,
+              "mean_sampling_seconds": 3.003933752074681,
+              "samples_per_second": 43907.42635682497,
+              "mean_postburn_acceptance": 0.5580159534506635,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 5.870879280616785e-07,
+                  "mse_empirical_mcse": 1.1717753727447902e-07,
+                  "largest_error_share": 0.1096197862885194,
+                  "largest_three_error_share": 0.29910286894214083,
+                  "leave_one_chain_out_mse_min": 5.361348460051156e-07,
+                  "leave_one_chain_out_mse_max": 6.021343167294513e-07,
+                  "ess_valid_chains": 40,
+                  "total_ess": 612419.3914552929,
+                  "ess_per_sampling_second": 5096.811730887229,
+                  "mse_ratio_to_original_scs": 0.15524479091935423
+                },
+                "mean_norm": {
+                  "mse": 0.049780298878947485,
+                  "mse_empirical_mcse": 0.013640657906741793,
+                  "largest_error_share": 0.2495691495717422,
+                  "largest_three_error_share": 0.43109089802820705,
+                  "leave_one_chain_out_mse_min": 0.03831453540748863,
+                  "leave_one_chain_out_mse_max": 0.05105665881881658,
+                  "ess_valid_chains": 40,
+                  "total_ess": 573545.1465242103,
+                  "ess_per_sampling_second": 4773.283915866059,
+                  "mse_ratio_to_original_scs": 0.27640760023315
+                }
+              }
+            },
+            "DCS-BW-reflect": {
+              "chains": 40,
+              "total_generated": 4702800,
+              "total_postburn_used": 3135200,
+              "total_stored_thinned": 62704,
+              "total_sampling_seconds": 120.14653341300072,
+              "mean_sampling_seconds": 3.003663335325018,
+              "samples_per_second": 39142.2029950231,
+              "mean_postburn_acceptance": 0.8815268720283076,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 2.4513995626353396e-07,
+                  "mse_empirical_mcse": 4.5477410999167545e-08,
+                  "largest_error_share": 0.15835181824404126,
+                  "largest_three_error_share": 0.29505205506934107,
+                  "leave_one_chain_out_mse_min": 2.116118958614755e-07,
+                  "leave_one_chain_out_mse_max": 2.513923775594953e-07,
+                  "ess_valid_chains": 40,
+                  "total_ess": 1841402.1208094975,
+                  "ess_per_sampling_second": 15326.302544907589,
+                  "mse_ratio_to_original_scs": 0.0648228305115376
+                },
+                "mean_norm": {
+                  "mse": 0.016115488689180738,
+                  "mse_empirical_mcse": 0.0037786547790724366,
+                  "largest_error_share": 0.1675419782455901,
+                  "largest_three_error_share": 0.3991543298112828,
+                  "leave_one_chain_out_mse_min": 0.01375945418851381,
+                  "leave_one_chain_out_mse_max": 0.016527261821211402,
+                  "ess_valid_chains": 40,
+                  "total_ess": 1275079.2810672408,
+                  "ess_per_sampling_second": 10612.701380939452,
+                  "mse_ratio_to_original_scs": 0.0894820572691407
+                }
+              }
+            },
+            "DCS-Billiard": {
+              "chains": 40,
+              "total_generated": 4502400,
+              "total_postburn_used": 3001600,
+              "total_stored_thinned": 60032,
+              "total_sampling_seconds": 120.1834889970196,
+              "mean_sampling_seconds": 3.0045872249254897,
+              "samples_per_second": 37462.716697396376,
+              "mean_postburn_acceptance": 0.8163961617121643,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 4.6750392676371495e-07,
+                  "mse_empirical_mcse": 1.029152356155233e-07,
+                  "largest_error_share": 0.13646738382778056,
+                  "largest_three_error_share": 0.372759060211754,
+                  "leave_one_chain_out_mse_min": 4.1405629635800663e-07,
+                  "leave_one_chain_out_mse_max": 4.794270747637602e-07,
+                  "ess_valid_chains": 40,
+                  "total_ess": 1347573.3280904556,
+                  "ess_per_sampling_second": 11212.632777900746,
+                  "mse_ratio_to_original_scs": 0.12362296326553854
+                },
+                "mean_norm": {
+                  "mse": 0.03177151107206387,
+                  "mse_empirical_mcse": 0.007108943489751473,
+                  "largest_error_share": 0.18038977091770814,
+                  "largest_three_error_share": 0.37025463314442886,
+                  "leave_one_chain_out_mse_min": 0.026707954326220345,
+                  "leave_one_chain_out_mse_max": 0.032586118277373,
+                  "ess_valid_chains": 40,
+                  "total_ess": 1037041.8802452697,
+                  "ess_per_sampling_second": 8628.82155360781,
+                  "mse_ratio_to_original_scs": 0.17641290488362385
+                }
+              }
+            },
+            "SCS": {
+              "chains": 40,
+              "total_generated": 4212000,
+              "total_postburn_used": 2808000,
+              "total_stored_thinned": 56160,
+              "total_sampling_seconds": 120.18439499801389,
+              "mean_sampling_seconds": 3.004609874950347,
+              "samples_per_second": 35046.14721461639,
+              "mean_postburn_acceptance": 0.12834753049960096,
+              "metrics": {
+                "tail_probability": {
+                  "mse": 3.7816916405694796e-06,
+                  "mse_empirical_mcse": 9.707602090353607e-07,
+                  "largest_error_share": 0.22945896738501223,
+                  "largest_three_error_share": 0.4203734641201596,
+                  "leave_one_chain_out_mse_min": 2.9886652120573067e-06,
+                  "leave_one_chain_out_mse_max": 3.8784062568150674e-06,
+                  "ess_valid_chains": 40,
+                  "total_ess": 116149.24929071957,
+                  "ess_per_sampling_second": 966.4253773764806,
+                  "mse_ratio_to_original_scs": 1.0
+                },
+                "mean_norm": {
+                  "mse": 0.18009743160809533,
+                  "mse_empirical_mcse": 0.029857648859814796,
+                  "largest_error_share": 0.11975242154073928,
+                  "largest_three_error_share": 0.2926202194253182,
+                  "leave_one_chain_out_mse_min": 0.1625952082664187,
+                  "leave_one_chain_out_mse_max": 0.18471230113164286,
+                  "ess_valid_chains": 40,
+                  "total_ess": 84801.50601288058,
+                  "ess_per_sampling_second": 705.5949818966262,
+                  "mse_ratio_to_original_scs": 1.0
+                }
+              }
+            }
+          },
+          "paired_comparisons": [
+            {
+              "method": "DCS-RWM",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -3.2582918496787315e-06,
+              "empirical_mcse": 9.920282524103726e-07,
+              "mse_ratio": 0.1384036142121651
+            },
+            {
+              "method": "DCS-RWM",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.1571883460324588,
+              "empirical_mcse": 0.030383345044966953,
+              "mse_ratio": 0.12720384389205683
+            },
+            {
+              "method": "DCS-BW",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -3.194603712507801e-06,
+              "empirical_mcse": 9.908526420566418e-07,
+              "mse_ratio": 0.15524479091935423
+            },
+            {
+              "method": "DCS-BW",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.13031713272914786,
+              "empirical_mcse": 0.033730708863646174,
+              "mse_ratio": 0.27640760023315
+            },
+            {
+              "method": "DCS-BW-reflect",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -3.5365516843059456e-06,
+              "empirical_mcse": 9.793673891364846e-07,
+              "mse_ratio": 0.0648228305115376
+            },
+            {
+              "method": "DCS-BW-reflect",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.1639819429189146,
+              "empirical_mcse": 0.030522927732516168,
+              "mse_ratio": 0.0894820572691407
+            },
+            {
+              "method": "DCS-Billiard",
+              "reference": "SCS",
+              "metric": "tail_probability",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -3.314187713805765e-06,
+              "empirical_mcse": 9.549018731366193e-07,
+              "mse_ratio": 0.12362296326553854
+            },
+            {
+              "method": "DCS-Billiard",
+              "reference": "SCS",
+              "metric": "mean_norm",
+              "paired_chains": 40,
+              "difference_definition": "method squared error minus reference squared error",
+              "mse_difference": -0.14832592053603147,
+              "empirical_mcse": 0.028433641862369463,
+              "mse_ratio": 0.17641290488362385
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "protocol": {
+    "backend": "JAX CPU",
+    "workers": 2,
+    "seconds_per_chain": 3.0,
+    "fixed_warmup_transitions": 1500,
+    "burn_fraction": "first third of actual production iterations",
+    "adaptation_during_sampling": false,
+    "original_VI": {
+      "updates_per_family": 1000,
+      "fixed_reference_draws_per_family": 2000
+    },
+    "production_time_excludes": [
+      "fitting",
+      "extra R/h and centre development",
+      "compilation",
+      "separate warmup",
+      "ESS calculations",
+      "final file/report generation"
+    ],
+    "extra_calibration_disclosure": "DCS production map and R/h are developed overrides. Original SCS retains original VI and h=.1. Total development resources are not matched in this baseline comparison."
+  },
+  "environment": {
+    "platform": "macOS-15.6-arm64-arm-64bit",
+    "python": "3.12.14",
+    "backend": "cpu",
+    "worker_scheduling": "OS managed; no strict CPU pinning",
+    "numerical_packages": {
+      "numpy": "1.26.4",
+      "scipy": "1.14.1",
+      "jax": "0.4.35",
+      "jaxlib": "0.4.35",
+      "optax": "0.2.5",
+      "arviz": "0.19.0",
+      "matplotlib": "3.9.4"
+    }
+  },
+  "statistical_scope": "Conditional sampling replication at retained fits/parameters; radial-only metrics. Empirical squared-error uncertainty is descriptive for nu3.",
+  "estimator": "All post-burn-in samples including rejection repeats; equal-chain MSE. Sum per-chain unthinned functional ESS, not pooled-estimator ESS."
+}

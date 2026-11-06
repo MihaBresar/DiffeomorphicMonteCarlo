@@ -1,10 +1,18 @@
 # Reviewer guide
 
+The launcher now defaults to the [reported zero-centre study](REPORTED_STUDY.md),
+whose frozen maps, original results and calibration provenance are bundled in
+`studies/zero_centre`. It is distinct from the fitted-centre version-11 protocol
+discussed below. Its extra DCS development must not be described as equal total
+tuning effort against original SCS.
+
 This repository supports inspection and independent reruns of the corrected experiments and subsequent sampler extensions. Start with a small execution check, then inspect the recorded protocol before interpreting comparisons. The source commit and run manifest, rather than a figure filename, identify a result.
 
 ## Scope and evidence
 
-The current JAX and optimized-Numba comparisons use version 11. They compare DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard on 100D/500D normal-CDF-skewed t(3) targets, with VI fitted for both map families. Billiards and reflected BW are subsequent extensions. The current suite measures radial-tail probability and mean norm for fitted sampling procedures. It cannot separate proposal geometry from map-fitting effects or establish coordinate, no-VI or general sampler superiority.
+The default reported-study comparison loads bundled full-budget maps without refitting. All four DCS variants use the recorded zero-centre, zero-deformation maps and calibrated radius/step settings; SCS retains its original author-fitted map and h=0.1. Its JAX results and development record are bundled, while the Numba option is an implementation extension using those settings.
+
+The separately retained **earlier fitted-map** JAX and optimized-Numba comparisons use version 11. They compare DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard on 100D/500D normal-CDF-skewed t(3) targets, with VI fitted for both map families. Billiards and reflected BW are subsequent extensions. Both recipes measure radial-tail probability and mean norm for the recorded sampling procedures. They cannot separate proposal geometry from map preparation or establish coordinate, no-VI or general sampler superiority.
 
 Current runs incorporate implementation and calibration corrections and do not reproduce or validate the original manuscript figures retrospectively. The [manuscript relationship](MANUSCRIPT_CHANGES.md) identifies their scope. The [version-9 SCS study](AUTHOR_SCS_CALIBRATION.md) documents the SCS step-policy choice and reports both fixed and acceptance-tuned outcomes; it does not validate the v11 shared DCS step setting.
 
@@ -13,14 +21,18 @@ Current runs incorporate implementation and calibration corrections and do not r
 Install Python 3.12 and the pinned CPU dependencies using the [README](../README.md). The desktop launcher provides the same experiment choices. From an activated environment:
 
 ```sh
-python run_experiment.py sampler-comparison --preset quick --workers 1 --dry-run
-python run_experiment.py sampler-comparison --preset quick --workers 1 --output-dir results/reviewer-check
+python run_experiment.py reported-zero-centre --preset quick --workers 1 --dry-run
+python run_experiment.py reported-zero-centre --preset quick --workers 1 --output-dir results/reviewer-check
 python run_experiment.py --plot-only results/reviewer-check
 ```
 
-Confirm a complete manifest and open `paper_values.html`. A quick result checks execution only. The smaller preset uses 20 chains × 2 seconds; full settings use 50 chains × 20 seconds. Use a fresh output directory each time. VI is mandatory for new comparisons. To examine the dimensional extension, select `--target skew-t-500d`.
+Confirm a complete manifest and open `paper_values.html`. A quick result checks execution only. The reported-study smaller preset uses 20 chains × 3 seconds; full settings use 50 chains × 20 seconds. Every preset loads the same bundled maps without refitting. The default fresh sampling batch is 22; batches 20 and 21 repeat the reported streams, with hardware-dependent timed counts. Use a fresh output directory each time. To examine the dimensional extension, select `--target skew-t-500d`.
 
-## Review checklist
+For this default study, verify the bundled map hashes, effective zero-centre DCS maps, recorded radius/step choices and calibration provenance against [the reported-study protocol](REPORTED_STUDY.md). Equal sampling time and discarded warmup do not match the additional DCS preparation effort.
+
+## Review checklist for the earlier fitted-map version-11 recipe
+
+The fitting budgets, fitted-centre descriptions and h=0.07 below apply to `sampler-comparison` and `sampler-comparison-numba`, not the default reported-study entry.
 
 | Check | Evidence and interpretation |
 |---|---|
@@ -41,22 +53,22 @@ Confirm a complete manifest and open `paper_values.html`. A quick result checks 
 
 SCS's default h=0.1 is its authors' skew-t setting. The version-9 development study also tested acceptance adaptation toward 0.234 under the same target, maps, seeds and discarded transition budget. The disclosed rule retained adaptation only if its observed MSE improved both radial functions in the full-author-VI 100D pair and the no-VI pair; otherwise it selected fixed h=0.1 globally. Adaptation failed that rule. All reduced-fit and full-fit outcomes are retained in the [study report](AUTHOR_SCS_CALIBRATION.md).
 
-This is a development choice based on 100D evidence, not a proof of optimal tuning. The unchanged author VI routine at full settings uses its original 1,000-update/2,000-draw budget; quick and smaller presets deliberately abbreviate that budget. Using the same author routine and h=0.1 in 500D is an extension, not a reproduction of an author 500D experiment or a separately optimized 500D setting.
+This is a development choice based on 100D evidence, not a proof of optimal tuning. The unchanged author VI routine at full settings uses its original 1,000-update/2,000-draw budget; the earlier fitted-map recipe's quick and smaller presets deliberately abbreviate that budget. The reported study instead loads its full-budget maps at every run size. Using the same author routine and h=0.1 in 500D is an extension, not a reproduction of an author 500D experiment or a separately optimized 500D setting.
 
-Version 10 changed the full DCS fitting budget from 1,500 to 1,000 updates and introduced fixed clouds for both families. Version 11 preserves those maps and equal fitting resources, but changes all four DCS variants to the shared fixed covariance-matched move above. Public entry points use the preset h=0.07 automatically, without manual step choices. Historical studies retain their recorded settings. No optimality or guaranteed ranking is asserted for the preset. Fresh-cloud VI for both families remains a separate experimental study, not a public default.
+Version 10 changed the full DCS fitting budget from 1,500 to 1,000 updates and introduced fixed clouds for both families. Version 11 preserves those maps and equal fitting resources, but changes all four DCS variants to the shared fixed covariance-matched move above. The earlier fitted-map entry points use the preset h=0.07 automatically, without manual step choices. Historical studies retain their recorded settings. No optimality or guaranteed ranking is asserted for that preset. Fresh-cloud VI for both families remains a separate experimental study, not a public default.
 
 Freeze the version-11 protocol before evaluating a fresh, previously uninspected full-paper sampling batch. Rerun all five methods together and report the new batch separately from the version-9 and later development studies. A changed protocol after inspecting results needs a new independent assessment and disclosure. This guide does not assert that a new full batch has completed.
 
-The active comparison contains only author SCS VI and fixed h=0.1. Historical
+Both public five-method recipes contain only author SCS VI and fixed h=0.1. Historical
 step-policy sensitivity results remain in the archived study; they are not
 active baseline choices. Retaining the original baseline does not establish
 equally optimal tuning or isolate the transition geometry.
 
-Zero-centre DCS experiments are separate development studies. They change the
-production centre after VI and may also use pilot-selected radius/step values
-and post-Möbius coordinates for every DCS variant. The current public defaults
-retain fitted centres, use h=0.07, and use post-Möbius coordinates only for
-billiards. A comparison of a developed DCS variant against original SCS is a
+The reported zero-centre study records a later development stage. It changes the
+production centre after VI and uses pilot-selected radius/step values
+and post-Möbius coordinates for every DCS variant. It is now the default launcher
+entry; the earlier fitted-map recipe retains fitted centres, uses h=0.07,
+and uses post-Möbius coordinates only for billiards. A comparison of a developed DCS variant against original SCS is a
 valid declared-baseline experiment, but its additional target-specific
 development resources are not matched preparation for the two methods.
 Report that scope, retain the development record and assess frozen choices

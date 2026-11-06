@@ -32,6 +32,11 @@ jobs:
       - run: python -m unittest discover -s tests -v
       - run: python scripts/check_draw_storage.py --output results/ci-draw-storage.json
       - run: python -m examples.basic_sampler
+      - name: Reported zero-centre JAX study (100D)
+        run: python run_experiment.py reported-zero-centre --target skew-t-100d --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-reported-100d-jax
+      - run: python run_experiment.py --plot-only results/ci-reported-100d-jax
+      - name: Reported parameters Numba extension (500D)
+        run: python run_experiment.py reported-zero-centre-numba --target skew-t-500d --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-reported-500d-numba
       - run: python run_experiment.py sampler-comparison --target skew-t-100d --preset quick --runs 3 --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-single-scs
       - run: python run_experiment.py --plot-only results/ci-single-scs
       - run: python scripts/reproduce_scs_step_control.py results/ci-single-scs --output-dir results/ci-scs-acceptance
@@ -76,3 +81,5 @@ jobs:
             results/ci-draw-storage.json
             results/ci-garch11
             results/ci-logistic
+            results/ci-reported-100d-jax
+            results/ci-reported-500d-numba

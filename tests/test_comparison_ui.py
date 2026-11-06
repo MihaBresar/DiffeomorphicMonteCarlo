@@ -117,7 +117,8 @@ class ComparisonUiTests(unittest.TestCase):
         self.assertNotIn('<select id="vi"', page)
         self.assertNotIn('<select id="ball-map-policy"', page)
         self.assertNotIn('Without VI', page)
-        self.assertIn("vi:'on'", page)
+        # Earlier comparisons still enforce VI through their command route;
+        # the reported study loads fixed maps and sends no fitting choice.
 
     def test_launcher_forwards_every_mode_target_with_vi_enabled(self):
         for experiment in launcher.COMPARISONS:

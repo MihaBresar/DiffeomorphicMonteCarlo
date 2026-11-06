@@ -5,6 +5,7 @@ rejections. The first third of each timed sampling run is discarded. Each method
 """
 import argparse
 import concurrent.futures
+import copy
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -117,7 +118,7 @@ def _wave_cpu_ids(config, hardware):
 def source_hashes():
     paths = list((ROOT/'dcs_bench').glob('*.py')) + list((ROOT/'third_party/scs_paper').rglob('*.py'))
     paths += [Path(__file__), ROOT/'scripts/reproduce_boundary_100d.py', ROOT/'scripts/reproduce_comparison.py',
-              ROOT/'scripts/scs_100d_figures.py', ROOT/'requirements-cpu.txt']
+              ROOT/'scripts/reproduce_reported_study.py', ROOT/'scripts/scs_100d_figures.py', ROOT/'requirements-cpu.txt']
     return {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 
 
@@ -382,7 +383,16 @@ def summarize(config, maps, fitting, records, reference=None):
                          'More chains estimate error more precisely but cannot repair insufficient chain mixing.')
 
 
-def run(config, output):
+def run(config, output, *, prepared_inputs=None, prepared_input_load_seconds=None):
+    input_validation_started = time.perf_counter()
+    if prepared_input_load_seconds is not None:
+        if (prepared_inputs is None or isinstance(prepared_input_load_seconds, bool)
+                or not np.isfinite(prepared_input_load_seconds) or prepared_input_load_seconds < 0):
+            raise ValueError('Prepared-input loading time must be finite and nonnegative')
+    if config.get('protocol') in ('timed-reported-zero-centre-v1', 'timed-reported-zero-centre-numba-v1'):
+        from dcs_bench.reported_study import load_prepared
+        if prepared_inputs != load_prepared(config):
+            raise ValueError('Reported-study runs require the exact bundled prepared inputs')
     if config.get('experiment') in ('sampler-comparison', 'sampler-comparison-numba'):
         if (config.get('vi') != 'on' or config.get('vi_enabled') is not True
                 or config.get('ball_map_policy') != 'mobius'
@@ -391,6 +401,12 @@ def run(config, output):
         if config.get('protocol') in ('timed-sampler-comparison-v10', 'timed-numba-comparison-v10', 'timed-sampler-comparison-v11', 'timed-numba-comparison-v11'):
             from dcs_bench.tuning import validate_matched_vi
             validate_matched_vi(config)
+    if prepared_inputs is not None:
+        if set(prepared_inputs) != {'maps', 'fitting', 'provenance'}:
+            raise ValueError('Prepared inputs require maps, fitting, and provenance')
+        prepared_inputs = copy.deepcopy(prepared_inputs)
+        prepared_input_load_seconds = ((prepared_input_load_seconds or 0.)
+            + time.perf_counter() - input_validation_started)
     output = Path(output).resolve()
     if output.exists() and any(output.iterdir()):
         raise FileExistsError(f'Choose a fresh output folder: {output}')
@@ -399,6 +415,9 @@ def run(config, output):
     manifest = dict(status='running', protocol=config['protocol'], config=config,
                     source_hashes=source_hashes(), environment=environment(), hardware=cpu_info(),
                     started_utc=datetime.now(timezone.utc).isoformat(), time_scope=config.get('time_scope', TIME_SCOPE))
+    if prepared_inputs is not None:
+        manifest['prepared_input_provenance'] = prepared_inputs['provenance']
+        manifest['prepared_input_load_seconds'] = prepared_input_load_seconds
     write_json(output/'configuration.json', config)
     write_json(output/'manifest.json', manifest)
     try:
@@ -410,7 +429,11 @@ def run(config, output):
             reference = comparison_reference(config)
             manifest['reference_seconds'] = time.perf_counter()-reference_started
             write_json(output/'reference.json', reference)
-        maps, fitting = prepare(config)
+        if prepared_inputs is None:
+            maps, fitting = prepare(config)
+        else:
+            maps, fitting = prepared_inputs['maps'], prepared_inputs['fitting']
+            write_json(output/'prepared_input_provenance.json', prepared_inputs['provenance'])
         method_maps = effective_method_maps(config, maps)
         write_json(output/'maps.json', {'maps': maps, 'method_maps': method_maps, 'fitting': fitting})
         write_json(output/'method_maps.json', method_maps)
@@ -418,6 +441,9 @@ def run(config, output):
         write_json(output/'manifest.json', manifest)
         records = run_chains(output, config, maps)
         summary = summarize(config, maps, fitting, records, reference=reference)
+        if prepared_inputs is not None:
+            summary['prepared_input_provenance'] = prepared_inputs['provenance']
+            summary['prepared_input_load_seconds'] = prepared_input_load_seconds
         write_json(output/'summary.json', summary)
         from scripts.scs_100d_figures import render_report
         render_report(output, summary)

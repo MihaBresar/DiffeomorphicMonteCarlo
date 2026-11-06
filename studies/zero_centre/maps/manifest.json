@@ -1,0 +1,69 @@
+{
+  "schema": "reported-zero-centre-map-assets-v1",
+  "dimensions": {
+    "100": {
+      "file": "full_budget_100d.json",
+      "bytes": 78386,
+      "sha256": "dfbc1d209e47aae0364bb3d456d9325719a770981769764da5c37cb6c8cc344b",
+      "original_source": "review/matched_fixed_vi/full_budget_100d.json",
+      "original_source_sha256": "dfbc1d209e47aae0364bb3d456d9325719a770981769764da5c37cb6c8cc344b",
+      "bundled_copy": "byte-identical original fitting artifact; no personal or absolute paths",
+      "production_dcs": {
+        "scale": 0.6941299233184104,
+        "h": 0.025,
+        "beta": 2.0,
+        "mu_policy": "zero",
+        "delta_policy": "zero"
+      },
+      "production_scs": {
+        "mapping": "unchanged bundled original sphere map",
+        "h": 0.1
+      },
+      "selected_dcs_candidate": "DCS-BW-r0-h0"
+    },
+    "500": {
+      "file": "full_budget_500d.json",
+      "bytes": 127567,
+      "sha256": "469fda353c1c3afe4187473cbaf876b67e569f7961ed8e6e3f311e27460b9322",
+      "original_source": "review/matched_fixed_vi/full_budget_500d.json",
+      "original_source_sha256": "469fda353c1c3afe4187473cbaf876b67e569f7961ed8e6e3f311e27460b9322",
+      "bundled_copy": "byte-identical original fitting artifact; no personal or absolute paths",
+      "production_dcs": {
+        "scale": 1.3882232419648068,
+        "h": 0.044721359549995794,
+        "beta": 2.0,
+        "mu_policy": "zero",
+        "delta_policy": "zero"
+      },
+      "production_scs": {
+        "mapping": "unchanged bundled original sphere map",
+        "h": 0.1
+      },
+      "selected_dcs_candidate": "DCS-BW-r1-h2"
+    }
+  },
+  "original_fit_budget_per_family": {
+    "optimizer_steps": 1000,
+    "optimizer_samples": 2000,
+    "fixed_reference_cloud": true
+  },
+  "development_provenance": {
+    "pilot_results_sha256": "e61132ef97b6486a12f13c2d06c747a6c3b8b2a5ccd807402f9410c8e0951fac",
+    "assessment_plan_sha256": "a01826802eaadab289ec8562e8e4ab08481a27c99d3fffaeef9289cf754291f1",
+    "centre_diagnostic": {
+      "results_sha256": "106326a612fb5c8881d5c004d5b2f6fd893cb2efd73aa8e81d09554ff8c7eeb7",
+      "validation_sha256": "4ca56219da5fb5eb0c555b1305b06ed8a176dd3e5827f107cd088efb55b947bb",
+      "plan_sha256": "19060ff8a9ae07aa8d9f0d3e88365539d575bca309b749ac0510dd8283472c11",
+      "selection_scope": "Zero-centre choice developed after the completed stationary diagnostic, before fresh batch20 assessment. No new R/h calibration or VI fitting; no selection among assessment outcomes."
+    },
+    "dcs_oracle_pilot": {
+      "candidates": 16,
+      "exact_target_starts_per_candidate": 4096,
+      "transitions_per_start": 8,
+      "transitions_total": 524288,
+      "objective": "minimum of normalized lag-8 radial-CDF and tail-indicator movement",
+      "selection_scope": "R and h selected using stationary exact-target pilot, not assessment MSE"
+    },
+    "scope": "DCS zero-centre/post-Mobius production map is a declared intervention after original joint VI and an additional oracle-assisted radius/step pilot. Original SCS uses its unchanged author VI and fixed h=0.1. These are not identical fitting/tuning resources. No new fitting or tuning is performed by this preset."
+  }
+}

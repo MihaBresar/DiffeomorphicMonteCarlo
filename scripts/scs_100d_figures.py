@@ -197,7 +197,12 @@ def render_report(root, summary):
     figures = root/'figures'
     figures.mkdir(exist_ok=True)
     cases, config = summary['cases'], summary['config']
-    suite = config.get('protocol') in ('timed-sampler-comparison-v1', 'timed-numba-comparison-v1',
+    reported_study = config.get('protocol') in ('timed-reported-zero-centre-v1',
+                                               'timed-reported-zero-centre-numba-v1')
+    if reported_study:
+        from dcs_bench.reported_study import validate_reported_summary
+        validate_reported_summary(summary)
+    suite = reported_study or config.get('protocol') in ('timed-sampler-comparison-v1', 'timed-numba-comparison-v1',
                                       'timed-sampler-comparison-v2', 'timed-numba-comparison-v2',
                                       'timed-sampler-comparison-v3', 'timed-numba-comparison-v3',
                                       'timed-sampler-comparison-v4', 'timed-numba-comparison-v4',
@@ -207,23 +212,23 @@ def render_report(root, summary):
                                       'timed-sampler-comparison-v9', 'timed-numba-comparison-v9',
                                       'timed-sampler-comparison-v10', 'timed-numba-comparison-v10',
                                       'timed-sampler-comparison-v11', 'timed-numba-comparison-v11')
-    optimized = config.get('protocol') in ('timed-numba-comparison-v1', 'timed-numba-comparison-v2',
+    optimized = config.get('protocol') in ('timed-reported-zero-centre-numba-v1', 'timed-numba-comparison-v1', 'timed-numba-comparison-v2',
                                           'timed-numba-comparison-v3', 'timed-numba-comparison-v4', 'timed-numba-comparison-v5', 'timed-numba-comparison-v7', 'timed-numba-comparison-v8', 'timed-numba-comparison-v9', 'timed-numba-comparison-v10', 'timed-numba-comparison-v11')
-    radial_ess = config.get('protocol') in ('timed-sampler-comparison-v7', 'timed-numba-comparison-v7',
+    radial_ess = reported_study or config.get('protocol') in ('timed-sampler-comparison-v7', 'timed-numba-comparison-v7',
                                             'timed-sampler-comparison-v8', 'timed-numba-comparison-v8',
                                       'timed-sampler-comparison-v9', 'timed-numba-comparison-v9',
                                       'timed-sampler-comparison-v10', 'timed-numba-comparison-v10',
                                       'timed-sampler-comparison-v11', 'timed-numba-comparison-v11')
-    own_kernel = config.get('protocol') in ('timed-sampler-comparison-v8', 'timed-numba-comparison-v8',
+    own_kernel = reported_study or config.get('protocol') in ('timed-sampler-comparison-v8', 'timed-numba-comparison-v8',
                                       'timed-sampler-comparison-v9', 'timed-numba-comparison-v9',
                                       'timed-sampler-comparison-v10', 'timed-numba-comparison-v10',
                                       'timed-sampler-comparison-v11', 'timed-numba-comparison-v11')
-    author_vi_protocol = config.get('protocol') in ('timed-sampler-comparison-v9', 'timed-numba-comparison-v9',
+    author_vi_protocol = reported_study or config.get('protocol') in ('timed-sampler-comparison-v9', 'timed-numba-comparison-v9',
                                       'timed-sampler-comparison-v10', 'timed-numba-comparison-v10',
                                       'timed-sampler-comparison-v11', 'timed-numba-comparison-v11')
-    matched_vi = config.get('protocol') in ('timed-sampler-comparison-v10', 'timed-numba-comparison-v10',
+    matched_vi = reported_study or config.get('protocol') in ('timed-sampler-comparison-v10', 'timed-numba-comparison-v10',
                                       'timed-sampler-comparison-v11', 'timed-numba-comparison-v11')
-    v11 = config.get('protocol') in ('timed-sampler-comparison-v11', 'timed-numba-comparison-v11')
+    v11 = reported_study or config.get('protocol') in ('timed-sampler-comparison-v11', 'timed-numba-comparison-v11')
     author_fitting = (author_vi_protocol or config.get('sphere_map_policy') == 'author-paper-vi'
                       or config.get('scs_fitting_revision') == 'author-vi-v1'
                       or summary.get('fitting', {}).get('sphere', {}).get('map_policy') == 'SCS-paper-VI')
@@ -326,7 +331,7 @@ def render_report(root, summary):
                   ' — seven samplers, JAX' if has_billiard else
                   ' — six samplers, JAX' if has_rwm_rotation else
                   ' — five samplers, JAX' if has_rotation else ' — four samplers, JAX')
-        title += ' — VI '+str(vi_mode)
+        title += ' — reported zero-centre study' if reported_study else ' — VI '+str(vi_mode)
     elif boundary:
         title += ' — boundary comparison'
     budget = (f"{config['runs']} chains per method; {number(config['time_budget'])} s of timed sampling per chain; "
@@ -384,6 +389,10 @@ def render_report(root, summary):
         tuning_note = tuning_note.replace('matched map fitting and step tuning', 'method-specific map fitting and step tuning')
         tuning_note += (' SCS uses the original author VI routine.' if vi_mode == 'on'
                         else ' Both maps are untuned; VI is disabled.')
+    if reported_study:
+        tuning_note = ('Frozen study maps; DCS centre/deformation zero, shared h='+
+                       ('0.025' if dimension == 100 else '1/√500')+
+                       '; original SCS h=0.1. No refitting or step adaptation. Prior DCS calibration is additional.')
     x = np.arange(1, len(names)+1)
     colors = [COLORS[name] for name in names]
     figure_names = []
@@ -837,6 +846,9 @@ def render_report(root, summary):
                         if vi_mode == 'on' else 'Post-Mobius ball; untuned unit map, effective delta=0')
                        if name == 'DCS-Billiard' else 'Sphere' if name == 'SCS' else
                        'Fitted ball' if vi_mode == 'on' else 'Untuned ball')
+        if reported_study:
+            coordinates = ('Frozen original author-fitted sphere' if name == 'SCS' else
+                           'Frozen study ball: centre=0, delta=0, prior calibrated R, beta=2')
         effective_rows.append(dict(method=name, coordinates=coordinates, **parameters))
         effective_summaries.append(dict(method=name, coordinates=coordinates,
             scale_R=parameters.get('scale'), centre_norm=float(np.linalg.norm(parameters.get('mu', []))),
@@ -1176,6 +1188,40 @@ def render_report(root, summary):
                               'recorded author fitting and benchmark tuning protocol')
                       .replace('shared fitting and tuning budgets', 'separately recorded fitting and tuning budgets')
                  for note in notes]
+    if reported_study:
+        notes = [
+            'Reported zero-centre study: the original full-budget VI maps are bundled and reused. '
+            'No optimizer or radius/step calibration runs during this invocation. The first reported '
+            'study used JAX, two workers, two batches of 20 chains and 3 seconds per chain. '
+            'The Full paper preset extends the sampling budget with the same frozen parameters.',
+            'All four DCS variants use physical centre zero, deformation zero and beta=2. '
+            'The frozen radius R and common proposal radius h come from the prior study. '
+            'Gaussian RWM uses sigma=h/sqrt(d+2). These are post-fit choices, not a constrained VI refit. '
+            'Original fitted vectors and losses remain separate from the actual production maps.',
+            'SCS retains the exact original author-VI sphere map, latitude 1.1 and fixed h=0.1. '
+            'Its centre, observer and radius are not replaced by the DCS choices. The author '
+            'transition and VI sources are pinned; this applies them to the common normal-CDF skew-t target.',
+            'The original fits each used 1,000 updates on a fixed 2,000-point reference cloud. '
+            'DCS additionally received a radius/step pilot and centre diagnostic during development. '
+            'This compares developed DCS settings with original-author SCS settings, not equal total '
+            'tuning resources or a change of sampling kernel alone. Preparation costs are excluded from sampling time.',
+            'Every method starts its 1,500 fixed-step warmup transitions at the same physical all-ones '
+            'point. Warmup is discarded separately. The first third of timed production iterations is '
+            'also discarded, and every remaining state, including rejection repeats, enters the estimates.',
+            'The two radial reference values are analytic. MSE and functional ESS concern mean norm '
+            'and radial-tail probability only; they do not establish coordinate or angular mixing. '
+            'New runs assess sampling variability conditional on the frozen maps, not fitting variability.',
+            'Setup tables retain the original fitting budgets and historical fitting seconds. '
+            'Current fitting seconds are zero because maps are loaded; asset loading, compilation, '
+            'warmup, ESS computation and saving are outside the production clock. Actual timing and '
+            '300-transition batch overshoot are recorded. Equal seed inputs do not ensure identical '
+            'sample counts or MSE on different computers under a time budget.',
+            ('Numba extension: DCS uses optimized Numba production and SCS uses original author JAX. '
+             'This is an extension of the reported JAX experiment, not a reproduction of its measured '
+             'throughput. Both retain the same frozen maps, step rules and summary definitions.' if optimized else
+             'All five methods use the same JAX timing and full-state recording framework. '
+             'Methods run in synchronized equal-size worker waves with rotating method order.'),
+        ]
     if radial_ess:
         notes.append('Functional ESS is computed for the unthinned post-burn-in radial-tail indicator and norm, '
                      'including repeated states after rejection. It uses raw mean ESS with split-chain '
@@ -1214,7 +1260,11 @@ def render_report(root, summary):
 <title>Sampler comparison</title><style>body{font:15px/1.55 system-ui,sans-serif;max-width:1450px;margin:auto;padding:28px;color:#24354b;background:#f6f8fb}h1,h2{line-height:1.2}h2{margin-top:32px}a{color:#5a429c}figure{margin:24px 0;padding:10px;background:white;border-radius:8px}img{max-width:100%;height:auto}figcaption{font-size:13px;color:#566579}.table-wrap{overflow:auto;background:white}table{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}td,th{padding:8px;border:1px solid #dee4ee;text-align:left;white-space:nowrap}td{font-family:ui-monospace,monospace}th{background:#eaf0f8}.warning{padding:12px;background:#fff0cf;border-left:4px solid #a4670d}li{margin-bottom:8px}</style></head><body>'''
     page += '<h1>'+html.escape(title)+(' — equal sampling time' if timed else ' — original comparison protocol')+'</h1>'+warning+'<p>'+html.escape(budget)+'.</p>'
     if suite:
-        page += '<p>Target: '+html.escape(target_title)+'; VI '+html.escape(str(vi_mode))+' for both map families; DCS β = '+number(config.get('beta', 2.))+'.</p>'
+        fit_description = ('frozen full-budget VI maps with recorded DCS post-fit overrides; no refitting'
+                           if reported_study else 'VI '+str(vi_mode)+' for both map families')
+        page += '<p>Target: '+html.escape(target_title)+'; '+html.escape(fit_description)+'; DCS β = '+number(config.get('beta', 2.))+'.</p>'
+    if reported_study:
+        page += '<p><strong>Reported study protocol.</strong> This uses the bundled zero-centre DCS settings, not the previous fitted-centre h=0.07 comparison. Full parameters and preparation provenance are saved with this run.</p>'
     if config.get('protocol'):
         page += '<p>Recorded protocol: <code>'+html.escape(config['protocol'])+'</code>.</p>'
     if config.get('implementation_revision'):
@@ -1234,9 +1284,12 @@ def render_report(root, summary):
     if paired_rows:
         page += '<h2>Paired MSE differences from SCS</h2><p>Negative differences favor the named method. Empirical MCSE is descriptive; it is not a confidence interval.</p>'+_table(paired_rows)
     if setup_rows:
-        page += '<h2>Map fitting excluded from production time</h2>'+_table(setup_rows)
+        page += ('<h2>Original map fitting provenance — maps reused without refitting</h2>' if reported_study else
+                 '<h2>Map fitting excluded from production time</h2>')+_table(setup_rows)
     if effective_summaries:
-        page += '<h2>Effective maps used by each sampler</h2><p>Shared fitted parameters and production coordinates are distinct for DCS-Billiard. Full vectors are in <a href="effective_maps.csv">effective_maps.csv</a> and the saved summary.</p>'+_table(effective_summaries)
+        map_description = ('All four DCS methods use the same frozen zero-centre, zero-deformation map; SCS retains its original author-fitted map.' if reported_study else
+                           'Shared fitted parameters and production coordinates are distinct for DCS-Billiard.')
+        page += '<h2>Effective maps used by each sampler</h2><p>'+map_description+' Full vectors are in <a href="effective_maps.csv">effective_maps.csv</a> and the saved summary.</p>'+_table(effective_summaries)
     if tuning_summaries:
         reflected_heading = 'Reflected-step pilot tuning and frozen steps' if has_rwm_rotation else 'Reflected BW pilot tuning and frozen steps'
         page += '<details><summary>'+reflected_heading+'</summary><p>The score is the mean squared jump in ball coordinates, including zero movement after rejection. It is not an MSE estimate. Full pilot candidates are available in <a href="reflected_tuning.csv">reflected_tuning.csv</a> and the saved summary.</p>'+_table(tuning_summaries)+'</details>'

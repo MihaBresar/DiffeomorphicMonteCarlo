@@ -90,7 +90,10 @@ class RWMRotationReportTests(unittest.TestCase):
                     render.assert_called_once()
                     run.assert_not_called()
         page = (Path(__file__).resolve().parents[1]/'launcher/index.html').read_text(encoding='utf-8')
-        for text in ('Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)', 'Five samplers: optimized Numba DCS versus SCS',
+        for text in ('Reported study: zero-centre DCS vs original SCS (JAX)',
+                     'Reported-study parameters: Numba extension',
+                     'Earlier fitted-map comparison: five samplers (JAX)',
+                     'Earlier fitted-map comparison: Numba DCS vs SCS',
                      'DCS-RWM', 'DCS-BW', 'DCS-Billiard', 'functional ESS'):
             self.assertIn(text,page)
 

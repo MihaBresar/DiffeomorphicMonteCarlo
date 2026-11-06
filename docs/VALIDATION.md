@@ -1,5 +1,31 @@
 # Validation
 
+## Reported zero-centre study
+
+On 6 November 2026, the complete local regression suite passed **426 tests**.
+The [release validation record](../validation/reported_study_release.json)
+summarizes its scope and the execution checks below.
+
+The default launcher experiment now reproduces the [reported study](REPORTED_STUDY.md),
+using its frozen full-budget map assets, zero DCS centre and deformation, and
+dimension-specific preset radii and steps. It does not refit maps or select steps
+during a new run. The earlier fitted-map version-11 recipe remains separately named.
+
+Independent checks compared **36 preset configurations** with the original study:
+both dimensions and implementations, all three run sizes, and both recorded seed
+batches plus the fresh default batch. Map parameters, proposal scales, target,
+warmup, burn-in and reporting rules matched the declared study settings. All four
+Quick executions (JAX/Numba, 100D/500D) completed, covering **40 production chains**
+and 20 generated figure families. Checks verified frozen-map provenance, unchanged
+original SCS, exact first-third burn-in and unthinned functional ESS. The Numba
+option is explicitly labelled an extension of the original JAX study.
+
+These are execution and configuration checks, not new performance benchmarks.
+Some Quick executions overlapped in time; their timings must not be used to rank
+samplers. The bundled reported results preserve both original sampling batches,
+all 400 active-method chain records and the pooled analysis. Additional DCS
+development and conditional-on-fit limitations are documented with the study.
+
 ## Identity-map and fixed-SCS follow-up
 
 The JAX ball transform now skips Möbius arithmetic only when every supplied
@@ -38,7 +64,7 @@ is made. Compare fresh complete cohorts when assessing timed performance
 after an implementation update. The larger historical validation counts
 below retain their original release scope.
 
-## Current version-11 scope
+## Earlier fitted-map version-11 scope
 
 Version 11 uses one shared DCS move: fixed BW/reflected-BW/billiard increment
 radius h=0.07 and Gaussian RWM coordinate standard deviation h/√(d+2).
@@ -48,7 +74,7 @@ step overrides. Historical mixed-policy tests remain separate; they cover
 acceptance-target 0.234 for ordinary RWM/BW, ball-movement pilots for reflected
 BW and radial-movement pilots for billiards. Version-10 fixed-cloud VI budgets and
 maps remain unchanged. Fresh sampling is needed to evaluate the new step
-policy. Experimental fresh-cloud VI studies do not change this public default.
+policy. This recipe remains available separately from the default reported study.
 
 Local validation covered **386 regression checks**: the full suite plus a
 successful targeted rerun after updating a historical calibration fixture.
@@ -135,7 +161,8 @@ The regression suite checks:
 
 The public experiment checks cover both comparison implementations,
 100D/500D targets. New comparisons require VI; saved-report and lower-level
-checks retain coverage of earlier untuned maps. They also exercise the 200D NUTS comparison,
+checks retain coverage of earlier untuned maps. The reported-study entry points
+load verified frozen VI assets. They also exercise the 200D NUTS comparison,
 200D random-walk baselines, the 50D super-heavy-tail target, Eight Schools,
 GARCH and both logistic-prior settings. Their distinct fitting, diagnostic
 and timing policies are documented in [the experiment guide](EXPERIMENTS.md)

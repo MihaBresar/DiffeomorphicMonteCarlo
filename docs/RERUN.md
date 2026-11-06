@@ -1,10 +1,16 @@
 # Running the experiments
 
-Current version-11 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
+To run the reported results' configuration, choose **Reported study: zero-centre
+DCS vs original SCS (JAX)**. Its bundled maps and parameters are fixed, with no
+manual step choices or refitting. Use **Smaller reproduction** for one reported
+20-chain × 3-second batch, or **Full paper settings** for 50 chains × 20 seconds.
+See [the study instructions](REPORTED_STUDY.md), including the recorded seed batches.
+
+The previous version-11 comparisons contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard
 in both JAX and optimized Numba modes, with fitted maps and 100D/500D targets.
-VI is mandatory for new comparisons; the launcher has no VI-off option.
+VI is mandatory when running that earlier recipe; the reported study loads its bundled maps. The launcher has no VI-off option.
 New reports contain only radial estimates/MSE/counts/time plus functional ESS
-and ESS/s. See [the current protocol](COMPARISONS.md).
+and ESS/s. See [the previous fitted-map protocol](COMPARISONS.md).
 
 On Windows, download the updated repository ZIP, extract it into a new folder,
 then double-click **Start.bat**. On macOS, use **Start.command**. Click
@@ -18,9 +24,9 @@ the final measured iteration count; thinning keeps its original iteration grid.
 For 500,000 iterations, discard 166,667 and use the remaining 333,333 before
 thinning. At thinning 10 this stores 33,334 post-burn-in states.
 
-## Version-11 sampling update
+## Earlier fitted-map version-11 sampling update
 
-Rerun all five methods together for each 100D/500D target and implementation
+For the earlier fitted-map recipe, rerun all five methods together for each 100D/500D target and implementation
 mode used in a new comparison. All four DCS methods share h=0.07:
 BW/reflected-BW/billiard use that increment radius; Gaussian RWM uses
 coordinate standard deviation h/√(d+2). Each uses its own kernel during
@@ -29,7 +35,7 @@ warmup-transition budget and first-third production burn-in.
 
 The version-10 fixed-cloud VI settings and fitted maps are unchanged. New v11
 results require fresh sampling; replotting old chains cannot apply a new step
-policy. Public entry points use the protocol's preset steps automatically;
+policy. Its public entry points use the version-11 preset steps automatically;
 manual step-size and calibration-policy flags are not accepted. The preset
 is not claimed optimal. Fresh-cloud VI studies remain experimental.
 The other six experiments do not change under this sampling update.
@@ -57,10 +63,10 @@ new sampling solely because map fitting changed, provided they remain valid
 for the recorded target and reference protocol. Replotting old chains cannot
 apply a new fit.
 
-## Current sampler comparisons
+## Earlier fitted-map sampler comparisons
 
-Choose **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)** or
-**Five samplers: optimized Numba DCS versus SCS**. Both version-11 suites
+Choose **Earlier fitted-map comparison: five samplers (JAX)** or
+**Earlier fitted-map comparison: Numba DCS vs SCS**. Both version-11 suites
 contain the same methods, with 100D/500D and VI fitted for both map families. Numba production differs
 in implementation and recording costs; author SCS remains in JAX.
 
@@ -94,10 +100,12 @@ from saved results without sampling or changing their statistics. MSE labels
 use two decimal places in scientific notation, sample counts remain exact
 integers, and CSV/JSON retain full precision.
 
-| Launcher experiment | Current comparison | Outputs |
+| Launcher experiment | Comparison recipe | Outputs |
 |---|---|---|
-| Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX) | Selected target, fitted maps; equal time, JAX | `VsSCS`, radial estimates, counts, runtime, bias/variance, functional ESS |
-| Five samplers: optimized Numba DCS versus SCS | Selected target, fitted maps; equal time, mixed implementations | Same comparison figure families and exact-value tables |
+| Reported study: zero-centre DCS vs original SCS (JAX) | Default: bundled maps, recorded zero-centre DCS settings, original author SCS; equal sampling time, extra prior DCS calibration | `VsSCS`, radial estimates, counts, runtime, bias/variance, functional ESS |
+| Reported-study parameters: Numba extension | Same bundled settings; Numba DCS versus author JAX SCS; implementation extension | Same comparison figure families and exact-value tables |
+| Earlier fitted-map comparison: five samplers (JAX) | Version 11, fitted maps and h=0.07 for DCS; equal time, JAX | Same comparison figure families and exact-value tables |
+| Earlier fitted-map comparison: Numba DCS vs SCS | Version 11, fitted maps and h=0.07 for DCS; equal time, mixed implementations | Same comparison figure families and exact-value tables |
 | 50D t: infinite first moment, equal samples | 50 chains/method, 500,000 iterations/chain | `SuperInfiniteFirstTest`, tail/log-norm and quantiles |
 | 200D skew-t: DCS versus NUTS | Equal sampling time | `NUTS_PBW_vs` |
 | 200D skew-t: random-walk baselines | Equal sampling time | `VsRWM_NUTS` |
@@ -105,7 +113,12 @@ integers, and CSV/JSON retain full precision.
 | GARCH(1,1) | HnR time matched to mean NUTS sampling time | Posterior table and diagnostics |
 | Logistic regression: both priors | Equal sampling time, independent reference | `QQ-regresssion` |
 
-Both current comparisons use 2 chains of 0.05 seconds for Quick check, 20 chains of
+Both reported-study options use 2 chains of 0.05 seconds for Quick check,
+20 chains of 3 seconds for Smaller reproduction, and 50 chains of 20 seconds
+for Full paper settings. All presets load the same frozen full-budget maps;
+no fitting or parameter recalibration occurs.
+
+Both earlier fitted-map comparisons use 2 chains of 0.05 seconds for Quick check, 20 chains of
 2 seconds for Smaller reproduction, and 50 chains of 20 seconds for Full paper
 settings, for either target. SCS uses the pinned
 authors' fixed-cloud optimizer, seed 0, and full budget of 1,000 updates on
@@ -113,7 +126,7 @@ authors' fixed-cloud optimizer, seed 0, and full budget of 1,000 updates on
 its own fixed 2,000-point cloud. Their clipping rules also differ, as recorded in the
 [protocol](COMPARISONS.md). Quick and Smaller settings reduce both fitting
 budgets; full fitting may change rankings. The same separate
-transition budget applies to every method and both SCS step policies.
+transition budget applies to every method; SCS uses only fixed h=0.1.
 All steps freeze before timed sampling. Numba DCS starts from the same JAX
 pilot state and selected step as its JAX counterpart.
 
@@ -121,11 +134,11 @@ The super-heavy-tail experiment retains equal iteration counts. Its mean norm
 does not exist at ν=0.5, so use its tail probability, finite mean log norm and
 marginal quantiles. These plots cannot be reconstructed by rescaling timed MSE.
 
-**All seven experiments + posterior table** runs the five-method JAX comparison
+**Earlier seven experiments + posterior table** runs the earlier version-11 five-method JAX comparison
 on the 100D skewed-t target and the other six experiments,
 and prepares independent logistic references. It fits both comparison maps
 by VI and uses the specified maps for the other experiments.
-The optimized Numba and 500D comparisons are separate selections.
+The reported study, optimized Numba and 500D comparisons are separate selections.
 Quick check only verifies that
 execution works. Use Smaller reproduction first to estimate resource needs;
 use Full paper settings for the recorded full benchmark budgets. This does not
@@ -134,13 +147,17 @@ other computer activity comparable across methods; concurrency is limited by
 the detected allocation, available chains and memory. See
 [parallel execution](PARALLEL.md).
 
-The launcher uses fitted maps for the synthetic and logistic experiments.
+The earlier recipes use fitted maps for the synthetic and logistic experiments;
+the reported-study entries load their recorded effective maps without refitting.
 Eight Schools and GARCH retain their specified identity maps. Previously saved
 untuned-map reports remain readable; they are not relabelled as fitted runs.
 
 ## Optional command-line equivalents
 
 ```bash
+python run_experiment.py reported-zero-centre --target skew-t-100d --preset paper --workers 2 --output-dir results/reported-100d
+python run_experiment.py reported-zero-centre --target skew-t-500d --preset paper --workers 2 --output-dir results/reported-500d
+python run_experiment.py reported-zero-centre-numba --target skew-t-100d --preset paper --workers 2 --output-dir results/reported-numba-100d
 python scripts/reproduce_all.py --preset paper --workers 2 --output-root results/paper-new
 python run_experiment.py sampler-comparison --target skew-t-100d --preset paper --workers 2 --output-dir results/comparison-100d-vi
 python run_experiment.py sampler-comparison-numba --target skew-t-100d --preset paper --workers 2 --output-dir results/numba-100d-vi

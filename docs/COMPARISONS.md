@@ -1,4 +1,9 @@
-# Current sampler comparisons
+# Fitted-map sampler comparisons (version 11)
+
+This page specifies `sampler-comparison` and `sampler-comparison-numba`, the
+previous fitted-centre recipes. The default launcher now selects the separately
+specified [reported zero-centre study](REPORTED_STUDY.md). Its frozen maps,
+radius/step settings and preparation policy differ from this page.
 
 Both launcher comparisons use the same five methods: **DCS-RWM, DCS-BW,
 author SCS, DCS-BW-reflect and DCS-Billiard**. The two rotation mixtures are
@@ -79,9 +84,9 @@ See [the author baseline and sensitivity study](AUTHOR_SCS_CALIBRATION.md).
 
 Version 11 does not change these fitting settings or maps. Fresh-cloud VI for
 both families is a separate experimental study, not the public default.
-Zero-centre and post-VI radius/step studies are also separate: current public
-runs retain the fitted physical centre and the stated default radius/step
-policy. Their outcomes must not be labelled as results of these defaults.
+The separately selectable [reported zero-centre study](REPORTED_STUDY.md) uses
+bundled maps and post-VI radius/step settings. The version-11 recipes on this
+page retain fitted centres; their results must not be labelled as that study.
 Such extra, target-informed DCS development is not matched end-to-end tuning
 against an unchanged author SCS baseline.
 

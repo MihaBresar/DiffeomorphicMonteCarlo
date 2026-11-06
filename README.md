@@ -2,9 +2,9 @@
 
 Research software accompanying *Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions*, by Miha Brešar and Aleksandar Mijatović.
 
-The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. It includes corrected manuscript experiments and subsequent sampler comparisons. **The current comparison is protocol version 11; it does not reproduce the original paper figures unchanged.** Billiards and reflected BW are later extensions. The documentation describes the current experiments so they can be independently run and inspected.
+The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. **The default launcher experiment now reproduces the reported zero-centre DCS study**, using its bundled maps and frozen parameters. The previous fitted-centre version-11 comparison remains separately available. Neither reproduces the original paper figures unchanged; billiards and reflected BW are later extensions.
 
-Start with the [reviewer guide](docs/REVIEW_GUIDE.md), [comparison protocol](docs/COMPARISONS.md), or [experiment catalogue](docs/EXPERIMENTS.md). No general performance ranking is assumed; comparisons must be assessed for the functions and budgets measured.
+Start with the [reported study instructions](docs/REPORTED_STUDY.md), [reviewer guide](docs/REVIEW_GUIDE.md), or [experiment catalogue](docs/EXPERIMENTS.md). No general performance ranking is assumed; comparisons must be assessed for the functions and budgets measured.
 
 ## Install and run
 
@@ -18,7 +18,7 @@ Use **64-bit Python 3.12** and the pinned CPU dependencies in `requirements-cpu.
 | macOS | Double-click `Start.command`. If the downloaded script cannot open, use IDLE as below. |
 | Linux desktop, Windows or macOS with IDLE | In IDLE, open `START_HERE.py`, then select **Run → Run Module**. |
 
-Click **Set up environment**, then choose the JAX five-sampler comparison and **Quick check**. Start with one or two CPU workers. After it completes, the launcher links to the report and figures. Keep its console or IDLE window open while it runs. Open the Python launcher, rather than opening `launcher/index.html` directly. See [click-to-run instructions](docs/CLICK_TO_RUN.md) for details.
+Click **Set up environment**, then leave **Reported study: zero-centre DCS vs original SCS (JAX)** and **Quick check** selected. Start with one or two CPU workers. After it completes, the launcher links to the report and figures. Keep its console or IDLE window open while it runs. Open the Python launcher, rather than opening `launcher/index.html` directly. See [click-to-run instructions](docs/CLICK_TO_RUN.md) for details.
 
 ### Terminal
 
@@ -41,12 +41,32 @@ python -m pip install -r requirements-cpu.txt
 Then run the smallest comparison:
 
 ```sh
-python run_experiment.py sampler-comparison --preset quick --workers 1 --output-dir results/first-check
+python run_experiment.py reported-zero-centre --preset quick --workers 1 --output-dir results/first-check
 ```
 
 This checks execution and report generation. Its short chains are not evidence of sampler performance. Python 3.12 is the supported environment; Linux and Windows checks are defined in [CI](.github/workflows/ci.yml), and macOS has local validation. Inspect the [Actions results](https://github.com/MihaBresar/DiffeomorphicMonteCarlo/actions) for the status of a particular commit.
 
-## Current comparison
+## Reported zero-centre study
+
+Choose **100D** or **500D**, then **Smaller reproduction** (20 chains × 3 seconds)
+or **Full paper settings** (50 chains × 20 seconds). Both retain the same frozen
+full-budget maps, 1,500 separate warmup transitions and first-third production
+discard. No manual radius, step or fitting choices are needed. Original SCS
+retains its author-fitted map and h=0.1. All four DCS variants use zero centre
+and deformation, with the study's fixed radius and step for each dimension.
+
+The original results used JAX and two workers. The default new seed batch is 22;
+recorded batches 20 and 21 are available explicitly. The separately named Numba
+option is an implementation extension. DCS received extra calibration during
+development, so this is not an equal-total-tuning comparison.
+
+See the [full protocol and run instructions](docs/REPORTED_STUDY.md) and
+[reported results and provenance](studies/zero_centre/results/index.html).
+The original 40-chain pooled result combines two 20-chain batches; a fresh
+Smaller run is one batch. Time budgets do not imply identical sample counts
+or outcomes on another computer.
+
+## Previous fitted-map comparison (version 11)
 
 Both modes contain **DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard**.
 
@@ -63,7 +83,7 @@ SCS uses its authors' unchanged VI routine; DCS retains its own VI fit. Their fi
 
 All four DCS methods share one fixed move h=0.07: BW, reflected BW and billiard use a uniform-ball increment of radius h; RWM uses Gaussian coordinate standard deviation h/√(d+2). This matches the increments’ coordinate covariances, not their physical endpoints or acceptance rates. Each method uses its own kernel during discarded equilibration, with no separate step adaptation. The single SCS baseline uses the authors' fixed **h=0.1** and unchanged author VI/transition; alternative SCS calibration is not offered in new five-method comparisons. Every method receives the same discarded warmup-transition budget. All production steps are frozen, and the first third of generated production iterations is discarded.
 
-The launcher and public commands use the protocol's preset DCS h=0.07 automatically; there is no manual step-size or calibration-policy choice. This preset is not a claim of optimality or guaranteed superiority. Internal configuration helpers retain historical settings for study reproduction. Version 11 preserves the version-10 fixed-cloud VI maps and changes all four DCS proposal-step policies, so new sampling is required for a v11 comparison. Fresh-cloud VI and zero-centre studies remain experimental and do not change the public fitting default. Public runs keep the fitted physical centres; they do not apply a zero-centre override or post-VI radius calibration.
+These earlier fitted-map launcher entries and commands use preset DCS h=0.07 automatically; there is no manual step-size or calibration-policy choice. This preset is not a claim of optimality or guaranteed superiority. Internal configuration helpers retain historical settings for study reproduction. Version 11 preserves the version-10 fixed-cloud VI maps and changes all four DCS proposal-step policies, so new sampling is required for a v11 comparison. These previous version-11 recipes retain fitted physical centres and do not apply the zero-centre study overrides. Select the separately named reported study to use its bundled maps and calibration.
 
 The current suite retains only this original SCS baseline. Historical alternative-step results remain recorded for reproducibility. The fixed SCS choice followed a documented 100D development study; it was frozen before the planned full-paper seed-batch-8 assessment. It is not a demonstrated optimum for 500D. See [all sensitivity results and the selection rule](docs/AUTHOR_SCS_CALIBRATION.md).
 

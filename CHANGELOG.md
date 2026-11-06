@@ -1,5 +1,12 @@
 # Changes
 
+## 2026-11-06 — runnable reported zero-centre study
+
+- Add the reported JAX experiment as a clearly named default launcher choice, with the exact bundled original VI artifacts, their checksums and histories, and separately recorded DCS production overrides. All four DCS maps have zero centre/deformation; their dimension-specific R and h are frozen. Original SCS retains its author-fitted map and h=0.1.
+- Add fixed Quick, Smaller and Full paper sampling presets without manual scientific parameters. Smaller uses 20 chains × 3 seconds with 1,500 warmup transitions, matching one reported batch. Fresh sampling defaults to batch 22; recorded batches 20/21 are explicit replication inputs. Full paper extends sampling under the same maps. A separately labelled Numba extension shares the parameters.
+- Bundle both original batches, pooled results, chain estimates/counts/time/ESS and archived calibration summaries. Preserve radial figures and record original fit provenance separately from loaded production maps. Disclose extra DCS development, conditional replication and hardware-dependent timed sample counts.
+- Keep previous fitted-centre h=0.07 comparisons separately labelled. Their historical results are not relabelled as zero-centre study results.
+
 ## 2026-11-06 — automatic selection of protocol preset steps
 
 - Remove the manual shared-DCS-step field from the launcher and step-size/calibration-policy flags from public comparison commands. New runs automatically use the existing protocol: DCS h=0.07, Gaussian RWM coordinate scale h/√(d+2), and original SCS h=0.1.

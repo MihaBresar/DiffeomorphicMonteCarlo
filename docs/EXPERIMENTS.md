@@ -1,5 +1,11 @@
 # Experiment specification
 
+The default launcher experiment is the [reported zero-centre study](REPORTED_STUDY.md),
+with identifiers `reported-zero-centre` (JAX) and `reported-zero-centre-numba`
+(Numba extension). It loads the exact bundled study maps and fixed parameters;
+it does not refit VI. The following version-11 description concerns the separately
+labelled previous fitted-map comparison.
+
 The current comparison suite is specified in `scripts/reproduce_comparison.py`, with target definitions in `dcs_bench/comparison_targets.py` and budgets in `scripts/reproduce_scs_100d.py`. See [the protocol](COMPARISONS.md). The other six experiments use named JSON files in `configs/`; the older 100D JSON is retained for compatibility. Each generic configuration contains the full paper target, methods, budgets, warmup, thinning, optimization, seeds, quantile levels, and output basename. `presets.json` lists explicit quick and affordable-reproduction overrides. Use `python run_experiment.py IDENTIFIER --preset paper --dry-run` to inspect the exact resolved input.
 
 The version-11 JAX and Numba suites both contain DCS-RWM, DCS-BW, SCS,

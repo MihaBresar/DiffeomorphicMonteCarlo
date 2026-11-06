@@ -3,7 +3,9 @@
 `DCS-Billiard` is available in both current five-method comparisons alongside
 DCS-RWM, DCS-BW, DCS-BW-reflect and author SCS. Choose JAX for a common-framework comparison,
 or optimized Numba DCS versus the author JAX SCS implementation. Both offer
-100D and 500D skewed Student-t(3), with VI fitted for both map families. This is an experimental
+100D and 500D skewed Student-t(3). The default [reported study](REPORTED_STUDY.md)
+loads its exact frozen VI artifacts and sets all DCS centres/deformations to zero.
+The older fitted-map recipes described below fit maps anew. This is an experimental
 geometric proposal, not a claim of universal dominance.
 
 ## Running the full comparison

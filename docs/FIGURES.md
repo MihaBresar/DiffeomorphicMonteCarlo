@@ -1,5 +1,11 @@
 # Figures and exact values
 
+The [reported zero-centre study](REPORTED_STUDY.md) preserves all five radial
+figure families, including ESS, and adds explicit frozen-map provenance. Its
+reports use the study-specific steps, not the previous version-11 h=0.07
+settings described below. The original reported batches are bundled in
+`studies/zero_centre/results`.
+
 Figures and tables are generated from each run's saved chains and references.
 Both fixed-time and fixed-iteration designs are available. Filenames preserve
 the corresponding manuscript figure families; numerical values describe the

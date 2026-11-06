@@ -1,8 +1,13 @@
 # Reproducibility and timing
 
-This page describes the current comparison and then the six other manuscript experiments. The resolved `configuration.json` and the source/runtime record in `manifest.json` define an individual run.
+The default launcher experiment is the [reported zero-centre study](REPORTED_STUDY.md),
+which loads the bundled maps and frozen production parameters. Its maps and
+steps match the reported study, including the disclosed additional DCS calibration.
+The following section describes the separate, previous version-11 fitted-map
+comparison, followed by the manuscript experiments. The resolved
+`configuration.json` and source/runtime record in `manifest.json` define each run.
 
-## Current comparison: version 11
+## Previous fitted-map comparison: version 11
 
 `sampler-comparison` records `timed-sampler-comparison-v11`; `sampler-comparison-numba` records `timed-numba-comparison-v11`. Both contain DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and DCS-Billiard, with 100D/500D skewed t(3) targets and VI fitted for both map families. New comparison requests cannot disable VI. See the [complete protocol](COMPARISONS.md) and [reviewer checklist](REVIEW_GUIDE.md).
 
@@ -25,7 +30,7 @@ DCS-RWM/BW/reflected BW use the ball map. Billiards retain its jointly fitted ce
 
 Every chain has separate discarded warmup before production. All four DCS methods share one fixed move h=0.07: BW, reflected BW and billiard use a uniform-ball increment of radius h; RWM uses Gaussian coordinate standard deviation h/√(d+2). This matches the increments’ coordinate covariances, not their physical endpoints or acceptance rates. Each method uses its own kernel during discarded equilibration, with no separate step adaptation. The only active SCS baseline uses author fixed h=0.1 throughout warmup and production. All methods receive equal discarded transition counts, not necessarily equal warmup seconds or equally optimal settings. The final warmup state initializes production and every production step is fixed.
 
-Public launcher and command-line runs automatically use the protocol's shared DCS h=0.07. Manual step-size and calibration-policy overrides are not offered; internal helpers retain historical study settings. The single SCS baseline retains author VI and fixed h=0.1; new alternative SCS step-policy requests are rejected. VI is unchanged. The preset DCS step is not claimed optimal. Version 11 requires fresh sampling but retains the version-10 fixed-cloud maps; experimental fresh-cloud VI studies are not public defaults.
+These earlier fitted-map launcher entries and commands automatically use shared DCS h=0.07. Manual step-size and calibration-policy overrides are not offered; internal helpers retain historical study settings. The single SCS baseline retains author VI and fixed h=0.1; new alternative SCS step-policy requests are rejected. VI is unchanged. The preset DCS step is not claimed optimal. Version 11 requires fresh sampling but retains the version-10 fixed-cloud maps. The default reported study instead loads its documented frozen maps and dimension-specific parameters.
 
 The fixed SCS default was selected using the disclosed 100D seed-batch-7 development study and its full-author-VI sensitivity pair. Its rule did not select by DCS ranking. That study used version 9. Evaluate version 11 with fresh, previously uninspected full-paper sampling seeds, separately from development evidence. The 500D setting extends the SCS choice without a separate tuning study. [Historical outcomes for both SCS policies](AUTHOR_SCS_CALIBRATION.md) remain archived; they are not active comparison options.
 

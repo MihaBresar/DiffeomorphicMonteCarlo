@@ -23,12 +23,19 @@ ROOT = Path(__file__).resolve().parent
 RUNS = ROOT/'results'/'click-runs'
 PRESETS = ('quick', 'reproduce', 'paper')
 EXPERIMENTS = ('all', 'skew-t-200d-nuts', 'skew-t-200d-baselines', 'sampler-comparison',
-               'sampler-comparison-numba', 'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression')
+               'sampler-comparison-numba', 'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression',
+               'reported-zero-centre', 'reported-zero-centre-numba')
 COMPARISONS = ('sampler-comparison', 'sampler-comparison-numba')
+REPORTED_COMPARISONS = ('reported-zero-centre', 'reported-zero-centre-numba')
 LEGACY_SCS_COMPARISONS = ('skew-t-100d-fixed', 'skew-t-100d-boundary')
-SCS_COMPARISONS = COMPARISONS + LEGACY_SCS_COMPARISONS
+SCS_COMPARISONS = REPORTED_COMPARISONS + COMPARISONS + LEGACY_SCS_COMPARISONS
 COMPARISON_TARGETS = ('skew-t-100d', 'skew-t-500d')
 STEP_PRESET_MESSAGE = 'New launcher runs use the protocol preset step sizes; manual DCS move or step-rule overrides are not available.'
+_DEFAULT_SEED_BATCH = object()
+
+
+def default_seed_batch(experiment):
+    return 22 if experiment in REPORTED_COMPARISONS else 0
 
 
 def environment_python():
@@ -76,9 +83,11 @@ def environment_ready():
         return False
 
 
-def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=0, comparison_target='skew-t-100d', vi='on', dcs_fixed_move=None, dcs_step_rule=None):
+def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=_DEFAULT_SEED_BATCH, comparison_target='skew-t-100d', vi='on', dcs_fixed_move=None, dcs_step_rule=None):
     if preset not in PRESETS or experiment not in EXPERIMENTS + LEGACY_SCS_COMPARISONS:
         raise ValueError('Choose a listed preset and experiment')
+    if seed_batch is _DEFAULT_SEED_BATCH:
+        seed_batch = default_seed_batch(experiment)
     if type(seed_batch) is not int or not 0 <= seed_batch <= 999:
         raise ValueError('Seed batch must be an integer from 0 to 999')
     if seed_batch and experiment not in SCS_COMPARISONS:
@@ -93,6 +102,17 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
             raise ValueError('New launcher runs use fitted DCS maps; the vanilla option has been removed.')
     py = str(environment_python())
     directory = Path(directory)
+    if experiment in REPORTED_COMPARISONS:
+        if comparison_target not in COMPARISON_TARGETS:
+            raise ValueError('Choose a listed comparison target')
+        if plot_only:
+            return [[py, '-u', str(ROOT/'run_experiment.py'), '--plot-only', str(directory/experiment)]]
+        if resume:
+            raise ValueError('Reported-study comparisons start from scratch in a new results folder.')
+        return [[py, '-u', str(ROOT/'scripts/reproduce_reported_study.py'),
+                 '--comparison', 'numba' if experiment.endswith('-numba') else 'jax',
+                 '--target', comparison_target, '--preset', preset, '--workers', str(workers),
+                 '--seed-batch', str(seed_batch), '--output-dir', str(directory/experiment)]]
     if experiment in COMPARISONS:
         if comparison_target not in COMPARISON_TARGETS:
             raise ValueError('Choose a listed comparison target')
@@ -237,7 +257,7 @@ class Controller:
                 raise RuntimeError('Environment validation failed; see installation output above')
         self.start_job(work, 'Setting up the environment…')
 
-    def run(self, preset='quick', experiment='sampler-comparison', run_id=None, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=0, comparison_target='skew-t-100d', vi='on', dcs_fixed_move=None, dcs_step_rule=None):
+    def run(self, preset='quick', experiment='reported-zero-centre', run_id=None, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=_DEFAULT_SEED_BATCH, comparison_target='skew-t-100d', vi='on', dcs_fixed_move=None, dcs_step_rule=None):
         if not self.ready:
             raise ValueError('Click Set up environment first')
         saved_run_requested = bool(run_id)
@@ -249,7 +269,7 @@ class Controller:
             preset, experiment = saved['preset'], saved['experiment']
             workers = saved.get('workers', 1)
             ball_map_policy = saved.get('ball_map_policy', 'mobius')
-            seed_batch = saved.get('seed_batch', 0)
+            seed_batch = saved.get('seed_batch', default_seed_batch(experiment))
             comparison_target = saved.get('comparison_target', 'skew-t-100d')
             vi = saved.get('vi', 'on')
             dcs_fixed_move = saved.get('dcs_fixed_move')
@@ -260,6 +280,8 @@ class Controller:
             run_id = datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'-'+preset
             fresh_run_base = run_id
             directory = RUNS/run_id
+        if seed_batch is _DEFAULT_SEED_BATCH:
+            seed_batch = default_seed_batch(experiment)
         commands = commands_for_run(preset, experiment, directory, resume=saved_run_requested,
                                     plot_only=plot_only, workers=workers, ball_map_policy=ball_map_policy,
                                     seed_batch=seed_batch, comparison_target=comparison_target, vi=vi,
@@ -286,6 +308,10 @@ class Controller:
             request = {'preset': preset, 'experiment': experiment,
                 'workers': workers, 'ball_map_policy': ball_map_policy, 'seed_batch': seed_batch,
                 'comparison_target': comparison_target, 'vi': vi}
+            if experiment in REPORTED_COMPARISONS:
+                request.pop('ball_map_policy')
+                request.pop('vi')
+                request.update(map_source='bundled_reported_study', fitting_performed=False)
             # A plot-only request reads saved data and must not rewrite its
             # scientific settings or original launcher provenance.
             if not plot_only:
@@ -341,6 +367,12 @@ def make_handler(controller, token):
             if path == '/':
                 page = (ROOT/'launcher/index.html').read_text(encoding='utf-8').replace('__TOKEN__', json.dumps(token))
                 return self.respond(page.encode(), content_type='text/html; charset=utf-8')
+            if path.startswith('/study-results/'):
+                folder = (ROOT/'studies/zero_centre/results').resolve()
+                artifact = (folder/path[len('/study-results/'):]).resolve()
+                if not artifact.is_relative_to(folder) or artifact.suffix not in ('.html', '.json', '.csv', '.png', '.pdf', '.svg') or not artifact.is_file():
+                    return self.respond({'error': 'File not available'}, 404)
+                return self.respond(artifact.read_bytes(), content_type=mimetypes.guess_type(str(artifact))[0] or 'application/octet-stream')
             if path == '/state':
                 if not self.authorized(): return self.respond({'error': 'Unauthorized'}, 403)
                 return self.respond(controller.snapshot())
@@ -374,9 +406,12 @@ def make_handler(controller, token):
                 elif self.path == '/run':
                     if {'dcs_fixed_move', 'dcs_step_rule'} & data.keys():
                         raise ValueError(STEP_PRESET_MESSAGE)
-                    controller.run(data.get('preset', 'quick'), data.get('experiment', 'sampler-comparison'),
+                    experiment = data.get('experiment', 'reported-zero-centre')
+                    if experiment in REPORTED_COMPARISONS and data.keys()-{'preset', 'experiment', 'workers', 'seed_batch', 'comparison_target'}:
+                        raise ValueError('The reported study loads fixed recorded maps and preset budgets; additional parameter choices are not available.')
+                    controller.run(data.get('preset', 'quick'), experiment,
                         workers=data.get('workers', 1), ball_map_policy=data.get('ball_map_policy', 'mobius'),
-                        seed_batch=data.get('seed_batch', 0),
+                        seed_batch=data.get('seed_batch', default_seed_batch(experiment)),
                         comparison_target=data.get('comparison_target', 'skew-t-100d'), vi=data.get('vi', 'on'))
                 elif self.path == '/resume': controller.run(run_id=data['id'])
                 elif self.path == '/replot': controller.run(run_id=data['id'], plot_only=True)

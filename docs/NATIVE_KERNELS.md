@@ -1,5 +1,10 @@
 # Native sampling kernels
 
+The default [reported zero-centre study](REPORTED_STUDY.md) reuses these same
+kernels with its bundled maps and frozen parameters. Its JAX mode is the
+reported implementation; its Numba mode is a separately labelled extension.
+The version-11 identifiers below describe the previous fitted-map recipes.
+
 All seven launcher experiments use compiled loops for their canonical sampling
 methods. `compiled_sampling.py` covers DCS-RWM, DCS-BW, DCS-HnR, ordinary Gaussian
 and stable random walks, and SCS. It supports the skew-t, logistic, Eight Schools
