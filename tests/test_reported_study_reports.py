@@ -15,8 +15,9 @@ from scripts import reproduce_scs_100d as runner
 from scripts.scs_100d_figures import render_report
 
 
-def reported_summary(dimension=100, backend='jax', legacy=False):
-    configure = study.legacy_configuration if legacy else study.configuration
+def reported_summary(dimension=100, backend='jax', legacy=False, version=None):
+    configure = (study.legacy_configuration if legacy else
+                 study.calibrated_configuration if version == 'v2' else study.configuration)
     config = configure(target=f'skew-t-{dimension}d', comparison=backend)
     prepared = study.load_prepared(config)
     _, truth, _ = radial_truth(Target(config['target']), config['threshold'])
@@ -73,7 +74,11 @@ class ReportedStudyReportTests(unittest.TestCase):
                 self.assertIn('All six methods' if backend == 'jax' else 'Numba extension', page)
                 self.assertIn('Archived joint radius/step calibration', page)
                 self.assertIn('Equal pilot counts do not imply equal seconds', page)
-                self.assertIn('original author centre', rows['SCS-calibrated']['production_step_policy'])
+                self.assertIn('SCS calibrated (zero)', page)
+                self.assertIn('production centre and observer now zero', rows['SCS-calibrated']['production_step_policy'])
+                self.assertIn('no recalibration', rows['SCS-calibrated']['radius_step_preparation'])
+                self.assertEqual(float(rows['SCS-calibrated']['centre_norm']), 0.)
+                self.assertEqual(float(rows['SCS-calibrated']['observer_norm']), 0.)
                 self.assertEqual(float(rows['SCS-calibrated']['fixed_step']), calibrated['h'])
                 self.assertEqual(float(rows['SCS-calibrated']['sphere_radius']), calibrated['R'])
                 self.assertEqual(rows['SCS-calibrated']['execution_backend'], 'JAX')
@@ -83,12 +88,24 @@ class ReportedStudyReportTests(unittest.TestCase):
                     with (root/filename).open(encoding='utf-8', newline='') as stream:
                         method_rows = list(csv.DictReader(stream))
                     self.assertEqual({r['method'] for r in method_rows}, set(study.METHODS))
+                    if filename == 'effective_maps.csv':
+                        zero = next(r for r in method_rows if r['method'] == 'SCS-calibrated')
+                        original = next(r for r in method_rows if r['method'] == 'SCS')
+                        import json
+                        self.assertEqual(json.loads(zero['mu']), [0.]*dimension)
+                        self.assertEqual(json.loads(zero['observer']), [0.]*dimension)
+                        self.assertEqual(json.loads(original['mu']), summary['maps']['sphere']['mu'])
+                        self.assertEqual(json.loads(original['observer']), summary['maps']['sphere']['observer'])
                 with (root/'joint_calibration.csv').open(encoding='utf-8', newline='') as stream:
                     pilot_rows = list(csv.DictReader(stream))
                 self.assertEqual(len(pilot_rows), 2)
                 self.assertEqual({int(r['total_pilot_transitions']) for r in pilot_rows}, {524288})
                 self.assertEqual({int(r['shared_exact_target_starts']) for r in pilot_rows}, {4096})
                 self.assertTrue(all(float(r['historical_transition_evaluation_seconds']) > 0 for r in pilot_rows))
+                self.assertTrue(all(r['parameters_reselected_after_map_change'] == 'False' for r in pilot_rows))
+                scs_pilot = next(r for r in pilot_rows if r['method'] == 'SCS calibrated')
+                self.assertEqual(scs_pilot['pilot_map_policy'], 'author-fitted SCS centre and observer')
+                self.assertEqual(scs_pilot['production_map_change_after_pilot'], 'centre and observer zero')
                 self.assertEqual(summary, before)
 
     def test_historical_five_method_reports_remain_readable_without_new_control(self):
@@ -104,6 +121,26 @@ class ReportedStudyReportTests(unittest.TestCase):
             self.assertFalse((root/'joint_calibration.csv').exists())
             self.assertEqual(summary, before)
 
+    def test_historical_v2_keeps_fitted_calibrated_scs_map_and_label(self):
+        summary = reported_summary(500, 'numba', version='v2')
+        before = deepcopy(summary)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            result = render_report(root, summary)
+            self.assertEqual(len(result['figures']), 5)
+            page = (root/'paper_values.html').read_text(encoding='utf-8')
+            self.assertIn('SCS calibrated retains the same author centre and observer', page)
+            self.assertNotIn('SCS calibrated (zero)', page)
+            self.assertNotIn('production centre and observer now zero', page)
+            with (root/'paper_values.csv').open(encoding='utf-8', newline='') as stream:
+                rows = {r['method']: r for r in csv.DictReader(stream)}
+            self.assertIn('original author centre', rows['SCS-calibrated']['production_step_policy'])
+            self.assertEqual(float(rows['SCS-calibrated']['fixed_step']), .025)
+            self.assertEqual(rows['SCS-calibrated']['execution_backend'], 'JAX')
+            self.assertEqual(summary['method_maps']['SCS-calibrated']['mu'], summary['maps']['sphere']['mu'])
+            self.assertEqual(summary['method_maps']['SCS-calibrated']['observer'], summary['maps']['sphere']['observer'])
+            self.assertEqual(summary, before)
+
     def test_calibrated_step_records_cannot_silently_revert_to_original_scs(self):
         summary = reported_summary()
         summary['cases']['SCS-calibrated']['records'][0]['final_scale'] = .1
@@ -115,6 +152,8 @@ class ReportedStudyReportTests(unittest.TestCase):
             lambda d: d['maps']['ball']['mu'].__setitem__(0, .1),
             lambda d: d['maps']['sphere'].__setitem__('scale', 1.),
             lambda d: d['maps']['sphere_calibrated'].__setitem__('scale', 1.),
+            lambda d: d['maps']['sphere_calibrated']['mu'].__setitem__(0, .1),
+            lambda d: d['maps']['sphere_calibrated']['observer'].__setitem__(0, .1),
             lambda d: d['fitting']['ball']['loss'].__setitem__(0, 0.),
             lambda d: d['prepared_input_provenance']['joint_calibration']['budget_per_family_per_dimension'].__setitem__('transitions_total', 1),
         ):

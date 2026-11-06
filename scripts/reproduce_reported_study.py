@@ -1,4 +1,4 @@
-"""Run frozen DCS settings against original SCS and equally pilot-calibrated SCS."""
+"""Run frozen DCS settings against original SCS and zero-centre/observer calibrated SCS."""
 import argparse
 from datetime import datetime, timezone
 import json
@@ -13,7 +13,8 @@ from dcs_bench.reported_study import PRESETS, TARGETS, configuration, run
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, epilog='Maps and steps are bundled and frozen. '
-        'The current six-method comparison adds pilot-calibrated SCS to the original JAX study; '
+        'The current six-method comparison uses zero centre/observer for the calibrated SCS control, '
+        'retaining its prior radius/step selection without recalibration; original SCS stays unchanged. '
         'Numba is a separately labelled implementation extension. '
         'Timed counts and results depend on hardware. No manual fitting or step-size choice is required.')
     parser.add_argument('--preset', choices=PRESETS, default='quick')

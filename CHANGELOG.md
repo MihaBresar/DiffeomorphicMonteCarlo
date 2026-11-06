@@ -1,5 +1,11 @@
 # Changes
 
+## 2026-11-06 — zero-centre/observer calibrated SCS
+
+- Replace the active calibrated SCS control with **SCS calibrated (zero)**: physical centre and observer displacement are zero in both dimensions and both implementation modes. Original SCS, all DCS settings, the author SCS transition and latitude 1.1 are unchanged.
+- Retain calibrated SCS's previously selected R/h without retuning: 100D R=0.5524147794720602, h=0.05; 500D R=1.1156813625824848, h=0.025. Record zeroing as a later map intervention, not a constrained VI fit or calibration on the final zero map.
+- Record fresh runs as reported-study v3. Preserve v1/v2 settings and report reading, and do not relabel archived zero-centre controls that retained a nonzero observer as this new variant.
+
 ## 2026-11-06 — equally pilot-calibrated SCS control
 
 - Add **SCS calibrated** alongside original SCS in current JAX and Numba comparisons, including All seven. Preserve original SCS at author VI and h=0.1, and preserve all four DCS settings.

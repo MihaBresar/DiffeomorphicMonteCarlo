@@ -15,9 +15,12 @@ ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / 'studies' / 'zero_centre' / 'maps'
 LEGACY_PROTOCOLS = {'jax': 'timed-reported-zero-centre-v1',
                     'numba': 'timed-reported-zero-centre-numba-v1'}
-PROTOCOLS = {'jax': 'timed-reported-zero-centre-v2',
-             'numba': 'timed-reported-zero-centre-numba-v2'}
-SUPPORTED_PROTOCOLS = tuple(LEGACY_PROTOCOLS.values()) + tuple(PROTOCOLS.values())
+CALIBRATED_PROTOCOLS = {'jax': 'timed-reported-zero-centre-v2',
+                        'numba': 'timed-reported-zero-centre-numba-v2'}
+PROTOCOLS = {'jax': 'timed-reported-zero-centre-v3',
+             'numba': 'timed-reported-zero-centre-numba-v3'}
+SUPPORTED_PROTOCOLS = (tuple(LEGACY_PROTOCOLS.values()) + tuple(CALIBRATED_PROTOCOLS.values())
+                       + tuple(PROTOCOLS.values()))
 CALIBRATED_METHOD = 'SCS-calibrated'
 CALIBRATION_SHA256 = '02744e053bc5a39d1f35a677cde5a49c76f83e6d0832ab669e8152cd3f431f64'
 CALIBRATED_SCS = {100: dict(R=.5524147794720602, h=.05, candidate='SCS-r0-h1'),
@@ -150,14 +153,14 @@ def _load_calibration():
     return value
 
 
-def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax',
-                  target='skew-t-100d', seed_batch=22):
-    """Current six-method preset; original and equally pilot-calibrated SCS coexist."""
+def calibrated_configuration(preset='quick', workers=1, overrides=None, *, comparison='jax',
+                           target='skew-t-100d', seed_batch=22):
+    """Historical v2 preset with the author-fitted SCS centre and observer."""
     config = legacy_configuration(preset, workers, overrides, comparison=comparison,
                                   target=target, seed_batch=seed_batch)
     calibration = _load_calibration()
     frozen = CALIBRATED_SCS[config['dimension']]
-    config.update(protocol=PROTOCOLS[comparison],
+    config.update(protocol=CALIBRATED_PROTOCOLS[comparison],
         algorithms=list(METHODS), implementation_revision='reported-zero-centre-two-scs-controls-v2',
         study_id='zero-centre-original-and-calibrated-scs-v2',
         method_display_labels={CALIBRATED_METHOD: 'SCS calibrated'},
@@ -184,14 +187,64 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
     validate_configuration(config)
     return config
 
+
+def _zero_scs_intervention():
+    return dict(centre_override='zero', observer_override='zero', latitude='unchanged at 1.1',
+        radius_step_selection_map='original author VI centre and observer',
+        radius_step_recalibrated=False, constrained_vi_refit=False,
+        new_fitting=False, new_radius_step_pilot=False,
+        scope='SCS has an observer displacement rather than a DCS Mobius delta. '
+              'Both its physical centre and observer are set to zero after the original fitting '
+              'and R/h pilot. Prior R/h values are retained without recalibration for this changed map; '
+              'they are not claimed optimal for the zero-centre, zero-observer control.')
+
+
+def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax',
+                  target='skew-t-100d', seed_batch=22):
+    """Current six-method preset with a zero-centre, zero-observer SCS control."""
+    config = calibrated_configuration(preset, workers, overrides, comparison=comparison,
+                                      target=target, seed_batch=seed_batch)
+    selected = CALIBRATED_SCS[config['dimension']]
+    config.update(protocol=PROTOCOLS[comparison],
+        implementation_revision='reported-zero-centre-zero-observer-scs-v3',
+        study_id='zero-centre-original-and-zero-map-calibrated-scs-v3',
+        method_display_labels={CALIBRATED_METHOD: 'SCS calibrated (zero)'},
+        reported_calibrated_scs_parameters=dict(R=selected['R'], h=selected['h'],
+            centre='zero', observer='zero'),
+        production_calibrated_scs_map_policy='zero_mu_zero_observer_with_prior_frozen_radius_step',
+        calibrated_scs_map_intervention=_zero_scs_intervention(),
+        study_note='Original SCS retains its exact author VI map and h=0.1. The calibrated SCS '
+            'control now has zero physical centre and zero observer displacement, with the prior '
+            'pilot-selected R/h retained. That pilot used the author-fitted centre/observer before '
+            'this map intervention; no new pilot or optimization is performed for the zero map. '
+            'All DCS settings remain unchanged. Equal historical pilot counts do not establish '
+            'optimal tuning of the modified SCS map or identical development procedures.',
+        fitting_policy='Reuse the original joint VI artifacts and loss histories. Original SCS '
+            'keeps its exact author fit. The calibrated control uses explicit zero-centre and '
+            'zero-observer production overrides and a prior selected radius. This is not a '
+            'constrained VI refit, and neither family is fitted again.',
+        tuning_note='All four DCS methods retain their recorded fixed move; RWM uses h/sqrt(d+2). '
+            'Original SCS uses h=0.1. SCS calibrated (zero) retains its prior R/h selection, '
+            'made before the zero-centre/zero-observer override. All six receive 1500 discarded '
+            'nonadaptive warmup transitions from the same physical all-ones point. No new '
+            'calibration or production adaptation occurs.',
+        seed_note='Default batch22 supplies the six-method random-stream inputs. Saved v1/v2 '
+            'results retain their original maps; the zero-observer intervention requires fresh '
+            'sampling. Timed stopping, hardware and map changes can alter counts and estimates.')
+    validate_configuration(config)
+    return config
+
+
 def validate_configuration(config):
     """Validate scientific settings without requiring the original computer."""
     backend = config.get('comparison')
     target_id = config.get('target_id')
-    _require(backend in PROTOCOLS and config.get('protocol') in (LEGACY_PROTOCOLS[backend], PROTOCOLS[backend]),
+    _require(backend in PROTOCOLS and config.get('protocol') in
+             (LEGACY_PROTOCOLS[backend], CALIBRATED_PROTOCOLS[backend], PROTOCOLS[backend]),
              'Unknown reported-study protocol')
-    current = config['protocol'] == PROTOCOLS[backend]
-    methods = METHODS if current else LEGACY_METHODS
+    calibrated = config['protocol'] != LEGACY_PROTOCOLS[backend]
+    zero_scs = config['protocol'] == PROTOCOLS[backend]
+    methods = METHODS if calibrated else LEGACY_METHODS
     _require(target_id in TARGETS and config.get('preset') in PRESETS, 'Unknown reported-study target or preset')
     d = TARGETS[target_id]
     _require(config.get('target') == dict(kind='skew_t', dimension=d, nu=3., alpha={'0': 100., '1': -100.})
@@ -212,18 +265,25 @@ def validate_configuration(config):
     _require(config.get('reported_production_parameters') == dict(dcs_R=FROZEN[d]['scale'], dcs_h=FROZEN[d]['h'],
              dcs_mu='zero', dcs_delta='zero', dcs_beta=2., scs_map='unchanged original author VI', scs_h=.1),
              'Reported production parameter metadata changed')
-    if current:
+    if calibrated:
         calibration = _load_calibration()
         selected = CALIBRATED_SCS[d]
+        centre_policy = 'zero' if zero_scs else 'original author VI'
+        label = 'SCS calibrated (zero)' if zero_scs else 'SCS calibrated'
         _require(config.get('scs_calibrated_move') == selected['h']
                  and config.get('reported_calibrated_scs_parameters') == dict(R=selected['R'], h=selected['h'],
-                     centre='original author VI', observer='original author VI')
-                 and config.get('method_display_labels') == {CALIBRATED_METHOD: 'SCS calibrated'},
+                     centre=centre_policy, observer=centre_policy)
+                 and config.get('method_display_labels') == {CALIBRATED_METHOD: label},
                  'Reported calibrated SCS parameters changed')
         _require(config.get('reported_calibration_asset') == 'studies/zero_centre/maps/joint_calibration.json'
                  and config.get('reported_calibration_asset_sha256') == CALIBRATION_SHA256
                  and config.get('calibration_budget_per_family') == calibration['budget_per_family_per_dimension'],
                  'Reported calibration provenance changed')
+        if zero_scs:
+            _require(config.get('production_calibrated_scs_map_policy') ==
+                     'zero_mu_zero_observer_with_prior_frozen_radius_step'
+                     and config.get('calibrated_scs_map_intervention') == _zero_scs_intervention(),
+                     'Reported zero-map SCS intervention changed')
     _require(config.get('fit_reused_without_refitting') is True
              and config.get('fit_constrained_mu_zero') is False and config.get('fit_constrained_delta_zero') is False,
              'Reported frozen-fit provenance changed')
@@ -259,10 +319,13 @@ def load_prepared(config):
             fit_constrained_delta_zero=False, fit_constrained_mu_zero=False,
             reuse_note='Original joint VI loss history is retained unchanged. Zero-centre/deformation '
                 'and prior DCS radius/step selection are production interventions, not constrained VI refitting.')
-    current = config['protocol'] in PROTOCOLS.values()
-    if current:
+    calibrated = config['protocol'] in tuple(CALIBRATED_PROTOCOLS.values()) + tuple(PROTOCOLS.values())
+    zero_scs = config['protocol'] in PROTOCOLS.values()
+    if calibrated:
         maps['sphere_calibrated'] = copy.deepcopy(saved['maps']['sphere'])
         maps['sphere_calibrated']['scale'] = CALIBRATED_SCS[dimension]['R']
+        if zero_scs:
+            maps['sphere_calibrated'].update(mu=[0.] * dimension, observer=[0.] * dimension)
     provenance = dict(schema='reported-zero-centre-prepared-inputs-v1',
         map_asset=config['reported_map_asset'], map_asset_sha256=entry['sha256'], map_asset_bytes=entry['bytes'],
         map_manifest_sha256=config['reported_map_manifest_sha256'],
@@ -272,11 +335,14 @@ def load_prepared(config):
         production_input_maps=copy.deepcopy(maps), new_fitting_seconds=0., new_tuning_seconds=0.,
         development_provenance=copy.deepcopy(manifest['development_provenance']),
         production_parameters=copy.deepcopy(config['reported_production_parameters']))
-    if current:
+    if calibrated:
         provenance.update(schema='reported-zero-centre-prepared-inputs-v2',
             calibration_asset=config['reported_calibration_asset'],
             calibration_asset_sha256=CALIBRATION_SHA256, joint_calibration=_load_calibration(),
             calibrated_scs_production_parameters=copy.deepcopy(config['reported_calibrated_scs_parameters']))
+        if zero_scs:
+            provenance.update(schema='reported-zero-centre-prepared-inputs-v3',
+                calibrated_scs_map_intervention=copy.deepcopy(config['calibrated_scs_map_intervention']))
     return dict(maps=maps, fitting=fitting, provenance=provenance)
 
 

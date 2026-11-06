@@ -67,14 +67,17 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 
 ## Comparison settings
 
-The comparison contains DCS-RWM, DCS-BW, original SCS, **SCS calibrated**,
+The comparison contains DCS-RWM, DCS-BW, original SCS, **SCS calibrated (zero)**,
 DCS-BW-reflect and DCS-Billiard. All four DCS methods use zero centre and zero deformation,
 with frozen radius and step values from the reported experiment. Their common
 h is 0.025 in 100D and 1/√500 in 500D. Gaussian RWM uses coordinate standard
 deviation h/√(d+2). Original SCS retains the author-fitted sphere map and h=0.1.
-SCS calibrated retains the same centre and observer with pilot-selected R/h:
+SCS calibrated (zero) uses zero physical centre and zero observer displacement,
+retaining its previously selected R/h:
 100D R=0.5524147794720602, h=0.05; 500D R=1.1156813625824848, h=0.025.
-Every preset reuses the same full-budget maps without refitting or retuning.
+Every preset reuses the same full-budget source fits with the recorded production
+overrides. The SCS R/h pilot preceded zeroing the map; there is no new fitting
+or retuning and no claim that these settings optimize the zero map.
 See [the exact protocol and preparation history](REPORTED_STUDY.md).
 
 **Smaller reproduction** runs 20 chains per method for 3.00 seconds each,
@@ -86,7 +89,7 @@ The separately labelled **Numba extension** keeps the same study maps and steps
 but changes DCS's production implementation; it is not the backend used for
 those reported results.
 
-DCS and SCS calibrated used equal original VI evaluation budgets and equal
+DCS and the preceding calibrated SCS used equal original VI evaluation budgets and equal
 radius/step pilot transition budgets. Original SCS remains a separate baseline
 without those R/h changes. Equal counts do not imply equal elapsed time or
 identical map choices. Current runs load the saved preparations; their radial

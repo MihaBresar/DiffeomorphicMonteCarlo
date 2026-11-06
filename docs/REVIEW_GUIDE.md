@@ -3,7 +3,7 @@
 The launcher now defaults to the [reported zero-centre study](REPORTED_STUDY.md),
 whose frozen maps, original results and calibration provenance are bundled in
 `studies/zero_centre`. It is distinct from the fitted-centre version-11 protocol
-discussed below. Current runs include both original SCS and SCS calibrated.
+discussed below. Current runs include original SCS and SCS calibrated (zero centre/observer).
 DCS and the calibrated control used equal VI evaluation and R/h pilot transition
 budgets; original SCS retains its author defaults. This does not imply identical
 map choices or equal elapsed preparation time.
@@ -13,8 +13,11 @@ This repository supports inspection and independent reruns of the corrected expe
 ## Scope and evidence
 
 The default reported-study comparison loads bundled full-budget maps without refitting. All four DCS variants use the recorded zero-centre, zero-deformation maps and calibrated radius/step settings; original SCS retains its author-fitted map and h=0.1. The added SCS calibrated
-control retains the same author centre/observer with pilot-selected radius and
-step under the same pilot budget as DCS. Its original JAX results and development record are bundled, while the Numba option is an implementation extension using those settings.
+control sets centre and observer displacement to zero while retaining its previous
+pilot-selected radius and step. That pilot used the fitted map under the same
+budget as DCS; it was not repeated after zeroing. The prior JAX results and
+development record are bundled, while this map intervention requires fresh
+sampling. Both backends use the unchanged author SCS transition.
 
 The separately retained **earlier fitted-map** JAX and optimized-Numba comparisons use version 11. They compare DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard on 100D/500D normal-CDF-skewed t(3) targets, with VI fitted for both map families. Billiards and reflected BW are subsequent extensions. Both recipes measure radial-tail probability and mean norm for the recorded sampling procedures. They cannot separate proposal geometry from map preparation or establish coordinate, no-VI or general sampler superiority.
 
@@ -33,7 +36,7 @@ python run_experiment.py --plot-only results/reviewer-check
 Confirm a complete manifest and open `paper_values.html`. A quick result checks execution only. The reported-study smaller preset uses 20 chains × 3 seconds; full settings use 50 chains × 20 seconds. Every preset loads the same bundled maps without refitting. The default fresh sampling batch is 22; batches 20 and 21 repeat the reported streams, with hardware-dependent timed counts. Use a fresh output directory each time. To examine the dimensional extension, select `--target skew-t-500d`.
 
 For this default study, verify the bundled map hashes, effective zero-centre DCS maps, recorded radius/step choices and calibration provenance against [the reported-study protocol](REPORTED_STUDY.md). The VI and R/h pilot counts match DCS against SCS calibrated. Distinguish these
-counts from elapsed preparation time and the distinct retained map policies;
+counts from elapsed preparation time and the later zero-centre/observer override;
 original SCS remains a separate author-default baseline.
 
 ## Review checklist for the earlier fitted-map version-11 recipe

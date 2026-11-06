@@ -14,13 +14,20 @@ The [SCS paper](https://arxiv.org/abs/2601.11066) is by Sebastiano Grazzi,
 Sifan Liu, Gareth O. Roberts and Jun Yang.
 
 The adapter removes progress callbacks, compiles before timing, and evaluates
-radial summaries in bounded scan blocks. The active version-11 baseline uses
-the authors' VI recipe and fixed h=0.1; an explicit acceptance-tuned alternative
-is retained. Full settings use the authors' 1,000 VI updates on 2,000 fixed
-reference draws. Smaller presets reduce that fitting budget. Version 10 gives DCS the same 1,000-update/2,000-point full budget and a
-fixed reference cloud of its own. Its parameterization, gradient clipping
-and calibration recipe remain distinct. See [the complete protocol](docs/COMPARISONS.md)
-and [the author-source attribution](third_party/scs_paper/README.md).
+radial summaries in bounded scan blocks. Current frozen-map comparisons retain
+original SCS with its author-fitted map and h=0.1, and add **SCS calibrated (zero)**.
+The latter sets physical centre and observer displacement to zero while retaining
+radius/step values selected previously on the fitted map. It is a declared map
+intervention, not the authors' original fitted configuration or a new constrained
+VI fit. Both variants execute the unchanged author projection and transition.
+
+Current comparisons load the original 1,000-update/2,000-point fixed-cloud fit
+at every preset. The historical R/h pilot budgets match DCS and calibrated SCS;
+no refitting or recalibration occurs after the current zero-map intervention.
+Earlier fitted-map and generic experiments retain their documented fitting
+budgets and policies. See [the current protocol](docs/REPORTED_STUDY.md),
+[earlier protocol](docs/COMPARISONS.md) and
+[author-source attribution](third_party/scs_paper/README.md).
 
 All methods evaluate the same benchmark target. The normal-CDF-skewed t(3)
 target here differs from the authors' Student-t-CDF skew targets at ν=1 and ν=2;

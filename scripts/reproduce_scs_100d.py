@@ -417,7 +417,8 @@ def run(config, output, *, prepared_inputs=None, prepared_input_load_seconds=Non
                 or not np.isfinite(prepared_input_load_seconds) or prepared_input_load_seconds < 0):
             raise ValueError('Prepared-input loading time must be finite and nonnegative')
     if config.get('protocol') in ('timed-reported-zero-centre-v1', 'timed-reported-zero-centre-numba-v1',
-                                  'timed-reported-zero-centre-v2', 'timed-reported-zero-centre-numba-v2'):
+                                  'timed-reported-zero-centre-v2', 'timed-reported-zero-centre-numba-v2',
+                                  'timed-reported-zero-centre-v3', 'timed-reported-zero-centre-numba-v3'):
         from dcs_bench.reported_study import load_prepared
         if prepared_inputs != load_prepared(config):
             raise ValueError('Reported-study runs require the exact bundled prepared inputs')

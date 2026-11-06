@@ -55,6 +55,7 @@ class ReportedCalibratedSCSTests(unittest.TestCase):
                     self.assertEqual(maps['SCS'], original)
                     chosen = copy.deepcopy(original)
                     chosen['scale'] = study.CALIBRATED_SCS[dimension]['R']
+                    chosen.update(mu=[0.] * dimension, observer=[0.] * dimension)
                     self.assertEqual(maps['SCS-calibrated'], chosen)
                     for method, scale, policy in [('SCS', .1, 'author_scs_fixed_01'),
                             ('SCS-calibrated', study.CALIBRATED_SCS[dimension]['h'], 'fixed_scs_move_v1')]:

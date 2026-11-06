@@ -117,7 +117,7 @@ class ReportedStudyUiTests(unittest.TestCase):
                 self.assertEqual(run_experiment.main([experiment, '--dry-run']), 0)
             config = json.loads(output.getvalue())['configuration']
             self.assertIn(config['protocol'], (
-                'timed-reported-zero-centre-v2', 'timed-reported-zero-centre-numba-v2'))
+                'timed-reported-zero-centre-v3', 'timed-reported-zero-centre-numba-v3'))
             self.assertEqual(config['algorithms'].count('SCS'), 1)
             self.assertEqual(config['algorithms'].count('SCS-calibrated'), 1)
             self.assertEqual(len(config['algorithms']), 6)

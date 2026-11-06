@@ -2,10 +2,12 @@
 
 The default launcher experiment is the [reported zero-centre study](REPORTED_STUDY.md),
 which loads the bundled maps and frozen production parameters. Its maps and
-steps preserve the reported DCS/original-SCS settings. Current v2 runs add
-**SCS calibrated**, whose radius/step selection used the same VI and joint-pilot
-resources as DCS. Both SCS variants retain the author-fitted centre and observer
-and execute the unchanged author JAX transition. Neither family repeats VI or
+steps preserve the reported DCS/original-SCS settings. Current v3 runs use
+**SCS calibrated (zero)**, retaining its earlier R/h selection under the same VI
+and joint-pilot resources as DCS, then setting centre and observer to zero.
+Original SCS retains the author-fitted map. Both execute the unchanged author
+JAX transition at latitude 1.1. No R/h recalibration on the zero map is claimed;
+historical v1/v2 reports retain their recorded settings. Neither family repeats VI or
 the joint pilot in a frozen-map run; preparation counts and elapsed time are
 distinct quantities. See the linked protocol for the exact budget accounting.
 The following section describes the separate, previous version-11 fitted-map

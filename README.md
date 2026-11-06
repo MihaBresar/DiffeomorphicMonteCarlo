@@ -2,7 +2,7 @@
 
 Research software accompanying *Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions*, by Miha Brešar and Aleksandar Mijatović.
 
-The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. **The default launcher experiment now reproduces the reported zero-centre DCS study**, using its bundled maps and frozen parameters, with an additional equally pilot-calibrated SCS control. The previous fitted-centre version-11 recipe remains available only through its compatibility commands and saved reports. Neither reproduces the original paper figures unchanged; billiards and reflected BW are later extensions.
+The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. **The default launcher experiment now reproduces the reported zero-centre DCS study**, using its bundled maps and frozen parameters, with an additional SCS control using zero centre/observer and its prior pilot-selected radius and step. The previous fitted-centre version-11 recipe remains available only through its compatibility commands and saved reports. Neither reproduces the original paper figures unchanged; billiards and reflected BW are later extensions.
 
 Start with the [reported study instructions](docs/REPORTED_STUDY.md), [reviewer guide](docs/REVIEW_GUIDE.md), or [experiment catalogue](docs/EXPERIMENTS.md). No general performance ranking is assumed; comparisons must be assessed for the functions and budgets measured.
 
@@ -54,8 +54,10 @@ full-budget maps, 1,500 separate warmup transitions and first-third production
 discard. No manual radius, step or fitting choices are needed. Original SCS
 retains its author-fitted map and h=0.1. All four DCS variants use zero centre
 and deformation, with the study's fixed radius and step for each dimension.
-Current runs add **SCS calibrated**, which retains the author-fitted centre and
-observer while using the independently selected radius and step. Both SCS
+Current runs use **SCS calibrated (zero)**, which sets physical centre and
+observer displacement to zero while retaining its previously selected radius
+and step. The R/h pilot was performed before zeroing these parameters; no
+recalibration is claimed. Latitude remains 1.1. Both SCS
 variants appear in the same six-method report; there is no extra control to select.
 
 The original results used JAX and two workers. The default new seed batch is 22;
@@ -64,8 +66,10 @@ option is an implementation extension. DCS and SCS calibrated used equal VI
 evaluation budgets and equal radius/step pilot budgets: 524,288 transitions
 per dimension from the same 4,096 exact target starts. The original SCS baseline
 does not apply that pilot. Production timing excludes historical preparation
-for both; current runs reuse the frozen settings. Equal counts do not imply
-equal elapsed preparation time or identical map choices.
+for both; current runs reuse the frozen settings with the declared SCS map override.
+Equal historical counts do not imply equal elapsed preparation time or optimal
+settings after the map change. Archived fitted-observer results are not results
+for the new zero-observer control.
 
 See the [full protocol and run instructions](docs/REPORTED_STUDY.md) and
 [reported results and provenance](studies/zero_centre/results/index.html).

@@ -3,8 +3,10 @@
 The default launcher experiment is the [reported zero-centre study](REPORTED_STUDY.md),
 with identifiers `reported-zero-centre` (JAX) and `reported-zero-centre-numba`
 (Numba extension). It loads the exact bundled study maps and fixed parameters;
-it does not refit VI. Current v2 runs compare all four DCS variants with both
-original SCS and SCS calibrated, whose R/h uses the same pilot budget as DCS.
+it does not refit VI. Current v3 runs compare all four DCS variants with original SCS and
+SCS calibrated (zero). The latter sets centre/observer to zero while retaining
+R/h chosen earlier on the fitted map under the same pilot budget as DCS. It
+does not recalibrate on the final zero map.
 The two current launcher choices are **DCS vs original SCS**
 and **Numba extension**. The following version-11 description concerns the earlier
 fitted-map compatibility commands, which are no longer launcher options.

@@ -2,7 +2,8 @@
 
 To run the reported results' configuration, choose **DCS vs original SCS**. Its bundled maps and parameters are fixed, with no
 manual step choices or refitting. Current runs include both original SCS and
-SCS calibrated under the same R/h pilot budget as DCS. Use **Smaller reproduction** for one reported
+SCS calibrated (zero centre/observer), retaining the R/h from the previous
+equal-budget pilot without retuning after zeroing. Use **Smaller reproduction** for one reported
 20-chain × 3-second batch, or **Full paper settings** for 50 chains × 20 seconds.
 See [the study instructions](REPORTED_STUDY.md), including the recorded seed batches.
 
@@ -103,7 +104,7 @@ integers, and CSV/JSON retain full precision.
 
 | Launcher experiment | Comparison recipe | Outputs |
 |---|---|---|
-| DCS vs original SCS | Default: bundled maps, recorded zero-centre DCS settings, original and pilot-calibrated SCS; equal sampling time, matched DCS/calibrated-SCS pilot counts | `VsSCS`, radial estimates, counts, runtime, bias/variance, functional ESS |
+| DCS vs original SCS | Default: bundled maps, recorded zero-centre DCS settings, original SCS and zero-centre/observer SCS with prior pilot R/h; equal sampling time, historical pilot counts disclosed | `VsSCS`, radial estimates, counts, runtime, bias/variance, functional ESS |
 | Numba extension | Same bundled settings; Numba DCS versus author JAX SCS; implementation extension | Same comparison figure families and exact-value tables |
 | 50D t: infinite first moment, equal samples | 50 chains/method, 500,000 iterations/chain | `SuperInfiniteFirstTest`, tail/log-norm and quantiles |
 | 200D skew-t: DCS versus NUTS | Equal sampling time | `NUTS_PBW_vs` |

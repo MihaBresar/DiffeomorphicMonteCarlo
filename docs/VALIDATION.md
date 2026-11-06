@@ -1,8 +1,33 @@
 # Validation
 
-## Calibrated SCS control
+## Zero-centre/observer calibrated SCS control
 
-The current six-method comparison adds **SCS calibrated** without changing
+On 6 November 2026, the full local suite passed **443 tests**. Current v3 runs
+set the calibrated SCS control's physical centre and observer displacement to
+zero. Its previous radius/step selections and latitude 1.1 are retained;
+original SCS and all DCS settings remain unchanged. Those selections were made
+before this intervention and have not been recalibrated on the zero map.
+
+Independent review passed **20 geometry checks** and verified **12
+dimension/backend/preset combinations**. Checks include projection/inverse and
+Jacobian agreement, direct author transition parity in 100D/500D, preservation
+of original map assets and kernels, and exact historical v1/v2 configuration
+and prepared-input compatibility. Reports distinguish the current zero map
+from the earlier fitted calibrated control.
+
+Complete Quick checks for 100D JAX and 500D Numba covered **24 production
+chains**, all six methods and five figure families per run. They verified
+zero effective centre/observer, fixed proposal steps, separate warmup, exact
+first-third burn-in, unthinned functional ESS and report provenance. These
+executions overlapped with other validation: their timings and errors are not
+comparative performance evidence. Both SCS variants still use author JAX.
+
+See the [validation record](../validation/zero_scs_release.json). Inspect the
+published revision's GitHub Actions separately.
+
+## Earlier fitted calibrated SCS control
+
+The preceding v2 six-method comparison added **SCS calibrated** without changing
 original SCS or the four DCS methods' numerical settings. On 6 November 2026,
 the full local suite passed **437 tests**. Checks include exact warmup and
 production-trajectory agreement with the author SCS driver at the selected
@@ -27,7 +52,7 @@ On 6 November 2026, the complete local regression suite passed **426 tests**.
 The [release validation record](../validation/reported_study_release.json)
 summarizes its scope and the execution checks below.
 
-The default launcher experiment now reproduces the [reported study](REPORTED_STUDY.md),
+The preceding v1 launcher experiment reproduced the [reported study](REPORTED_STUDY.md),
 using its frozen full-budget map assets, zero DCS centre and deformation, and
 dimension-specific preset radii and steps. It does not refit maps or select steps
 during a new run. The earlier fitted-map version-11 recipe remains separately named.
@@ -75,8 +100,8 @@ and production using the unchanged author transition. Tests cover 0.025,
 0.05, 0.1 and 0.2 in both dimensions and verify that metadata does not label
 this policy as the author's fixed-0.1 experiment. This is an execution API,
 not a step-selection rule. It remains available for archived results and
-separate review studies; current five-method entry points allow only the
-original author SCS baseline at 0.1.
+separate review studies; that release's five-method entry points allowed only
+the original author SCS baseline at 0.1.
 
 A serial paired throughput check retained complete state projection and
 recording, with unchanged-path controls. It showed modest or negligible
