@@ -47,7 +47,7 @@ class ProcessingTests(unittest.TestCase):
             before = {path: path.read_bytes() for path in paths}
             messages = []
             actual = process_chains(paths, target, 5., probabilities, names,
-                expected='parity', temporary_parent=root, label='DCS-HnR', progress=messages.append)
+                expected='parity', temporary_parent=root, label='DCS-HnR', progress=messages.append, diagnostics_enabled=True)
             np.testing.assert_array_equal(actual['estimates'], np.array([x.mean(axis=0) for x in functions]))
             np.testing.assert_array_equal(actual['quantiles'], np.array([
                 np.quantile(x[:, :4], probabilities, axis=0) for x in chains]))
@@ -65,7 +65,7 @@ class ProcessingTests(unittest.TestCase):
             for workers in (2, 4, 16):
                 threaded = process_chains(paths, target, 5., probabilities, names,
                     expected='parity', temporary_parent=root, progress=None,
-                    diagnostic_workers=workers)
+                    diagnostic_workers=workers, diagnostics_enabled=True)
                 np.testing.assert_array_equal(threaded['estimates'], actual['estimates'])
                 np.testing.assert_array_equal(threaded['quantiles'], actual['quantiles'])
                 self.assert_diagnostics_equal(threaded['diagnostics'], actual['diagnostics'])
@@ -87,11 +87,61 @@ class ProcessingTests(unittest.TestCase):
             for path, chain in zip(paths, chains):
                 save_chain(path, chain, {})
             actual = process_chains(paths, target, 2., [.25, .5, .75], names,
-                                    temporary_parent=tmp, progress=None, diagnostic_workers=4)
+                                    temporary_parent=tmp, progress=None, diagnostic_workers=4, diagnostics_enabled=True)
             expected = [mcmc_diagnostics(x[None, ...], target.names)['ess_bulk'] for x in chains]
             for new, old in zip(actual['coordinate_ess'], expected):
                 for name in target.names:
                     np.testing.assert_allclose(new[name], old[name], rtol=2e-13)
+
+    def test_standard_processing_skips_all_diagnostics_and_temporary_traces(self):
+        target = SimpleNamespace(kind='skew_t', d=12, names=[f'x{i}' for i in range(12)],
+                                 alpha=np.r_[1., np.zeros(11)], nu=3.)
+        names = ['tail', 'norm', 'direction', 'tanh']
+        chains = [np.random.default_rng(i).standard_t(3., size=(n, 12))
+                  for i, n in enumerate((101, 127))]
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = [Path(tmp)/f'chain-{i}.npz' for i in range(2)]
+            for path, chain in zip(paths, chains):
+                save_chain(path, chain, dict(retained_draws=len(chain), sampling_seconds=2.))
+            with patch('dcs_bench.processing.mcmc_diagnostics', side_effect=AssertionError('No rank diagnostics')), \
+                 patch('dcs_bench.processing._independent_diagnostics', side_effect=AssertionError('No individual diagnostics')), \
+                 patch('dcs_bench.processing._FunctionalStore', side_effect=AssertionError('No trace staging')), \
+                 patch('dcs_bench.processing.ThreadPoolExecutor', side_effect=AssertionError('No diagnostic workers')), \
+                 patch('dcs_bench.functional_ess.functional_ess', side_effect=AssertionError('No functional ESS')), \
+                 patch('dcs_bench.processing.tempfile.TemporaryDirectory', side_effect=AssertionError('No scratch directory')):
+                result = process_chains(paths, target, 2., [.25, .5, .75], names,
+                                        temporary_parent=tmp, progress=None, diagnostic_workers=4)
+            np.testing.assert_array_equal(result['estimates'],
+                [functional_draws(target, chain, 2.).mean(axis=0) for chain in chains])
+            np.testing.assert_array_equal(result['quantiles'],
+                [np.quantile(chain[:, :4], [.25, .5, .75], axis=0) for chain in chains])
+            self.assertIsNone(result['diagnostics'])
+            self.assertEqual(result['indiv'], [])
+            self.assertEqual(result['coordinate_ess'], [])
+            self.assertFalse(result['processing']['diagnostics_computed'])
+            self.assertFalse(result['processing']['functional_ess_computed'])
+            for field in ('staged_functional_bytes', 'temporary_bytes_peak_upper_bound',
+                          'diagnostic_workers', 'cross_chain_seconds', 'independent_seconds'):
+                self.assertEqual(result['processing'][field], 0)
+            self.assertEqual(result['processing']['retained_draws'], 228)
+
+    def test_moment_only_processing_skips_unused_quantile_sorting(self):
+        for kind in ('eight_schools', 'garch'):
+            target = SimpleNamespace(kind=kind, d=3, names=['a', 'b', 'c'])
+            names = target.names+[f'{n}^2' for n in target.names]
+            draws = np.random.default_rng(121).normal(size=(131, 3))
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp)/'chain.npz'
+                save_chain(path, draws, dict(retained_draws=len(draws)))
+                with patch('dcs_bench.processing.np.quantile', side_effect=AssertionError('No unused quantiles')):
+                    result = process_chains([path], target, 2., [.25, .5, .75], names,
+                                            progress=None, quantiles_enabled=False)
+                np.testing.assert_array_equal(result['estimates'][0],
+                    functional_draws(target, draws, 2.).mean(axis=0))
+                self.assertEqual(result['quantiles'].shape, (1, 0, 3))
+                self.assertFalse(result['processing']['quantiles_computed'])
+                self.assertFalse(result['processing']['diagnostics_computed'])
+                self.assertEqual(result['processing']['retained_draws'], 131)
 
     def test_diagnostic_worker_count_rejects_invalid_values(self):
         for workers in (0, -1, True, 1.5):
@@ -114,7 +164,7 @@ class ProcessingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, \
              patch('dcs_bench.engine.read_chain', side_effect=tracked_read):
             result = process_chains(['first', 'second', 'third'], target, 1., [.5], ['x'],
-                                    temporary_parent=tmp, progress=None)
+                                    temporary_parent=tmp, progress=None, diagnostics_enabled=True)
             self.assertEqual(len(result['records']), 3)
             gc.collect()
             self.assertTrue(all(reference() is None for reference in seen))
@@ -143,7 +193,7 @@ class ProcessingTests(unittest.TestCase):
                        return_value=SimpleNamespace(free=0)):
                 with self.assertRaisesRegex(OSError, 'Cross-chain diagnostics need'):
                     process_chains([path], target, 1., [.5], ['x'],
-                                   temporary_parent=tmp, progress=None)
+                                   temporary_parent=tmp, progress=None, diagnostics_enabled=True)
             self.assertEqual(list(Path(tmp).glob('.processing-*')), [])
 
     def test_scratch_is_removed_after_diagnostic_failure(self):
@@ -163,7 +213,7 @@ class ProcessingTests(unittest.TestCase):
             with patch('dcs_bench.processing.mcmc_diagnostics', side_effect=fail_cross):
                 with self.assertRaisesRegex(RuntimeError, 'intentional cross-chain failure'):
                     process_chains(paths, target, 1., [.5], ['x'],
-                                   temporary_parent=root, progress=None)
+                                   temporary_parent=root, progress=None, diagnostics_enabled=True)
             self.assertEqual(list(root.glob('.processing-*')), [])
             for path in paths:
                 self.assertEqual(read_chain(path)[0].shape, (50, 2))

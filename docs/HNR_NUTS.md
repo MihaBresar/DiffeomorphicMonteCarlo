@@ -8,8 +8,8 @@ HnR receives the mean NUTS production-time budget. Construction, compilation and
 
 Eight Schools uses centred coordinates (θ,μ,log τ), including the log-scale Jacobian; outputs use physical τ. GARCH uses the same unconstrained potential and constant physical prior on its stationary triangle for both samplers. See [target definitions](TARGETS.md).
 
-Posterior errors square individual chains' errors before averaging. Inspect moment errors together with counts, preparation/sampling costs, functional ESS, NUTS divergences and depth saturation. Faster execution does not guarantee smaller error.
+Posterior errors square individual chains' errors before averaging. Reports show moment errors, counts and preparation/sampling costs; chain diagnostics are disabled. Faster execution does not guarantee smaller error.
 
 The slice-attempt guard limits an individual transition's work; most transitions may finish earlier. A guarded failure must retain its declared rejection/error behavior and must not silently change the target.
 
-Large HnR output can make diagnostics take additional time after sampling. The [result pipeline](RESULT_PROCESSING.md) stages data in bounded buffers and reports its separate processing costs.
+The [result pipeline](RESULT_PROCESSING.md) calculates estimates and errors one chain at a time. It skips ESS, R-hat, per-chain MCSE and temporary diagnostic traces and unused coordinate quantiles; large output still requires archive writing and reading.

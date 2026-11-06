@@ -1,9 +1,9 @@
 {
   "date": "2026-11-06",
-  "scope": "Matched final-map DCS/SCS preparation, portable replay, current JAX and Numba comparisons",
+  "scope": "Matched DCS-SCS preparation and ESS-only main comparison; standard experiments calculate estimates/errors without chain diagnostics",
   "unit_tests": {
     "command": "python -m unittest discover -s tests -q",
-    "passed": 391,
+    "passed": 397,
     "failures": 0,
     "errors": 0
   },
@@ -61,5 +61,46 @@
     "Execution checks and radial calibration do not establish a sampler ranking or global optimality.",
     "Equal calibration resources and final-map policy do not make native VI routines, proposal units or elapsed costs identical.",
     "Local validation is separate from Linux/Windows CI for the uploaded commit."
-  ]
+  ],
+  "followup_posterior_processing_tests": {
+    "processing_and_policy_tests_passed": 23,
+    "report_tests_passed": 9,
+    "scope": "After disabling unused Eight Schools and GARCH quantile sorting"
+  },
+  "standard_quick_checks": {
+    "experiments": [
+      "skew-t-200d-nuts",
+      "skew-t-200d-baselines",
+      "skew-t-50d-nu-0.5",
+      "eight-schools",
+      "garch11",
+      "logistic-regression"
+    ],
+    "completed_production_chains": 34,
+    "all_chain_diagnostics_disabled": true,
+    "no_diagnostic_trace_files": true,
+    "complete_mse_count_time_reports": true,
+    "posterior_table_generated": true
+  },
+  "posterior_reprocessing": {
+    "experiments": [
+      "eight-schools",
+      "garch11"
+    ],
+    "no_resampling": true,
+    "estimates_and_errors_exactly_unchanged": true,
+    "all_three_csv_tables_byte_identical": true,
+    "chain_and_reference_archives_unchanged": true,
+    "unused_quantile_sorting_disabled": true
+  },
+  "nuts_output_validation": {
+    "blackjax_and_numpyro_positions_bitwise_equal_with_diagnostics_on_or_off": true,
+    "standard_runs_create_no_scalar_diagnostic_files": true,
+    "independent_reference_quality_checks_preserved": true
+  },
+  "diagnostic_scope": {
+    "main_scs_comparison_and_numba_extension": "functional ESS retained",
+    "all_standard_benchmark_chains": "no ESS, rank diagnostics, autocorrelation MCSE, or diagnostic trace staging",
+    "independent_reference_preparation": "separate quality validation retained"
+  }
 }

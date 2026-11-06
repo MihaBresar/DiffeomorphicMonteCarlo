@@ -31,7 +31,7 @@ Seed choices alter sampling streams without altering maps or fitting seeds. Exac
 
 ## Results and stopping
 
-The launcher prints sampling and processing progress. Reports may require extra time after all chains finish; ESS and plots have separate costs.
+The launcher prints sampling and processing progress. Only the main DCS–SCS comparison and its Numba extension calculate ESS. Other experiments skip chain diagnostics; saving samples, calculating errors and rendering plots still have separate costs.
 
 When complete, open **paper_values.html** from the result links. Figures are available as PNG/PDF, and CSV/JSON preserve full precision. Runs are stored under **results → click-runs → dated folder**.
 

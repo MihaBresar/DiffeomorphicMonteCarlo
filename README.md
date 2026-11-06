@@ -56,10 +56,10 @@ Six additional experiments cover 200D skew-t comparisons with NUTS and random-wa
 | `configuration.json`, `manifest.json` | Settings, source hashes, environment, CPU allocation and run status |
 | Map and fitting records | Source fits, effective maps and preparation |
 | `summary.json`, `paper_values.csv`, `paper_values.html` | Results and full-precision exports |
-| `functional_ess.csv` | Functional ESS, draw stride and unavailable reasons |
+| `functional_ess.csv` (main DCS–SCS comparison only) | Functional ESS, draw stride and unavailable reasons |
 | `chains/`, `figures/` | Saved traces and metadata, PNG/PDF figures |
 
-Reports include estimates, MSE, exact generated and post-burn-in counts, production time, ESS and ESS/s. Rejected repeats remain observations. Displays use two decimal places or scientific notation; integer counts remain exact. CSV/JSON retain full precision. Timed counts depend on hardware.
+Reports include estimates, MSE, exact generated and post-burn-in counts and production time. Only the main DCS–SCS comparison and its Numba extension calculate ESS and ESS/s. Other experiments skip benchmark-chain diagnostics, including ESS, R-hat and autocorrelation-based MCSE. Rejected repeats remain observations. Displays use two decimal places or scientific notation; integer counts remain exact. CSV/JSON retain full precision. Timed counts depend on hardware.
 
 The main comparison measures radial mean norm and tail probability, not general or marginal superiority. The t(3) norm has no fourth moment, so empirical MSE uncertainty can be unstable. See [ESS](docs/ESS.md) and the [reviewer guide](docs/REVIEW_GUIDE.md).
 

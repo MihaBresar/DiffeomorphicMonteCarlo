@@ -2,13 +2,18 @@
 
 Automated tests check mathematical kernels, experiment settings, saved outputs and public interfaces. Passing tests and Quick checks do not establish a performance ranking.
 
-Local validation on 6 November 2026 passed **391 tests** and all four current
-DCS/SCS Quick comparisons: 100D/500D in JAX and the Numba extension (**48 production chains**).
-Both full-budget VI fits were replayed exactly, including every loss value.
-All 64 pilot and six diagnostic scores were recomputed independently, and
-fresh-fit and bundled-fit preparation produced identical arrays and selections.
-The checks verify the actual backends, frozen steps, first-third discard and complete reports.
-See the [current validation receipt](../validation/current_checks.json).
+Local validation on 6 November 2026 passed the **397-test suite**, followed by
+23 focused processing/policy tests and nine report tests after removing unused
+posterior quantile sorting. All six standard Quick experiments completed
+(**34 production chains**) without benchmark-chain diagnostics. Eight Schools
+and GARCH were reprocessed without sampling; estimates, errors, counts, timing,
+CSV tables and saved archives remained unchanged.
+
+The main comparison's four Quick checks (**48 production chains**) and matched
+preparation replay also passed. Both full-budget VI fits reproduced exactly;
+all 64 pilot and six diagnostic scores were recomputed independently. These
+main-comparison settings and ESS calculations are unchanged by the standard
+experiment processing update. See the [current validation receipt](../validation/current_checks.json).
 
 ```sh
 python -m pip check

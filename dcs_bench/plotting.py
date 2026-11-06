@@ -1,4 +1,4 @@
-"""Original paper figures and supplementary diagnostics from saved chains."""
+"""Paper estimates, errors, sample counts and timing from saved chains."""
 import csv
 import html
 import json
@@ -12,9 +12,7 @@ import matplotlib.pyplot as plt
 from .targets import Target
 from .processing import process_chains
 from .radial_reporting import compact_radial_report, process_radial_chains
-from .cpu import cpu_info
 from .display import number, cell, figure_ticks
-from .functional_ess import aggregate_functional_ess
 
 COLORS = ['#9370DB', '#FF8C00', '#228B22', '#FF1493', '#4682B4']
 METHOD_COLORS = {'DCS-BW': '#9370DB', 'DCS-RWM': '#FF8C00', 'DCS-HnR': '#9370DB',
@@ -168,8 +166,7 @@ def skew_figures(target, ref, data, config, labels, folder, quick):
     is_nuts = config['experiment'] == 'skew-t-200d-nuts'
     save_figure(radial_boxplots(target, ref, data, config, labels), folder,
                 name if is_nuts else name+'_ergodic_averages', quick)
-    third = ('total_coordinate_bulk_ess' if is_nuts else 'mean_sampling_seconds'
-             if config['mode'] == 'iterations' else 'mean_iterations')
+    third = 'mean_sampling_seconds' if config['mode'] == 'iterations' else 'mean_iterations'
     ncols = 2 if config['experiment'] == 'skew-t-200d-baselines' else 3
     fig, axes = plt.subplots(1, ncols, figsize=(16 if ncols == 2 else 18, 6))
     title = ('Performance & Mean Squared Error Comparison' if config['mode'] == 'iterations'
@@ -179,11 +176,10 @@ def skew_figures(target, ref, data, config, labels, folder, quick):
         bar_panel(ax, algorithms, [data[a]['summary']['mse'][k] for a in algorithms], config,
                   f'MSE of {labels[ref["functional_names"][k]]}', 'Mean Squared Error')
     if ncols == 3:
-        heading, units = {'total_coordinate_bulk_ess': ('Total Effective Sample Size (ESS)', 'Sum of chain mean bulk ESS, first 10 coordinates'),
-                          'mean_sampling_seconds': ('Average Runtime (s)', 'Production Seconds'),
+        heading, units = {'mean_sampling_seconds': ('Average Runtime (s)', 'Production Seconds'),
                           'mean_iterations': ('Average Iterations Generated', 'Production Iterations / Chain')}[third]
         bar_panel(axes[2], algorithms, [data[a]['summary'][third] for a in algorithms], config, heading, units)
-    save_figure(fig, folder, name+'_mse_and_ess' if is_nuts else name, quick)
+    save_figure(fig, folder, name+'_mse_and_sampling' if is_nuts else name, quick)
 
     # Explicitly distinguish generated iterations from retained (thinned) draws.
     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
@@ -227,7 +223,7 @@ def skew_qq_figure(target, ref, data, config, folder, quick):
 
 def export_paper_values(output, config, all_summary):
     """Full-precision CSV values and a table with readable numerical labels."""
-    rows, count_rows, ess_rows = [], [], []
+    rows, count_rows = [], []
     for s, scenario in enumerate(all_summary):
         ref = scenario['reference']
         for a, summary in scenario['algorithms'].items():
@@ -239,11 +235,8 @@ def export_paper_values(output, config, all_summary):
                 mean_iterations=summary['mean_iterations'], mean_iterations_exact=str(Fraction(summary['total_iterations'], config['runs'])),
                 total_retained_samples=summary['total_retained_draws'], mean_retained_samples=summary['mean_retained_draws'],
                 mean_retained_samples_exact=str(Fraction(summary['total_retained_draws'], config['runs'])),
-                thin=config['thin'], mean_production_seconds=summary['mean_sampling_seconds'],
-                total_coordinate_bulk_ess=summary.get('total_coordinate_bulk_ess'))
+                thin=config['thin'], mean_production_seconds=summary['mean_sampling_seconds'])
             counts.update(burnin_counts(summary['records']))
-            if compact_radial_report(config):
-                counts.pop('total_coordinate_bulk_ess', None)
             count_rows.append(counts)
             for k, functional in enumerate(ref['functional_names']):
                 rows.append(dict(counts, functional=functional, reference=ref['functional_truth'][k],
@@ -252,30 +245,13 @@ def export_paper_values(output, config, all_summary):
                     mse_bootstrap_95_high=summary['mse_bootstrap_95_interval'][1][k]))
                 if compact_radial_report(config):
                     rows[-1]['estimate'] = float(np.mean(np.asarray(summary['chain_functional_estimates'])[:, k]))
-                ess = summary.get('functional_ess', {}).get(functional)
-                if ess is not None:
-                    ess_rows.append(dict(scenario=s, algorithm=a, functional=functional,
-                        **{key: json.dumps(value) if isinstance(value, (list, dict)) else value
-                           for key, value in ess.items()}))
-                    rows[-1].update(functional_ess_mean=ess['mean_ess'],
-                        functional_ess_median=ess['median_ess'], functional_ess_sum=ess['total_ess'],
-                        functional_ess_per_sampling_second=ess['ess_per_sampling_second'],
-                        functional_ess_valid_chains=ess['valid_chains'], functional_ess_chains=ess['chains'],
-                        functional_ess_draw_strides=json.dumps(ess['draw_strides']),
-                        functional_ess_unavailable_reasons='; '.join(ess['unavailable_reasons']))
     write_csv(output/'paper_values.csv', rows)
     write_csv(output/'sample_counts.csv', count_rows)
-    if ess_rows:
-        write_csv(output/'functional_ess.csv', ess_rows)
     # Display formatting is separate from the full-precision CSV exports.
     columns = ['scenario', 'algorithm', 'functional', 'mse', 'reference', 'mean_iterations',
                'mean_retained_samples', 'total_iterations', 'total_retained_samples', 'mean_production_seconds']
     if compact_radial_report(config):
         columns.insert(3, 'estimate')
-    if any('functional_ess_mean' in row for row in rows):
-        columns += ['functional_ess_mean', 'functional_ess_per_sampling_second',
-                    'functional_ess_valid_chains', 'functional_ess_chains',
-                    'functional_ess_draw_strides', 'functional_ess_unavailable_reasons']
     if any('total_burnin_iterations' in row for row in rows):
         columns += ['total_burnin_iterations', 'total_estimation_iterations', 'mean_burnin_iterations', 'mean_estimation_iterations']
     burn_note = ('Separate step tuning precedes sampling. Recorded sampling burn-in is included in generated counts and excluded from estimation counts. Retained samples follow tuning, sampling burn-in and thinning. '
@@ -293,19 +269,22 @@ def export_paper_values(output, config, all_summary):
             +burn_note+'These are finite numerical estimates, '
             'displayed with two decimals, using scientific notation for small values. CSV and JSON retain full precision.</p>'
             +('<p>Estimates are averages of independent-chain estimates. This report contains only the norm moment, '
-              'tail probability, MSE, sample counts and timing, plus functional ESS when recorded. No R-hat, coordinate quantiles or directional diagnostics are computed.</p>'
+              'tail probability, MSE, sample counts and timing.</p>'
               if compact_radial_report(config) else '')+
-            ('<p>Functional ESS is raw-mean split-chain autocorrelation ESS for the same retained draws used by each estimate. '
-             'The actual thinning stride is shown and is never multiplied into ESS. Tail-probability ESS uses its binary indicator; '
-             'it is not rank-normalized bulk ESS or quantile tail ESS. ESS per second divides the sum of per-chain ESS by '
-             'full production seconds, including sampling burn-in and excluding setup/diagnostic work. This sum is not the ESS '
-             'of a pooled estimator or a convergence guarantee. Any unavailable chain makes the all-chain aggregate unavailable.</p>'
-             if any('functional_ess_mean' in row for row in rows) else '')+
             '<p><a href="paper_values.csv">Download all values (CSV)</a> · '
             '<a href="sample_counts.csv">Sample counts and exact mean fractions (CSV)</a></p>'
             '<div class="scroll"><table><thead><tr>'+''.join('<th>'+c.replace('_', ' ')+'</th>' for c in columns)+
             '</tr></thead><tbody>'+content+'</tbody></table></div>')
     (output/'paper_values.html').write_text(page, encoding='utf-8')
+
+
+def _report_record(record):
+    """Exclude cached chain diagnostics while retaining estimates and run metadata."""
+    result = {key: value for key, value in record.items() if not key.startswith('functional_ess')}
+    if isinstance(result.get('radial_summary'), dict):
+        result['radial_summary'] = {key: value for key, value in result['radial_summary'].items()
+                                    if not key.startswith('functional_ess')}
+    return result
 
 
 def rebuild(output):
@@ -320,8 +299,7 @@ def rebuild(output):
     folder = output/'figures'
     folder.mkdir(exist_ok=True)
     all_summary, csv_rows, all_data = [], [], []
-    print('Sampling is complete. Collecting moment and tail estimates, MSE, sample counts and timing.'
-          if radial_only else 'Sampling is complete. Processing saved chains and convergence diagnostics.', flush=True)
+    print('Sampling is complete. Collecting estimates, MSE, sample counts and timing.', flush=True)
     for s, spec in enumerate(config['targets']):
         target = Target(spec)
         directory = output/f'scenario-{s}'
@@ -338,15 +316,16 @@ def rebuild(output):
             paths = [directory/'chains'/f'{algorithm}-{i:03d}.npz' for i in range(config['runs'])]
             arguments = dict(expected=manifest['fingerprint'], label=f'Scenario {s}, {algorithm}',
                              progress=lambda message: print(message, flush=True),
-                             ess_enabled=True)
+                             ess_enabled=False)
             if radial_only:
                 processed = process_radial_chains(paths, target, config['threshold'], **arguments)
             else:
                 processed = process_chains(paths, target, config['threshold'], config['q_levels'],
                     ref['functional_names'], temporary_parent=output,
-                    diagnostic_workers=min(4, config.get('workers', 1), cpu_info()['capacity']), **arguments)
+                    diagnostics_enabled=False,
+                    quantiles_enabled=target.kind not in ('eight_schools', 'garch'), **arguments)
             estimates, quantiles, records = (processed[key] for key in ('estimates', 'quantiles', 'records'))
-            length, diagnostics, indiv = (processed[key] for key in ('length', 'diagnostics', 'indiv'))
+            records = [_report_record(record) for record in records]
             errors = mse_summary(estimates, ref['functional_truth'])
             family = 'sphere' if algorithm == 'SCS' else 'ball'
             setup_seconds = setup.get(family, {}).get('optimization', {}).get('seconds', 0.) if algorithm == 'SCS' or algorithm.startswith('DCS') else 0.
@@ -356,30 +335,16 @@ def rebuild(output):
             totals = [r['sampling_seconds']+r.get('warmup_seconds', r.get('warmup_seconds_including_compilation', 0.))
                       +r.get('production_compile_and_pilot_seconds', 0.)+setup_seconds/config['runs'] for r in records]
             algo_summary = dict(errors, chain_functional_estimates=estimates.tolist(),
-                functional_ess=aggregate_functional_ess(records, ref['functional_names']),
-                chain_quantiles=quantiles.tolist(), cross_chain_diagnostics=diagnostics,
-                result_processing=processed['processing'],
-                diagnostic_draws_per_chain=length, independent_chain_diagnostics=indiv,
+                chain_quantiles=quantiles.tolist(), result_processing=processed['processing'],
                 mean_sampling_seconds=float(np.mean([r['sampling_seconds'] for r in records])),
                 mean_seconds_including_setup=float(np.mean(totals)),
                 setup_cost_charging='Shared fit and summed worker compilation durations amortized over this method\'s runs; not total elapsed wall time',
                 records=list(records))
-            if radial_only:
-                for key in ('cross_chain_diagnostics', 'diagnostic_draws_per_chain', 'independent_chain_diagnostics'):
-                    algo_summary.pop(key)
             algo_summary.update(burnin_counts(records))
             for field in ('iterations', 'retained_draws'):
                 total = sum(int(r[field]) for r in records)
                 algo_summary['total_'+field] = total
                 algo_summary['mean_'+field] = total/len(records)
-            if target.kind == 'skew_t' and not radial_only:
-                coord_names = target.names[:10]
-                coordinate_ess = processed['coordinate_ess']
-                values = [v for entry in coordinate_ess for v in entry.values()]
-                algo_summary['chain_coordinate_bulk_ess'] = coordinate_ess
-                algo_summary['total_coordinate_bulk_ess'] = (float(np.sum(values)/len(coord_names))
-                    if all(v is not None for v in values) else None)
-                algo_summary['coordinate_ess_definition'] = 'Sum over chains of the mean bulk ESS of the first min(10,d) coordinates; unavailable if any coordinate ESS is unavailable'
             if target.kind in ('garch', 'eight_schools'):
                 algo_summary['first_moment_rmse_across_chains_and_coordinates'] = float(np.sqrt(np.mean((estimates[:, :target.d]-ref['functional_truth'][:target.d])**2)))
                 algo_summary['second_moment_rmse_across_chains_and_coordinates'] = float(np.sqrt(np.mean((estimates[:, target.d:]-ref['functional_truth'][target.d:])**2)))
@@ -391,17 +356,6 @@ def rebuild(output):
                         estimate=est[k], reference=ref['functional_truth'][k], squared_error=(est[k]-ref['functional_truth'][k])**2,
                         sampling_seconds=record['sampling_seconds'], seconds_including_setup=totals[i],
                         iterations=record['iterations'], retained_draws=record['retained_draws']))
-                    ess_entry = record.get('functional_ess', {}).get(name, {})
-                    csv_rows[-1].update(functional_ess=ess_entry.get('ess'),
-                        functional_ess_per_sampling_second=ess_entry.get('ess_per_sampling_second'),
-                        functional_ess_draw_stride=ess_entry.get('draw_stride'),
-                        functional_ess_draws=ess_entry.get('draws'),
-                        functional_ess_unavailable_reason=ess_entry.get('unavailable_reason'))
-                    if not radial_only:
-                        diag = indiv[i]
-                        ess = diag['ess_bulk'][name]
-                        csv_rows[-1].update(mcse=diag['mcse_mean'][name], ess_bulk=ess, ess_tail=diag['ess_tail'][name],
-                            ess_per_sampling_second=None if ess is None else ess/record['sampling_seconds'])
                     if 'burnin_iterations' in record or 'discarded_iterations' in record:
                         burn = record.get('burnin_iterations', record.get('discarded_iterations'))
                         csv_rows[-1].update(burnin_iterations=burn,
@@ -414,16 +368,15 @@ def rebuild(output):
         writer = csv.DictWriter(stream, fieldnames=list(dict.fromkeys(key for row in csv_rows for key in row)))
         writer.writeheader()
         writer.writerows(csv_rows)
-    diagnostic_seconds = perf_counter()-started
-    print('Estimates collected. Saving tables and figures.' if radial_only else
-          'Convergence diagnostics complete. Saving tables and figures.', flush=True)
+    statistics_seconds = perf_counter()-started
+    print('Estimates collected. Saving tables and figures.', flush=True)
     rendered = _render_prepared(output, config, all_summary, all_data, labels)
     write_json(output/'processing.json', dict(
-        schema_version=1, statistics_seconds=diagnostic_seconds,
-        tables_and_figures_seconds=perf_counter()-started-diagnostic_seconds,
+        schema_version=1, statistics_seconds=statistics_seconds,
+        tables_and_figures_seconds=perf_counter()-started-statistics_seconds,
         total_seconds=perf_counter()-started,
         sampling_clock_includes_result_processing=False,
-        diagnostics_computed=True, functional_ess_computed=True,
+        diagnostics_computed=False, functional_ess_computed=False,
         diagnostic_subsampling=False))
     print(f'Result processing finished in {perf_counter()-started:.2f} seconds.', flush=True)
     return rendered
@@ -456,8 +409,6 @@ def render_saved_summary(output):
                     result[key] = result[key][:2]
                 for key in ('chain_functional_estimates', 'mse_bootstrap_95_interval'):
                     result[key] = [row[:2] for row in result[key]]
-            else:
-                result.setdefault('total_coordinate_bulk_ess', None)
             result.update(burnin_counts(result['records']))
         data = {algorithm: {'estimates': np.asarray(result['chain_functional_estimates']),
                             'quantiles': np.asarray(result['chain_quantiles']),
@@ -471,6 +422,10 @@ def _render_prepared(output, config, all_summary, all_data, labels):
     folder = output/'figures'
     folder.mkdir(exist_ok=True)
     quick = config['preset'] == 'quick'
+    # Remove only generated diagnostics retired from these standard reports.
+    (output/'functional_ess.csv').unlink(missing_ok=True)
+    for suffix in ('png', 'pdf'):
+        (folder/(config['figure']+'_mse_and_ess.'+suffix)).unlink(missing_ok=True)
     export_paper_values(output, config, all_summary)
     if config['experiment'] == 'logistic-regression':
         fig, axes = plt.subplots(len(all_data), len(config['algorithms']), figsize=(12, 10), squeeze=False)

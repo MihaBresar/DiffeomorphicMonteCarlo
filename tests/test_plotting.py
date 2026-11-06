@@ -12,7 +12,7 @@ from dcs_bench.engine import save_chain, write_json
 from tests.configuration_fixtures import load_config
 from dcs_bench.references import make_reference, functional_draws
 from dcs_bench.targets import Target
-from dcs_bench.plotting import rebuild, render_saved_summary, burnin_counts, number, method_labels, ball_map_description
+from dcs_bench.plotting import rebuild, render_saved_summary, burnin_counts, number, method_labels, ball_map_description, skew_figures, LABELS
 
 
 class FigureTests(unittest.TestCase):
@@ -61,6 +61,79 @@ class FigureTests(unittest.TestCase):
         self.assertEqual(ball_map_description(posterior), 'posterior identity map')
         self.assertNotIn('vanilla', method_labels(['DCS-BW'], posterior)[0])
 
+    def test_nuts_performance_figure_uses_counts_instead_of_ess(self):
+        config = load_config('skew-t-200d-nuts', 'quick')
+        target = Target(config['targets'][0])
+        ref = {'functional_names': ['tail_probability', 'mean_norm'],
+               'functional_truth': [.01, 10.]}
+        data = {algorithm: {'estimates': np.array([[.02, 9.], [.01, 10.]]),
+            'records': [{'iterations': 100, 'retained_draws': 50}],
+            'summary': {'mse': [.001, 1.], 'mean_iterations': 100,
+                        'mean_retained_draws': 50, 'mean_sampling_seconds': 2.}}
+                for algorithm in config['algorithms']}
+        saved = []
+        def capture(fig, folder, name, quick):
+            saved.append((name, [ax.get_title() for ax in fig.axes]))
+            import matplotlib.pyplot as plt
+            plt.close(fig)
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch('dcs_bench.plotting.skew_qq_figure'), \
+             patch('dcs_bench.plotting.save_figure', side_effect=capture):
+            skew_figures(target, ref, data, config, LABELS, Path(tmp), False)
+        performance = next(titles for name, titles in saved if name.endswith('_mse_and_sampling'))
+        self.assertEqual(performance[-1], 'Average Iterations Generated')
+        self.assertFalse(any('ESS' in title for _, titles in saved for title in titles))
+
+    def test_posterior_reports_skip_unused_chain_quantiles_and_preserve_rmse(self):
+        from dcs_bench.processing import process_chains
+        for experiment in ('eight-schools', 'garch11'):
+            with self.subTest(experiment=experiment), tempfile.TemporaryDirectory() as tmp:
+                config = load_config(experiment, 'quick')
+                target = Target(config['targets'][0])
+                root = Path(tmp)
+                write_json(root/'configuration.json', config)
+                write_json(root/'manifest.json', {'fingerprint': 'posterior-estimates-only'})
+                scenario = root/'scenario-0'
+                scenario.mkdir()
+                truth = np.r_[np.zeros(target.d), np.ones(target.d)]
+                reference = {'functional_names': [f'mean_{name}' for name in target.names]
+                    + [f'second_{name}' for name in target.names],
+                    'functional_truth': truth.tolist(), 'functional_reference_mcse': [0.]*(2*target.d),
+                    'quantiles': []}
+                write_json(scenario/'reference.json', reference)
+                write_json(scenario/'setup.json', {})
+                rng = np.random.default_rng(176)
+                expected = {}
+                for algorithm in config['algorithms']:
+                    expected[algorithm] = []
+                    for chain in range(config['runs']):
+                        draws = rng.normal(size=(41+chain, target.d))
+                        expected[algorithm].append(functional_draws(target, draws, config['threshold']).mean(axis=0))
+                        save_chain(scenario/'chains'/f'{algorithm}-{chain:03d}.npz', draws,
+                            dict(fingerprint='posterior-estimates-only', seed=chain,
+                                iterations=len(draws), retained_draws=len(draws), sampling_seconds=1.))
+                def no_chain_quantiles(*args, **kwargs):
+                    self.assertFalse(kwargs['quantiles_enabled'])
+                    with patch('numpy.quantile', side_effect=AssertionError('Unused chain quantiles requested')):
+                        return process_chains(*args, **kwargs)
+                with patch('dcs_bench.plotting.process_chains', side_effect=no_chain_quantiles):
+                    rebuild(root)
+                results = json.loads((root/'summary.json').read_text())['scenarios'][0]['algorithms']
+                for algorithm, result in results.items():
+                    estimates = np.asarray(expected[algorithm])
+                    np.testing.assert_array_equal(result['chain_functional_estimates'], estimates)
+                    np.testing.assert_array_equal(result['mse'], ((estimates-truth)**2).mean(axis=0))
+                    for moment, label in enumerate(('first', 'second')):
+                        sl = slice(moment*target.d, (moment+1)*target.d)
+                        expected_rmse = np.sqrt(np.mean((estimates[:, sl]-truth[sl])**2))
+                        self.assertEqual(result[f'{label}_moment_rmse_across_chains_and_coordinates'], expected_rmse)
+                    self.assertEqual(result['chain_quantiles'], [[] for _ in range(config['runs'])])
+                    self.assertFalse(result['result_processing']['quantiles_computed'])
+                # Empty serialized quantiles remain safe for saved-summary replot.
+                with patch('dcs_bench.engine.read_chain', side_effect=AssertionError('No chain reread')):
+                    render_saved_summary(root)
+                self.assertTrue((root/'posterior_table.tex').exists())
+
     def test_original_figure_set_and_values_from_unchanged_checkpoints(self):
         config = load_config('skew-t-50d-nu-0.5', 'quick', {'ball_map_policy': 'vanilla'})
         config['targets'][0]['dimension'] = 4
@@ -88,11 +161,24 @@ class FigureTests(unittest.TestCase):
                              retained_draws=n, sampling_seconds=1.0))
                 expected[a] = np.mean((np.array(estimates)-ref['functional_truth'])**2, axis=0)
             before = {p:hashlib.sha256(p.read_bytes()).hexdigest() for p in scenario.rglob('*.npz')}
-            with patch('dcs_bench.samplers.run_metropolis', side_effect=AssertionError('No MCMC during replot')):
+            (root/'functional_ess.csv').write_text('obsolete diagnostic export')
+            with patch('dcs_bench.samplers.run_metropolis', side_effect=AssertionError('No MCMC during replot')), \
+                 patch('dcs_bench.processing.mcmc_diagnostics', side_effect=AssertionError('No chain diagnostics')), \
+                 patch('dcs_bench.processing._FunctionalStore', side_effect=AssertionError('No diagnostic staging')), \
+                 patch('dcs_bench.functional_ess.functional_ess', side_effect=AssertionError('No ESS computation')):
                 rebuild(root)
+            self.assertFalse((root/'functional_ess.csv').exists())
+            processing = json.loads((root/'processing.json').read_text())
+            self.assertFalse(processing['diagnostics_computed'])
+            self.assertFalse(processing['functional_ess_computed'])
             summary = json.loads((root/'summary.json').read_text())['scenarios'][0]['algorithms']
             self.assertEqual(summary['DCS-BW']['mean_seconds_including_setup'], 3.0)
             self.assertEqual(summary['SCS']['mean_seconds_including_setup'], 1.0)
+            for result in summary.values():
+                for key in ('functional_ess', 'cross_chain_diagnostics', 'independent_chain_diagnostics',
+                            'total_coordinate_bulk_ess', 'chain_coordinate_bulk_ess'):
+                    self.assertNotIn(key, result)
+                self.assertEqual(result['result_processing']['staged_functional_bytes'], 0)
             for p, digest in before.items():
                 self.assertEqual(hashlib.sha256(p.read_bytes()).hexdigest(), digest)
             for suffix in ('', '_marginal_qq', '_ergodic_averages', '_sample_counts'):
@@ -100,6 +186,7 @@ class FigureTests(unittest.TestCase):
             self.assertTrue((root/'figures/supplementary/SuperInfiniteFirstTest_directional.png').exists())
             with (root/'paper_values.csv').open() as stream:
                 rows = list(csv.DictReader(stream))
+            self.assertFalse(any('ess' in key or 'rhat' in key for key in rows[0]))
             for row in rows:
                 self.assertEqual(row['ball_map_policy'], 'vanilla')
                 k = ref['functional_names'].index(row['functional'])

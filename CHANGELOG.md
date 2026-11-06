@@ -7,6 +7,7 @@
 - A portable preparation driver reproduces full-budget VI, all calibration candidates and frozen selections with explicit seeds, hashes and costs.
 - Eight numbered sampling-seed choices, with exact seeds recorded.
 - Numba production kernels for DCS and random-walk methods in the other experiments.
-- Exact sample counts, two-decimal displays, full-precision exports, functional ESS and separate preparation/production timing.
+- Exact sample counts, two-decimal displays, full-precision exports and separate preparation/production timing.
+- Functional ESS only in the main DCS–SCS comparison and its Numba extension; other experiments skip chain diagnostics and NUTS diagnostic trace files.
 
 The [comparison protocol](docs/REPORTED_STUDY.md) specifies settings and limitations. Both optimized families calibrate on their effective production maps. Equal transition budgets are distinct from equal elapsed preparation time.

@@ -1,6 +1,6 @@
 # Saving and processing results
 
-Sampling, archive writing, diagnostics and figure rendering have separate progress messages and recorded times. Reports can take time after chains finish. Logical array sizes describe stored data, not peak process memory.
+Sampling, archive writing, estimation and figure rendering have separate progress messages and recorded times. ESS is restricted to the main DCS–SCS comparison and its Numba extension. Logical array sizes describe stored data, not peak process memory.
 
 ## Main comparison
 
@@ -12,11 +12,13 @@ Scalar capture and buffer flushes are inside production time. ESS calculation, w
 
 Workers stream retained physical states into temporary files with bounded write buffers. Burn-in selects the appropriate view; archive writing copies data in bounded blocks. Completed chains release their storage before the worker takes another job.
 
-Streaming, coordinate conversion, thinning and buffer flushes are included in production time. Final archive serialization and report construction are separate. NUTS also records required scalar diagnostics during sampling.
+Streaming, coordinate conversion, thinning and buffer flushes are included in production time. Final archive serialization and report construction are separate. Standard NUTS runs retain physical states without writing separate per-iteration diagnostic files. Internal adaptation and transitions are unchanged.
 
-The compact 200D baseline report reads cached radial estimates and ESS metadata. It omits coordinate quantiles and cross-chain diagnostics. References are analytic.
+The compact 200D baseline report reads cached radial estimates. It omits coordinate quantiles and chain diagnostics. References are analytic.
 
-Full posterior reports process one chain and one functional at a time, staging scalar traces on disk. Cross-chain diagnostics use the common prefix of the shortest chain. Individual diagnostic concurrency is bounded by the selected worker count. Large runs still require temporary disk space and autocorrelation/sorting work.
+Posterior reports process one saved chain at a time to calculate estimates, moment errors and the retained accuracy summaries. They do not stage traces for cross-chain analysis or calculate ESS, R-hat or autocorrelation-based MCSE. Eight Schools and GARCH retain their first- and second-moment RMSE tables and skip unused coordinate-quantile sorting. Saving and reading large physical chains still takes time.
+
+Independent reference preparation has separate quality checks and reference-error estimates. These validate the reference used for error calculations; they are not repeated diagnostics of the benchmark chains.
 
 Archives use a common lossless storage/compression policy for all methods. Metadata records saving choices and costs. Temporary mappings close before deletion, including on Windows.
 
@@ -26,10 +28,10 @@ Archives use a common lossless storage/compression policy for all methods. Metad
 python run_experiment.py --plot-only results/example-run
 ```
 
-A completed summary regenerates figures without repeating diagnostics. To explicitly recompute diagnostics from saved chains:
+A completed summary regenerates figures without rereading chains. To explicitly recompute estimates from saved chains:
 
 ```sh
-python run_experiment.py --plot-only results/example-run --recompute-diagnostics
+python run_experiment.py --plot-only results/example-run --recompute-estimates
 ```
 
 Saved-chain files and their original configuration remain unchanged. Rebuilding a report does not recover transitions that were not retained. A new scientific configuration or timing protocol requires a fresh complete run.

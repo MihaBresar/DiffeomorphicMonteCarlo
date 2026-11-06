@@ -66,7 +66,7 @@ The worker calls this after its production clock has stopped.
         raise ValueError('Radial summaries require nonempty physical draws with the target dimension')
     rows = max(1, _BLOCK_BYTES // (target.d * values.dtype.itemsize))
     tail_count = 0
-    norms = np.empty(len(values)) if ess_enabled or sampling_seconds is not None else None
+    norms = np.empty(len(values)) if ess_enabled else None
     offset = 0
 
     def moment_sums():

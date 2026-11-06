@@ -27,7 +27,7 @@ def main():
     config = load_config('logistic-regression', args.preset, {'workers': args.workers})
     config.update(warmup=args.warmup or {'paper': 4000, 'reproduce': 1000, 'quick': 100}[args.preset],
                   nuts_samples=args.draws or {'paper': 100000, 'reproduce': 10000, 'quick': 128}[args.preset],
-                  nuts_target_accept=.95, nuts_max_depth=12, thin=1)
+                  nuts_target_accept=.95, nuts_max_depth=12, thin=1, reference_diagnostics=True)
     root.mkdir(parents=True, exist_ok=True)
     plan = execution_plan(config['workers'], 4)
     context = environment()

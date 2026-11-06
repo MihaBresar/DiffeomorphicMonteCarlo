@@ -16,7 +16,7 @@ DCS and calibrated SCS receive equal VI evaluation and R/h selection-transition 
 
 ## Clocks and allocation
 
-Compared methods receive the same requested production seconds and worker allocation. Production includes transitions, rejected repeats, radial recording and scalar capture for ESS. Compilation, warmup, synchronization waits, fitting, ESS calculation and report generation have separate clocks.
+Compared methods receive the same requested production seconds and worker allocation. Production includes transitions, rejected repeats and recorded observations. The main DCS–SCS comparison also includes scalar capture for ESS. Compilation, warmup, synchronization waits, fitting, ESS calculation and report generation have separate clocks.
 
 The main comparison completes its final 300-transition block; general timed kernels use bounded batches. Actual time, overshoot and counts are recorded. Production includes the first third subsequently discarded.
 
@@ -31,7 +31,7 @@ effects; synchronized allocation alone cannot eliminate these effects.
 
 ## Estimates and diagnostics
 
-Main-comparison estimates and functional ESS use all post-burn-in scalar observations; saved-trace thinning changes neither. Other experiments record the actual retained-draw basis.
+Main-comparison estimates and functional ESS use all post-burn-in scalar observations; saved-trace thinning changes neither. Other experiments record the actual retained-draw basis and skip benchmark-chain ESS, R-hat and autocorrelation-based MCSE. Independent reference validation remains a separate preparation step.
 
 MSE averages individual chains' squared errors against the reference. Empirical MSE variability and paired differences use the available chains and can be unstable under heavy tails. Main radial references are analytic.
 

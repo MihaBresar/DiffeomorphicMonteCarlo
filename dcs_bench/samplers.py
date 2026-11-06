@@ -243,10 +243,12 @@ class BlackJAXRunner:
         import blackjax
         jax.config.update('jax_enable_x64', True)
         self.target, self.config = target, config
+        self.reference_diagnostics = config.get('reference_diagnostics', False) is True
         logdensity = lambda x: target.log_prob(x, 'jax')
         adaptation = blackjax.window_adaptation(blackjax.nuts, logdensity,
             target_acceptance_rate=config['nuts_target_accept'],
-            adaptation_info_fn=lambda state, info, adapt: (info.is_divergent, info.num_integration_steps),
+            adaptation_info_fn=((lambda state, info, adapt: (info.is_divergent, info.num_integration_steps))
+                                if self.reference_diagnostics else (lambda state, info, adapt: None)),
             max_num_doublings=config['nuts_max_depth'])
         warm = jax.jit(lambda key, x: adaptation.run(key, x, num_steps=config['warmup']))
         kernel = blackjax.nuts.build_kernel()
@@ -256,8 +258,10 @@ class BlackJAXRunner:
             def step(carry, key):
                 state, info = kernel(key, carry, logdensity, step_size, inverse_mass_matrix,
                                      max_num_doublings=config['nuts_max_depth'])
-                return state, (state.position, info.acceptance_rate, info.is_divergent,
-                               info.num_integration_steps, info.num_trajectory_expansions)
+                if self.reference_diagnostics:
+                    return state, (state.position, info.acceptance_rate, info.is_divergent,
+                                   info.num_integration_steps, info.num_trajectory_expansions)
+                return state, (state.position,)
             return jax.lax.scan(step, state, jax.random.split(key, batch_size))
 
         start = time.perf_counter()
@@ -278,7 +282,8 @@ class BlackJAXRunner:
         warmup_seconds = time.perf_counter()-start
         chunks, count, used_count = [], 0, 0
         with ExitStack() as stack:
-            metrics = _ScalarTraces(stack, collector.directory if collector is not None else None)
+            metrics = (_ScalarTraces(stack, collector.directory if collector is not None else None)
+                       if self.reference_diagnostics else None)
             start = time.perf_counter()
             while (count < iterations if seconds is None else time.perf_counter()-start < seconds):
                 key, drawkey = jax.random.split(key)
@@ -286,29 +291,34 @@ class BlackJAXRunner:
                 used = len(info[0]) if iterations is None else min(len(info[0]), max(0, iterations-count))
                 if used:
                     _append_physical(chunks, collector, self.target, info[0][:used], count, c['thin'])
-                    metrics.append(info[1:], used)
+                    if metrics is not None:
+                        metrics.append(info[1:], used)
                     used_count += used
                 count += c['nuts_batch_size']
-            metrics.flush()
+            if metrics is not None:
+                metrics.flush()
             if collector is not None:
                 collector.flush()
             elapsed = time.perf_counter()-start
             draws = _finish_physical(chunks, collector, self.target.d)
-            acc, div, work, depth = metrics.finalize()
             record = {'algorithm': 'NUTS', 'implementation': 'BlackJAX', 'sampling_backend': 'jax', 'seed': seed,
                 'iterations': used_count, 'computed_iterations': count, 'retained_draws': len(draws), 'thin': c['thin'],
                 'warmup_iterations': c['warmup'], 'warmup_seconds': warmup_seconds,
                 'sampling_seconds': elapsed, 'requested_seconds': seconds,
                 'budget_overshoot_seconds': max(0., elapsed-seconds) if seconds else 0.,
-                'acceptance_rate': float(acc.mean()), 'divergences': int(div.sum()),
-                'max_depth_hits': _count_at_least(depth, c['nuts_max_depth']),
-                'gradient_evaluations': int(work.sum()), 'warmup_divergences': int(np.asarray(winfo[0]).sum()),
                 'frozen_scale': float(parameters['step_size']), 'inverse_mass_matrix': np.asarray(parameters['inverse_mass_matrix']).tolist(),
                 'adaptation_during_sampling': False,
-                'sampling_output_timing': 'Thinning, physical conversion, scalar recording, draw appends and final buffer flush included',
-                'diagnostic_collection': metrics.metadata(),
+                'sampling_output_timing': ('Thinning, physical conversion, draw appends and final buffer flush included'
+                                          + ('; reference diagnostic scalar recording included' if metrics is not None else '')),
+                'reference_diagnostics_computed': self.reference_diagnostics,
                 'draw_collection': (collector.metadata() if collector is not None else
                                        {'collection_strategy': 'in-memory standalone API'})}
+            if metrics is not None:
+                acc, div, work, depth = metrics.finalize()
+                record.update(acceptance_rate=float(acc.mean()), divergences=int(div.sum()),
+                    max_depth_hits=_count_at_least(depth, c['nuts_max_depth']),
+                    gradient_evaluations=int(work.sum()), warmup_divergences=int(np.asarray(winfo[0]).sum()),
+                    diagnostic_collection=metrics.metadata())
             from .burnin import discard_burnin
             return discard_burnin(draws, record, c)
 
@@ -325,6 +335,7 @@ class NumPyroRunner:
         from numpyro.infer import NUTS
         jax.config.update('jax_enable_x64', True)
         self.target, self.config = target, config
+        self.reference_diagnostics = config.get('reference_diagnostics', False) is True
         kernel = NUTS(potential_fn=lambda x: -target.log_prob(x, 'jax'),
                       target_accept_prob=config['nuts_target_accept'], max_tree_depth=config['nuts_max_depth'])
         start = time.perf_counter()
@@ -341,7 +352,9 @@ class NumPyroRunner:
             def run_batch(state):
                 def step(state, unused):
                     state = one_step(state)
-                    return state, (state.z, state.accept_prob, state.diverging, state.num_steps)
+                    if self.reference_diagnostics:
+                        return state, (state.z, state.accept_prob, state.diverging, state.num_steps)
+                    return state, (state.z,)
                 return jax.lax.scan(step, state, None, length=length)
             return jax.jit(run_batch).lower(dummy).compile()
         self.production = production(self.production_batch_size)
@@ -357,7 +370,8 @@ class NumPyroRunner:
         frozen_scale = float(state.adapt_state.step_size)
         chunks, count = [], 0
         with ExitStack() as stack:
-            metrics = _ScalarTraces(stack, collector.directory if collector is not None else None)
+            metrics = (_ScalarTraces(stack, collector.directory if collector is not None else None)
+                       if self.reference_diagnostics else None)
             start = time.perf_counter()
             while count < c['nuts_samples']:
                 batch = (self.production if c['nuts_samples']-count >= self.production_batch_size
@@ -365,30 +379,34 @@ class NumPyroRunner:
                 state, result = jax.block_until_ready(batch(state))
                 raw = np.asarray(result[0])
                 _append_physical(chunks, collector, self.target, raw, count, c['thin'])
-                metrics.append(result[1:], len(raw))
+                if metrics is not None:
+                    metrics.append(result[1:], len(raw))
                 count += len(raw)
-            metrics.flush()
+            if metrics is not None:
+                metrics.flush()
             if collector is not None:
                 collector.flush()
             elapsed = time.perf_counter()-start
             if float(state.adapt_state.step_size) != frozen_scale:
                 raise RuntimeError('NUTS adapted during production')
             draws = _finish_physical(chunks, collector, self.target.d)
-            acc, div, work = metrics.finalize()
             record = {'algorithm': 'NUTS', 'implementation': 'NumPyro', 'sampling_backend': 'jax', 'seed': seed,
                 'iterations': count, 'retained_draws': len(draws), 'thin': c['thin'],
                 'warmup_iterations': c['warmup'], 'warmup_seconds': warmup_seconds,
-                'sampling_seconds': elapsed, 'acceptance_rate': float(acc.mean()),
-                'divergences': int(div.sum()),
-                'max_depth_hits': _count_at_least(work, 2**c['nuts_max_depth']-1),
-                'max_depth_detection': 'num_steps >= 2**max_tree_depth - 1 (full tree saturation)',
-                'gradient_evaluations': int(work.sum()), 'frozen_scale': frozen_scale,
+                'sampling_seconds': elapsed, 'frozen_scale': frozen_scale,
                 'inverse_mass_matrix': np.asarray(state.adapt_state.inverse_mass_matrix).tolist(),
                 'adaptation_during_sampling': False,
                 'production_batch_size': self.production_batch_size,
-                'sampling_output_timing': 'Thinning, physical conversion, scalar recording, draw appends and final buffer flush included',
-                'diagnostic_collection': metrics.metadata(),
+                'sampling_output_timing': ('Thinning, physical conversion, draw appends and final buffer flush included'
+                                          + ('; reference diagnostic scalar recording included' if metrics is not None else '')),
+                'reference_diagnostics_computed': self.reference_diagnostics,
                 'draw_collection': (collector.metadata() if collector is not None else
                                        {'collection_strategy': 'in-memory standalone API'})}
+            if metrics is not None:
+                acc, div, work = metrics.finalize()
+                record.update(acceptance_rate=float(acc.mean()), divergences=int(div.sum()),
+                    max_depth_hits=_count_at_least(work, 2**c['nuts_max_depth']-1),
+                    max_depth_detection='num_steps >= 2**max_tree_depth - 1 (full tree saturation)',
+                    gradient_evaluations=int(work.sum()), diagnostic_collection=metrics.metadata())
             from .burnin import discard_burnin
             return discard_burnin(draws, record, c)

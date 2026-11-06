@@ -46,8 +46,9 @@ def parser():
     p.add_argument('--reference-dir', type=Path, default=Path('results/references/logistic-paper'))
     p.add_argument('--resume', action='store_true')
     p.add_argument('--plot-only', type=Path, metavar='SAVED_RUN')
-    p.add_argument('--recompute-diagnostics', action='store_true',
-                   help='With --plot-only, recalculate statistics from saved chains instead of using the completed summary')
+    p.add_argument('--recompute-estimates', dest='recompute_diagnostics', action='store_true',
+                   help='With --plot-only, recalculate estimates from saved chains instead of using the completed summary')
+    p.add_argument('--recompute-diagnostics', dest='recompute_diagnostics', action='store_true', help=argparse.SUPPRESS)
     p.add_argument('--dry-run', action='store_true')
     for name in ('runs', 'iterations', 'warmup', 'thin', 'nuts-samples', 'nuts-max-depth', 'nuts-batch-size', 'optimizer-steps', 'optimizer-samples', 'reference-samples', 'reference-batch-size', 'workers'):
         p.add_argument('--'+name, type=int)
@@ -72,7 +73,7 @@ def main(argv=None):
     if args.target is not None and (args.plot_only or args.experiment not in REPORTED_COMPARISONS):
         p.error('--target applies only to the reported-study comparisons')
     if args.recompute_diagnostics and not args.plot_only:
-        p.error('--recompute-diagnostics requires --plot-only SAVED_RUN')
+        p.error('--recompute-estimates requires --plot-only SAVED_RUN')
     if args.list:
         print('\n'.join(named_experiments()))
         return 0

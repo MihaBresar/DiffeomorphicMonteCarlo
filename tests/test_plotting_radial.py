@@ -1,4 +1,4 @@
-"""Compact reports add cached functional ESS without full convergence reports."""
+"""Standard reports keep estimates and timing without chain diagnostics."""
 import csv
 import json
 from pathlib import Path
@@ -62,7 +62,8 @@ class CompactFigureTests(unittest.TestCase):
                                  sampling_seconds=1.+index, draw_stride=config['thin'], ess_enabled=True)))
             with patch('dcs_bench.engine.read_chain', side_effect=AssertionError('Use cached estimates')), \
                  patch('dcs_bench.plotting.process_chains', side_effect=AssertionError('No full diagnostics')), \
-                 patch('dcs_bench.plotting.skew_qq_figure', side_effect=AssertionError('No coordinate quantiles')):
+                 patch('dcs_bench.plotting.skew_qq_figure', side_effect=AssertionError('No coordinate quantiles')), \
+                 patch('dcs_bench.functional_ess.estimate_ess', side_effect=AssertionError('No ESS computation')):
                 rebuild(root)
             saved = json.loads((root/'summary.json').read_text())
             for algorithm, result in saved['scenarios'][0]['algorithms'].items():
@@ -74,8 +75,11 @@ class CompactFigureTests(unittest.TestCase):
                 self.assertEqual(result['total_burnin_iterations'], 94)
                 self.assertEqual(result['mean_sampling_seconds'], 1.5)
                 self.assertEqual(result['result_processing']['cached_chains'], 2)
-                self.assertEqual(set(result['functional_ess']), set(ref['functional_names']))
-                self.assertEqual(result['functional_ess']['mean_norm']['draw_strides'], [config['thin']])
+                self.assertNotIn('functional_ess', result)
+                self.assertFalse(result['result_processing']['functional_ess_computed'])
+                for record in result['records']:
+                    self.assertNotIn('functional_ess', record)
+                    self.assertNotIn('functional_ess', record['radial_summary'])
                 for omitted in ('total_coordinate_bulk_ess', 'cross_chain_diagnostics', 'independent_chain_diagnostics'):
                     self.assertNotIn(omitted, result)
             figures = {path.name for path in (root/'figures').iterdir()}
@@ -86,14 +90,15 @@ class CompactFigureTests(unittest.TestCase):
                     rows = list(csv.DictReader(stream))
                 self.assertEqual({row['functional'] for row in rows}, set(ref['functional_names']))
                 self.assertTrue(all('estimate' in row for row in rows))
-                self.assertTrue(any('functional_ess' in key for key in rows[0]))
+                self.assertFalse(any('ess' in key or 'rhat' in key for key in rows[0]))
                 self.assertFalse(any('rhat' in key or 'ess_bulk' in key for key in rows[0]))
             with (root/'paper_values.csv').open() as stream:
                 for row in csv.DictReader(stream):
                     k = ref['functional_names'].index(row['functional'])
                     self.assertAlmostEqual(float(row['estimate']), np.mean(expected[row['algorithm']], axis=0)[k])
-            self.assertTrue(json.loads((root/'processing.json').read_text())['functional_ess_computed'])
-            self.assertTrue((root/'functional_ess.csv').is_file())
+            self.assertFalse(json.loads((root/'processing.json').read_text())['functional_ess_computed'])
+            self.assertFalse(json.loads((root/'processing.json').read_text())['diagnostics_computed'])
+            self.assertFalse((root/'functional_ess.csv').exists())
 
             # Historical completed summaries may contain four quantities.
             # Compact replot selects radial values without rewriting that data.

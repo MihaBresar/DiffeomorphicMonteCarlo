@@ -8,6 +8,7 @@ os.environ.setdefault('JAX_ENABLE_X64', 'true')
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
@@ -24,13 +25,20 @@ class StreamedSamplerTests(unittest.TestCase):
 
     def config(self):
         return dict(warmup=50, thin=7, nuts_samples=1031, nuts_batch_size=16,
-                    nuts_target_accept=.8, nuts_max_depth=4, burnin_fraction=1/3)
+                    nuts_target_accept=.8, nuts_max_depth=4, burnin_fraction=1/3,
+                    reference_diagnostics=True)
 
     def assert_counters_equal(self, actual, expected):
         for key in ('iterations', 'retained_draws', 'acceptance_rate', 'divergences',
                     'max_depth_hits', 'gradient_evaluations', 'frozen_scale',
                     'inverse_mass_matrix', 'burnin_iterations', 'first_retained_iteration'):
             self.assertEqual(actual[key], expected[key], key)
+
+    def assert_no_benchmark_diagnostics(self, record):
+        self.assertFalse(record['reference_diagnostics_computed'])
+        for name in ('acceptance_rate', 'divergences', 'max_depth_hits', 'gradient_evaluations',
+                     'warmup_divergences', 'diagnostic_collection'):
+            self.assertNotIn(name, record)
 
     def test_python_oracle_stream_keeps_same_draws_and_counters(self):
         target = self.target()
@@ -90,6 +98,17 @@ class StreamedSamplerTests(unittest.TestCase):
         self.assertIs(type(standalone), np.ndarray)
         np.testing.assert_array_equal(standalone, expected)
         self.assert_counters_equal(record, expected_record)
+        # Ordinary benchmarks emit only positions and never allocate scalar files.
+        plain_config = {k:v for k,v in config.items() if k != 'reference_diagnostics'}
+        plain = NumPyroRunner(target, plain_config)
+        with tempfile.TemporaryDirectory() as tmp:
+            with DiskDrawCollector(2, directory=tmp, buffer_bytes=256) as collector:
+                with patch('dcs_bench.samplers._ScalarTraces', side_effect=AssertionError('No scalar diagnostics')):
+                    actual, record = plain.run(seed, collector=collector)
+                np.testing.assert_array_equal(actual, expected)
+                self.assertEqual(record['frozen_scale'], expected_record['frozen_scale'])
+                self.assert_no_benchmark_diagnostics(record)
+            self.assertEqual(list(Path(tmp).iterdir()), [])
 
     def test_blackjax_stream_preserves_global_thinning_and_partial_batch(self):
         import jax
@@ -126,6 +145,17 @@ class StreamedSamplerTests(unittest.TestCase):
                 self.assertEqual(record['computed_iterations'], count)
                 self.assertEqual(record['warmup_divergences'], int(np.asarray(warm_info[0]).sum()))
                 self.assertTrue(np.shares_memory(actual, collector.finalize()))
+            self.assertEqual(list(Path(tmp).iterdir()), [])
+
+        plain_config = {k:v for k,v in config.items() if k != 'reference_diagnostics'}
+        plain = BlackJAXRunner(target, plain_config)
+        with tempfile.TemporaryDirectory() as tmp:
+            with DiskDrawCollector(2, directory=tmp, buffer_bytes=256) as collector:
+                with patch('dcs_bench.samplers._ScalarTraces', side_effect=AssertionError('No scalar diagnostics')):
+                    actual, record = plain.run(seed, iterations=iterations, collector=collector)
+                np.testing.assert_array_equal(actual, expected)
+                self.assertEqual(record['frozen_scale'], expected_record['frozen_scale'])
+                self.assert_no_benchmark_diagnostics(record)
             self.assertEqual(list(Path(tmp).iterdir()), [])
 
 

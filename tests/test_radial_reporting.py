@@ -40,6 +40,14 @@ class RadialReportingTests(unittest.TestCase):
             self.assertEqual(actual['retained_draws'], 7)
             self.assertEqual(actual['target'], target.spec)
 
+    def test_sampling_time_does_not_implicitly_enable_ess(self):
+        draws = np.random.default_rng(44).normal(size=(53, self.target.d))
+        with patch('dcs_bench.functional_ess.radial_ess', side_effect=AssertionError('No ESS requested')):
+            result = summarize_radial(draws, self.target, 5., sampling_seconds=2., ess_enabled=False)
+        self.assertNotIn('functional_ess', result)
+        np.testing.assert_allclose(result['estimates'],
+            functional_draws(self.target, draws, 5.)[:, :2].mean(axis=0), rtol=2e-15)
+
     def test_norm_work_is_bounded_and_all_draws_are_used(self):
         target = Target(dict(kind='skew_t', dimension=200, nu=3))
         draws = np.random.default_rng(815).normal(size=(11000, 200))
@@ -195,13 +203,14 @@ class RadialReportingTests(unittest.TestCase):
                           workers=1)
             job = dict(worker_slot=0, fingerprint='worker-test', scenario=0, seconds=.75)
             chain = dict(index=0, seed=4, path=str(path))
-            with patch('builtins.print'):
+            with patch('builtins.print'), patch('dcs_bench.functional_ess.radial_ess', side_effect=AssertionError('No worker ESS')):
                 _run_and_save_chain(job, chain, self.target, config, 'RWM-Gaussian', Runner(), None, {})
             saved, record = read_chain(path, 'worker-test')
             np.testing.assert_array_equal(saved, raw[3:])
             np.testing.assert_allclose(record['radial_summary']['estimates'],
                 functional_draws(self.target, saved, 5.)[:, :2].mean(axis=0), rtol=2e-15)
             self.assertEqual(record['radial_summary']['retained_draws'], 7)
+            self.assertNotIn('functional_ess', record['radial_summary'])
             self.assertEqual(record['sampling_seconds'], .75)
             self.assertEqual(record['burnin_iterations'], 34)
 

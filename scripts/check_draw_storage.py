@@ -1,7 +1,7 @@
 """Check bounded draw collection and exact archive bytes without running MCMC.
 
-The default is a small synthetic check. To exercise the reported Windows
-allocation shape, pass --rows 594918 --dimension 200; this requires about1.6GB
+The default is a small synthetic check. For a larger storage stress check,
+pass --rows 600000 --dimension 200; this requires about 1.6 GB
 of temporary disk space, checked before starting. All generated arrays/archives
 are temporary and removed after validation. Only the JSON receipt is retained.
 """
@@ -29,10 +29,40 @@ for key in ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS',
     os.environ[key] = '1'
 
 import numpy as np
-from benchmark_result_processing import peak_rss_bytes
 from dcs_bench.burnin import discard_burnin
 from dcs_bench.draw_storage import DiskDrawCollector
 from dcs_bench.engine import save_chain
+
+
+def peak_rss_bytes():
+    """Peak resident/working-set memory, or None on unsupported systems."""
+    try:
+        if sys.platform == 'win32':
+            import ctypes
+            from ctypes import wintypes
+
+            class Counters(ctypes.Structure):
+                _fields_ = [('cb', wintypes.DWORD), ('PageFaultCount', wintypes.DWORD)] + [
+                    (name, ctypes.c_size_t) for name in (
+                        'PeakWorkingSetSize', 'WorkingSetSize', 'QuotaPeakPagedPoolUsage',
+                        'QuotaPagedPoolUsage', 'QuotaPeakNonPagedPoolUsage',
+                        'QuotaNonPagedPoolUsage', 'PagefileUsage', 'PeakPagefileUsage')]
+
+            kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+            kernel.GetCurrentProcess.restype = wintypes.HANDLE
+            query = ctypes.WinDLL('psapi', use_last_error=True).GetProcessMemoryInfo
+            query.argtypes = [wintypes.HANDLE, ctypes.POINTER(Counters), wintypes.DWORD]
+            query.restype = wintypes.BOOL
+            counters = Counters()
+            counters.cb = ctypes.sizeof(counters)
+            if query(kernel.GetCurrentProcess(), ctypes.byref(counters), counters.cb):
+                return int(counters.PeakWorkingSetSize)
+            return None
+        import resource
+        value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return int(value if sys.platform == 'darwin' else value*1024)
+    except (ImportError, OSError, AttributeError):
+        return None
 
 
 def run(args):
@@ -47,7 +77,7 @@ def run(args):
     free = shutil.disk_usage(scratch).free
     if free < required:
         raise RuntimeError(f'This check requires {required} free temporary bytes; available {free}')
-    source_paths = [Path(__file__), ROOT/'scripts/benchmark_result_processing.py',
+    source_paths = [Path(__file__),
                     *(ROOT/'dcs_bench'/name for name in ('draw_storage.py', 'engine.py', 'burnin.py'))]
     source_hashes = {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                      for p in source_paths}

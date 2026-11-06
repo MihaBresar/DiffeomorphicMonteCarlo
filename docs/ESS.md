@@ -1,7 +1,8 @@
 # Functional effective sample size
 
-ESS describes Monte Carlo precision of a specific estimated mean. Current
-comparison reports calculate it separately for the radial-tail **indicator**
+ESS is calculated only in the main DCS–SCS comparison and its Numba extension.
+Other benchmark experiments skip chain diagnostics. ESS describes Monte Carlo
+precision of a specific estimated mean; the main reports calculate it separately for the radial-tail **indicator**
 and the **norm**. This is not coordinate ESS, rank-normalized bulk ESS, or the
 quantile diagnostic that ArviZ calls tail ESS. The event's ESS is the raw mean
 ESS of its zero/one time series.
@@ -24,12 +25,9 @@ the first third. ESS uses that **unthinned post-burn-in** history. The configure
 or MSE. Unthinned temporary histories are removed after diagnostics; they are
 not duplicated into the saved chain archive.
 
-For the other experiments, ESS describes the actual retained draws used by
-their estimators. Their saved stride is reported explicitly. A thinned-chain
-ESS is never multiplied by its stride to fabricate an unthinned result.
-A saved archive cannot reconstruct transitions that were not retained. The
-first/last half split drops at most one draw when the history length is odd;
-`draws` and `estimator_draws` record this.
+The first/last half split drops at most one draw when the history length is odd;
+`draws` and `estimator_draws` record this. A saved archive cannot reconstruct
+transitions that were not retained.
 
 ## Time, memory and aggregation
 
@@ -60,9 +58,8 @@ sum/mean/median and ESS/s are unavailable; valid-chain counts and reasons stay
 visible. Successful subsets are not silently reported as complete totals.
 
 For a Student-t norm with ν≤2, target variance is infinite and raw mean-norm
-ESS is marked unavailable. The super-heavy-tail experiment instead estimates
-the finite-variance log quantity log10(1+‖X‖), so its corresponding ESS can be
-reported. A finite estimated ESS never establishes convergence, lack of bias,
+ESS would be undefined. The separate super-heavy-tail experiment reports
+log norm and tail errors without calculating ESS. A finite estimated ESS never establishes convergence, lack of bias,
 or a Markov-chain CLT. Interpret it with MSE, chain variability and the target's
 moment assumptions. Current t(3) norm has finite variance but no fourth moment,
 so empirical MSE uncertainty can still be unstable.

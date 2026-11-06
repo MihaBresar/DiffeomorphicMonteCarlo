@@ -22,7 +22,7 @@ Displayed real values use two decimals or scientific notation. Integer sample co
 
 ## Additional experiments
 
-The 50D super-heavy-tail report uses tail probability and finite mean log norm. The 200D baseline report contains radial estimates, MSE, counts, time and ESS. Logistic reports compare quantiles with an independent reference. Eight Schools and GARCH report physical-parameter moments and posterior diagnostics.
+The 50D super-heavy-tail report uses tail probability and finite mean log norm. The 200D baseline report contains radial estimates, MSE, counts and time. Logistic reports compare quantiles with an independent reference. Eight Schools and GARCH report physical-parameter moments and their errors. Chain diagnostics are disabled in all these additional experiments.
 
 The applicable references, estimators and retained-draw stride are saved with each result. Comparing errors across different targets or timing policies requires their configurations.
 

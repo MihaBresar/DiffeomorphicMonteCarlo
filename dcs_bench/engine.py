@@ -37,7 +37,8 @@ def load_config(name, preset='quick', overrides=None):
         raise ValueError(f'Unknown preset: {preset}')
     config['preset'] = preset
     config['burnin_fraction'] = 1/3
-    config['ess_enabled'] = True
+    config['ess_enabled'] = False
+    config['diagnostics_enabled'] = False
     overrides = overrides or {}
     irrelevant = []
     if config['mode'] != 'iterations':
@@ -56,6 +57,10 @@ def load_config(name, preset='quick', overrides=None):
     if unused:
         raise ValueError(f'Overrides not used by {name}: {unused}')
     config.update({k: v for k, v in (overrides or {}).items() if v is not None})
+    for field in ('ess_enabled', 'diagnostics_enabled'):
+        if config.get(field) is not False:
+            raise ValueError('Standard experiments report estimates, errors, counts and time; '
+                             'chain diagnostics are enabled only in the main DCS-SCS comparisons')
     # A repeat changes production streams only. Seed 1 (batch 0) retains the
     # published streams; VI and independent references remain fixed.
     if overrides.get('seed') is not None and overrides.get('seed_batch') is not None:
@@ -356,7 +361,7 @@ def run(config, output, resume=False, reference_dir=None):
         manifest = {'schema_version': 3, 'started_utc': datetime.now(timezone.utc).isoformat(),
             'fingerprint': digest, 'source_hashes': hashes, 'environment': environment(),
             'execution_plan': plan,
-            'timing_policy': 'Independent chains in bounded CPU processes, one method at a time. Per-chain sampling wall time includes thinning, physical-coordinate conversion, bounded disk-backed draw collection and final buffer flush; NUTS scalar diagnostic collection is also included. Mapping finalization, NPZ serialization and report processing are outside this clock. After separate tuning, the first third of actual generated sampling iterations is discarded for every method; thinning uses the original iteration grid. Fitting, worker compilation, warmup and total invocation wall time are separately reported. Pinning is recorded; macOS scheduling is OS-managed.',
+            'timing_policy': 'Independent chains in bounded CPU processes, one method at a time. Per-chain sampling wall time includes thinning, physical-coordinate conversion, bounded disk-backed draw collection and final buffer flush. Benchmark chain diagnostics and NUTS scalar diagnostic files are disabled. Mapping finalization, NPZ serialization and report processing are outside this clock. After separate tuning, the first third of actual generated sampling iterations is discarded for every method; thinning uses the original iteration grid. Fitting, worker compilation, warmup and total invocation wall time are separately reported. Pinning is recorded; macOS scheduling is OS-managed.',
             'status': 'running'}
         write_json(output/'configuration.json', config)
         write_json(existing, manifest)
