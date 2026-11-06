@@ -39,9 +39,9 @@ All four DCS variants share the same fixed move parameter.
 The single SCS baseline uses the authors' fixed h=0.1; new comparisons do not
 offer alternative SCS step tuning. BW, reflected BW and billiard use fixed
 increment radius h=0.07; RWM uses coordinate standard deviation h/√(d+2).
-Each uses its own kernel during discarded warmup without step adaptation. The recorded `--dcs-fixed-move`
-alternative or historical method-specific calibration control must be
-identified in each report.
+Each uses its own kernel during discarded warmup without step adaptation.
+Public entry points select these preset steps automatically; historical
+alternative-step reports retain their original recorded policy.
 Every step freezes before production and the first third is discarded. Effective
 maps and fixed steps are recorded. Adaptive historical controls additionally
 export their billiard and reflected-BW pilot histories. See the

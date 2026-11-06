@@ -29,9 +29,9 @@ warmup-transition budget and first-third production burn-in.
 
 The version-10 fixed-cloud VI settings and fitted maps are unchanged. New v11
 results require fresh sampling; replotting old chains cannot apply a new step
-policy. The alternative `--dcs-fixed-move 0.15` and historical
-`--dcs-step-rule acceptance` control are explicit sensitivity settings. Neither
-fixed value is claimed optimal. Fresh-cloud VI studies remain experimental.
+policy. Public entry points use the protocol's preset steps automatically;
+manual step-size and calibration-policy flags are not accepted. The preset
+is not claimed optimal. Fresh-cloud VI studies remain experimental.
 The other six experiments do not change under this sampling update.
 
 ## Earlier version-10 fitting update
@@ -143,7 +143,6 @@ untuned-map reports remain readable; they are not relabelled as fitted runs.
 ```bash
 python scripts/reproduce_all.py --preset paper --workers 2 --output-root results/paper-new
 python run_experiment.py sampler-comparison --target skew-t-100d --preset paper --workers 2 --output-dir results/comparison-100d-vi
-python run_experiment.py sampler-comparison --target skew-t-100d --preset paper --dcs-fixed-move 0.15 --workers 2 --output-dir results/comparison-100d-move-015
 python run_experiment.py sampler-comparison-numba --target skew-t-100d --preset paper --workers 2 --output-dir results/numba-100d-vi
 python run_experiment.py sampler-comparison --target skew-t-500d --preset paper --workers 2 --output-dir results/comparison-500d-vi
 python run_experiment.py skew-t-50d-nu-0.5 --preset paper --workers 2 --output-dir results/superheavy-new

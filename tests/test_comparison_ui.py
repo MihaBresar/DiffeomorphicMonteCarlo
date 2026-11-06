@@ -1,5 +1,5 @@
 """Route both comparison modes and report target/VI/backend choices honestly."""
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from copy import deepcopy
 import csv
 from io import StringIO
@@ -37,6 +37,27 @@ def comparison_summary(optimized=False, vi='on'):
 
 
 class ComparisonUiTests(unittest.TestCase):
+    def test_public_cli_resolves_protocol_steps_without_manual_choices(self):
+        from scripts import reproduce_comparison as suite
+        for backend in ('jax', 'numba'):
+            experiment = 'sampler-comparison'+('-numba' if backend=='numba' else '')
+            for preset in ('quick', 'reproduce', 'paper'):
+                commands = ((suite.main, ['--comparison', backend]),
+                            (run_experiment.main, [experiment]))
+                for entrypoint, arguments in commands:
+                    with self.subTest(backend=backend, preset=preset, entrypoint=entrypoint.__module__), \
+                            patch.object(suite.runner, 'run') as sampling, redirect_stdout(StringIO()) as stream:
+                        self.assertEqual(entrypoint([*arguments, '--preset', preset, '--dry-run']), 0)
+                    sampling.assert_not_called()
+                    config=json.loads(stream.getvalue())['configuration']
+                    self.assertEqual(config['dcs_step_rule'], 'fixed')
+                    self.assertEqual(config['dcs_fixed_move'], .07)
+                    self.assertEqual(config['sphere_map_policy'], 'author-paper-vi')
+                    self.assertEqual(config['initial_scale'], .1)
+                    for method in config['algorithms']:
+                        self.assertEqual(config['step_tuning_policies'][method],
+                                         'author_scs_fixed_01' if method=='SCS' else 'fixed_dcs_move_v1')
+
     def test_current_cli_rejects_alternative_scs_before_sampling(self):
         from scripts import reproduce_comparison as suite
         for experiment in launcher.COMPARISONS:

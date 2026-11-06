@@ -1,5 +1,11 @@
 # Changes
 
+## 2026-11-06 — automatic selection of protocol preset steps
+
+- Remove the manual shared-DCS-step field from the launcher and step-size/calibration-policy flags from public comparison commands. New runs automatically use the existing protocol: DCS h=0.07, Gaussian RWM coordinate scale h/√(d+2), and original SCS h=0.1.
+- Reject manual step overrides in new launcher requests, including All seven. Preserve saved-run report settings and internal configuration helpers used by historical studies.
+- This interface change does not alter fitted maps, numerical kernels or preset sampling settings, and does not switch public runs to the separate zero-centre study.
+
 ## 2026-11-06 — original SCS baseline only in active comparisons
 
 - Keep only the original author VI/transition with fixed SCS h=0.1 in new five-method JAX and Numba comparisons. Reject acceptance-tuned SCS overrides at the current configuration and command-line entry points; retain the hidden fixed alias for compatible scripts.

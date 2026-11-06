@@ -43,10 +43,10 @@ below retain their original release scope.
 Version 11 uses one shared DCS move: fixed BW/reflected-BW/billiard increment
 radius h=0.07 and Gaussian RWM coordinate standard deviation h/√(d+2).
 All four keep these steps during discarded equilibration. SCS retains h=0.1.
-The declared h=0.15 sensitivity setting and historical mixed-policy control
-do not imply optimality. The latter uses acceptance-target 0.234 for ordinary
-RWM/BW, ball-movement pilots for reflected BW and radial-movement pilots for
-billiards. Version-10 fixed-cloud VI budgets and
+Public entry points select these preset steps automatically and reject manual
+step overrides. Historical mixed-policy tests remain separate; they cover
+acceptance-target 0.234 for ordinary RWM/BW, ball-movement pilots for reflected
+BW and radial-movement pilots for billiards. Version-10 fixed-cloud VI budgets and
 maps remain unchanged. Fresh sampling is needed to evaluate the new step
 policy. Experimental fresh-cloud VI studies do not change this public default.
 

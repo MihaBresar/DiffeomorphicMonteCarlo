@@ -11,9 +11,9 @@ Billiards use the fitted centre/R/β after Möbius with zero active deformation;
 all four DCS variants share fixed h=0.07: BW/reflected-BW/billiard use that
 increment radius, and RWM uses coordinate standard deviation h/√(d+2).
 Each uses its own kernel during discarded warmup without step adaptation. SCS uses
-the original author VI and fixed h=0.1, with an optional acceptance-tuned control.
-The alternative `--dcs-fixed-move 0.15` changes all four DCS moves using
-the same covariance matching, without asserting optimality. All methods receive the same discarded warmup-transition count; fitting recipes differ and their costs are recorded. The Numba implementation shares its JAX warmup, then uses fused
+the original author VI and fixed h=0.1 as the only active SCS baseline.
+Public entry points automatically use these preset steps, with no manual
+step-size or calibration-policy choice. No optimality is asserted. All methods receive the same discarded warmup-transition count; fitting recipes differ and their costs are recorded. The Numba implementation shares its JAX warmup, then uses fused
 native production. See [billiards](BILLIARD.md) and [ESS](ESS.md).
 
 Every new VI-enabled SCS fit uses the pinned author optimizer, including

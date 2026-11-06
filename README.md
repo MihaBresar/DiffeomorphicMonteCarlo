@@ -63,7 +63,7 @@ SCS uses its authors' unchanged VI routine; DCS retains its own VI fit. Their fi
 
 All four DCS methods share one fixed move h=0.07: BW, reflected BW and billiard use a uniform-ball increment of radius h; RWM uses Gaussian coordinate standard deviation h/√(d+2). This matches the increments’ coordinate covariances, not their physical endpoints or acceptance rates. Each method uses its own kernel during discarded equilibration, with no separate step adaptation. The single SCS baseline uses the authors' fixed **h=0.1** and unchanged author VI/transition; alternative SCS calibration is not offered in new five-method comparisons. Every method receives the same discarded warmup-transition budget. All production steps are frozen, and the first third of generated production iterations is discarded.
 
-The shared DCS move can be varied explicitly with `--dcs-fixed-move 0.15`; the historical method-specific calibration (ordinary BW/RWM acceptance target 0.234, reflected-BW ball movement and billiard radial movement) remains a sensitivity control with `--dcs-step-rule acceptance`. Values 0.07 and 0.15 are declared settings, not claims of optimality or guaranteed superiority. Version 11 preserves the version-10 fixed-cloud VI maps and changes all four DCS proposal-step policies, so new sampling is required for a v11 comparison. Fresh-cloud VI and zero-centre studies remain experimental and do not change the public fitting default. Public runs keep the fitted physical centres; they do not apply a zero-centre override or post-VI radius calibration.
+The launcher and public commands use the protocol's preset DCS h=0.07 automatically; there is no manual step-size or calibration-policy choice. This preset is not a claim of optimality or guaranteed superiority. Internal configuration helpers retain historical settings for study reproduction. Version 11 preserves the version-10 fixed-cloud VI maps and changes all four DCS proposal-step policies, so new sampling is required for a v11 comparison. Fresh-cloud VI and zero-centre studies remain experimental and do not change the public fitting default. Public runs keep the fitted physical centres; they do not apply a zero-centre override or post-VI radius calibration.
 
 The current suite retains only this original SCS baseline. Historical alternative-step results remain recorded for reproducibility. The fixed SCS choice followed a documented 100D development study; it was frozen before the planned full-paper seed-batch-8 assessment. It is not a demonstrated optimum for 500D. See [all sensitivity results and the selection rule](docs/AUTHOR_SCS_CALIBRATION.md).
 
@@ -81,9 +81,6 @@ python run_experiment.py sampler-comparison --preset paper --dry-run
 
 # Smaller 100D comparison with fitted maps.
 python run_experiment.py sampler-comparison --target skew-t-100d --preset reproduce --workers 2 --output-dir results/jax-100d-vi
-
-# Prespecified shared-DCS move-size sensitivity, retaining every method.
-python run_experiment.py sampler-comparison --target skew-t-100d --preset reproduce --dcs-fixed-move 0.15 --workers 2 --output-dir results/jax-100d-move-015
 
 # Full 500D comparison with the frozen default and a fresh sampling batch.
 python run_experiment.py sampler-comparison --target skew-t-500d --preset paper --workers 2 --seed-batch 8 --output-dir results/jax-500d-batch-8

@@ -70,10 +70,10 @@ Version 11 uses one shared DCS move: BW, reflected BW and billiard all draw
 uniform-ball increments with radius h=0.07; Gaussian RWM uses coordinate
 standard deviation h/√(d+2). All four use their own kernel during discarded
 equilibration without separate step optimization. SCS h=0.1 and the
-version-10 fixed-cloud VI maps are unchanged. The shared h=0.15 alternative
-is available for sensitivity checks; neither value is claimed optimal.
-`--dcs-step-rule acceptance` explicitly restores the historical mixed policy,
-including the billiard radial pilot described above.
+version-10 fixed-cloud VI maps are unchanged. Public entry points select
+these steps automatically, without a manual choice. The preset is not claimed
+optimal. Historical mixed-policy studies retain the billiard radial pilot
+described above and remain separate from the current protocol.
 
 The version-6/7 runs instead calibrated reflected BW in the active coordinates
 and transferred its step to billiards. Their saved reports retain that rule.

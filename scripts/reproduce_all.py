@@ -1,6 +1,5 @@
 """One command for all seven experiments, independent references, and the table."""
 import argparse
-import math
 from pathlib import Path
 import subprocess
 import sys
@@ -14,16 +13,6 @@ EXPERIMENTS = ['skew-t-200d-nuts', 'skew-t-200d-baselines', 'sampler-comparison'
                'skew-t-50d-nu-0.5', 'eight-schools', 'garch11', 'logistic-regression']
 
 
-def positive_move(value):
-    try:
-        move = float(value)
-    except (TypeError, ValueError):
-        raise argparse.ArgumentTypeError('Shared DCS move must be a positive finite number')
-    if not math.isfinite(move) or move <= 0:
-        raise argparse.ArgumentTypeError('Shared DCS move must be a positive finite number')
-    return move
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--preset', choices=['quick', 'reproduce', 'paper'], default='quick')
@@ -33,8 +22,6 @@ def main():
     parser.add_argument('--workers', type=int, default=1)
     parser.add_argument('--ball-map-policy', choices=['mobius'], default='mobius', help=argparse.SUPPRESS)
     parser.add_argument('--vi', choices=['on'], default='on', help=argparse.SUPPRESS)
-    parser.add_argument('--dcs-fixed-move', type=positive_move,
-                        help='Shared DCS move in the five-method comparison only; omitted keeps its default')
     args = parser.parse_args()
     output = (args.output_root or ROOT/'results'/args.preset).resolve()
     reference = output/'logistic-reference'
@@ -61,8 +48,6 @@ def main():
                 command += ['--ball-map-policy', args.ball_map_policy]
             else:
                 command += ['--target', 'skew-t-100d', '--vi', args.vi]
-                if args.dcs_fixed_move is not None:
-                    command += ['--dcs-fixed-move', str(args.dcs_fixed_move)]
             if args.resume and (directory/'manifest.json').exists():
                 if name == 'sampler-comparison':
                     import json

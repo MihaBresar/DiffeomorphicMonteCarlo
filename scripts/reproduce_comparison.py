@@ -110,13 +110,13 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+        epilog='The recorded protocol fixes shared DCS h=0.07 (RWM sigma=h/sqrt(d+2)) '
+               'and original SCS h=0.1; no step-size choice or recalibration is required.')
     parser.add_argument('--comparison', choices=COMPARISONS, default='jax')
     parser.add_argument('--target', choices=TARGET_IDS, default='skew-t-100d')
     parser.add_argument('--vi', choices=('on',), default='on', help=argparse.SUPPRESS)
     parser.add_argument('--scs-step-rule', choices=('fixed',), help=argparse.SUPPRESS)
-    parser.add_argument('--dcs-step-rule', choices=('fixed', 'acceptance'))
-    parser.add_argument('--dcs-fixed-move', type=float)
     parser.add_argument('--preset', choices=runner.PRESETS, default='quick')
     parser.add_argument('--workers', type=int, default=1)
     parser.add_argument('--output-dir', type=Path)

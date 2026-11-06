@@ -59,10 +59,6 @@ def parser():
                    help='Target for either sampler comparison')
     p.add_argument('--vi', choices=('on',), help=argparse.SUPPRESS)
     p.add_argument('--scs-step-rule', choices=('fixed',), help=argparse.SUPPRESS)
-    p.add_argument('--dcs-step-rule', choices=('fixed', 'acceptance'),
-                   help='Sampler comparisons only: fixed moves for all four DCS methods (default) or historical method-specific calibration')
-    p.add_argument('--dcs-fixed-move', type=float,
-                   help='Shared fixed BW, reflected-BW and billiard proposal radius h; RWM uses coordinate standard deviation h/sqrt(d+2)')
     p.add_argument('--time-budget', type=float)
     p.add_argument('--nuts-target-accept', type=float)
     p.add_argument('--ball-map-policy', choices=['mobius'], help=argparse.SUPPRESS)
@@ -79,8 +75,6 @@ def main(argv=None):
         p.error('--target and --vi apply only to the new sampler comparisons')
     if args.scs_step_rule is not None and (args.plot_only or args.experiment not in COMPARISONS):
         p.error('--scs-step-rule applies only to the new sampler comparisons')
-    if (args.dcs_step_rule is not None or args.dcs_fixed_move is not None) and (args.plot_only or args.experiment not in COMPARISONS):
-        p.error('--dcs-step-rule and --dcs-fixed-move apply only to the new sampler comparisons')
     if args.recompute_diagnostics and not args.plot_only:
         p.error('--recompute-diagnostics requires --plot-only SAVED_RUN')
     if args.list:
@@ -121,7 +115,7 @@ def main(argv=None):
             command += ['--output-dir', str(args.output_dir)]
         if args.dry_run:
             command.append('--dry-run')
-        for name in ('runs', 'time_budget', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples', 'seed', 'seed_batch', 'scs_step_rule', 'dcs_step_rule', 'dcs_fixed_move'):
+        for name in ('runs', 'time_budget', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples', 'seed', 'seed_batch', 'scs_step_rule'):
             if getattr(args, name) is not None:
                 command += ['--'+name.replace('_', '-'), str(getattr(args, name))]
         return comparison_main(command)
@@ -150,7 +144,7 @@ def main(argv=None):
         return single_main(command)
     if args.experiment in ALIASES:
         print(f'Legacy name {args.experiment} now resolves to {ALIASES[args.experiment]} (d=200).', file=sys.stderr)
-    overrides = {k: v for k, v in vars(args).items() if k not in ('experiment', 'list', 'preset', 'output_dir', 'reference_dir', 'resume', 'plot_only', 'recompute_diagnostics', 'dry_run', 'seed_batch', 'target', 'vi', 'scs_step_rule', 'dcs_step_rule', 'dcs_fixed_move')}
+    overrides = {k: v for k, v in vars(args).items() if k not in ('experiment', 'list', 'preset', 'output_dir', 'reference_dir', 'resume', 'plot_only', 'recompute_diagnostics', 'dry_run', 'seed_batch', 'target', 'vi', 'scs_step_rule')}
     config = load_config(args.experiment, args.preset, overrides)
     output = args.output_dir or Path('results')/config['experiment']/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
     if args.dry_run:

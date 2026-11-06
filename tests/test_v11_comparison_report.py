@@ -150,17 +150,26 @@ class FixedDCSReportTests(unittest.TestCase):
                     render.assert_called_once()
                     run.assert_not_called()
 
-    def test_dcs_options_are_forwarded_only_for_current_comparisons(self):
-        for experiment in ('sampler-comparison', 'sampler-comparison-numba'):
-            with patch('scripts.reproduce_comparison.main', return_value=71) as run:
-                self.assertEqual(run_experiment.main([experiment, '--dcs-step-rule', 'fixed', '--dcs-fixed-move', '.09', '--dry-run']), 71)
-                command = run.call_args.args[0]
-                self.assertEqual(command[command.index('--dcs-step-rule')+1], 'fixed')
-                self.assertEqual(float(command[command.index('--dcs-fixed-move')+1]), .09)
-        for experiment in ('skew-t-100d-fixed', 'eight-schools'):
-            for option in (['--dcs-step-rule', 'acceptance'], ['--dcs-fixed-move', '.07']):
-                with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
+    def test_public_cli_rejects_manual_dcs_choices_before_dispatch(self):
+        from scripts import reproduce_comparison as suite
+        options = (['--dcs-step-rule', 'fixed'], ['--dcs-step-rule', 'acceptance'],
+                   ['--dcs-fixed-move', '.07'], ['--dcs-fixed-move', '.15'])
+        for experiment in ('sampler-comparison', 'sampler-comparison-numba',
+                           'skew-t-100d-fixed', 'eight-schools'):
+            for option in options:
+                with self.subTest(experiment=experiment, option=option), \
+                        patch.object(suite, 'main') as dispatch, redirect_stderr(StringIO()), \
+                        self.assertRaises(SystemExit) as error:
                     run_experiment.main([experiment, *option, '--dry-run'])
+                self.assertEqual(error.exception.code, 2)
+                dispatch.assert_not_called()
+        for option in options:
+            with self.subTest(option=option), patch.object(suite.runner, 'run') as run, \
+                    redirect_stderr(StringIO()), self.assertRaises(SystemExit):
+                suite.main(option)
+            run.assert_not_called()
+        for option in ('--dcs-fixed-move', '--dcs-step-rule'):
+            self.assertNotIn(option, run_experiment.parser().format_help())
 
     def test_v11_scs_control_keeps_original_fitting_and_dcs_configuration(self):
         with tempfile.TemporaryDirectory() as directory, \

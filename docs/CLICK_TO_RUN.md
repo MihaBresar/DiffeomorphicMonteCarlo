@@ -54,8 +54,8 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
    the pinned packages inside this project and can take several minutes.
 2. Leave **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)** and
    **Quick check** selected. Choose a **Target distribution**; both map families
-   are fitted by VI automatically. Leave **Shared DCS move h** at its default
-   0.07 for the initial check. Choose **CPU workers**
+   are fitted by VI automatically. Proposal steps come from the protocol;
+   no manual step-size choice is needed. Choose **CPU workers**
    (start with 2–4), then click **Start run**. Quick-check graphs verify
    execution; they are not publication results.
 3. After the quick check succeeds, choose **Smaller reproduction** or **Full
@@ -74,17 +74,13 @@ the Numba option uses optimized native DCS loops against the unchanged author
 SCS JAX transition. Both offer 100D/500D and always fit both maps by VI. Rotation mixtures
 are no longer active choices.
 
-To compare another fixed move without commands, change **Shared DCS move h**
-before clicking **Start run**. Enter **0.15** for the larger-move comparison;
-the field also accepts values such as **0.10** and **0.025**. Every DCS method
-receives the same chosen h: BW, reflected BW and billiard use that increment
-radius, while Gaussian RWM uses coordinate standard deviation h/√(d+2).
-SCS stays at h=0.1. These are sensitivity choices, not demonstrated optima.
-The chosen value is saved in `launcher_request.json` and the resolved run
-configuration. For **All seven**, it changes only the five-method comparison;
-the other six experiments retain their specified step rules. Changing this
-field starts a new experiment; rebuilding an older report uses its saved
-settings and cannot change its samples.
+The five-method comparison automatically uses the protocol's shared DCS
+h=0.07: BW, reflected BW and billiard use that increment radius; Gaussian
+RWM uses coordinate standard deviation h/√(d+2). Original SCS stays at h=0.1.
+The launcher has no manual step-size field. Resolved steps are saved in the
+experiment configuration. **All seven** uses the same preset for this comparison;
+other experiments retain their own specified step rules. Rebuilding an older
+report preserves its saved settings and samples.
 
 For these two comparisons, **Full paper settings** selects the full benchmark
 budget: 50 chains per method, 20.00 seconds per chain and 1,500 separate
@@ -134,10 +130,9 @@ Version 11 changes all four DCS step policies and requires new sampling
 of all five methods together at every preset. It keeps version 10's matched
 fixed-cloud VI budgets and fitted maps. Saved reports retain their original
 policy. Smaller runs use abbreviated VI; full fitting can change the performance
-ordering. **Shared DCS move h** provides the same setting as the command-line
-`--dcs-fixed-move` option. A value of 0.15 is the declared larger-move
-comparison; neither it nor the default is claimed optimal. Fresh-cloud
-fitting experiments do not change the public defaults.
+ordering. Launcher and command-line runs select the same preset steps
+automatically. The preset is not claimed optimal. Fresh-cloud fitting and
+zero-centre experiments do not change the public defaults.
 
 ## Stop or finish
 

@@ -101,12 +101,10 @@ additional step-selection pilot under this default. Numba production receives
 the identical JAX warmup state and frozen step. Warmup time is recorded
 separately from sampling time.
 
-`--dcs-fixed-move 0.15` changes h for all four DCS variants. These values are
-declared settings, not demonstrated optima. The historical
-`--dcs-step-rule acceptance` control restores ordinary BW/RWM acceptance
-adaptation toward 0.234, reflected-BW ball-movement pilots and billiard
-radial-movement pilots. Record the selected policy and report prespecified
-alternatives without selecting by which method wins.
+The launcher and public command-line entry points use this preset automatically.
+There is no manual DCS h or calibration-policy choice. Internal configuration
+helpers retain explicit overrides for historical studies; those are not the
+current launcher protocol. The preset is not a demonstrated optimum.
 
 The only SCS baseline in new five-method comparisons uses the authors' skew-t
 **fixed h=0.1** throughout discarded warmup and production, with unchanged
@@ -126,8 +124,8 @@ for 500D.
 Under the historical adaptive control only, reflected BW tests rotating
 h/2, h and 2h trials by squared ball movement, and billiard tests its own
 kernel using bounded squared changes of physical log(1+norm). Rejections
-score zero. Their histories are exported when those controls are selected;
-they are not run or represented as fixed-step default warmup.
+score zero. Their saved histories remain readable; these controls are not offered by
+current public entry points or represented as preset fixed-step warmup.
 
 All methods receive the preset's same total discarded warmup-transition budget.
 Under the default, all five methods use fixed-step equilibration. Adaptive

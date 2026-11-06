@@ -44,9 +44,9 @@ configuration and saved results used to produce them.
   production and the fixed-h=0.1 default.
 - Version 11 retains version 10's fitted maps and changes all four DCS variants
   from method-specific calibration to a shared fixed move h=0.07,
-  with h=0.15 available as a sensitivity setting. Gaussian RWM scales by
+  selected automatically by public entry points. Gaussian RWM scales by
   1/√(d+2) to match BW increment covariance. This requires new sampling and
-  does not establish either value as optimal. Fresh-cloud VI studies are
+  does not establish the preset as optimal. Fresh-cloud VI studies are
   separate experiments and are not public fitting defaults.
 - NUTS comparison settings include target acceptance 0.8 and maximum depth 10.
   Reference chains have separate settings. Timing distinguishes preparation,
