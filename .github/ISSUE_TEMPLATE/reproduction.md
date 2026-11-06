@@ -16,8 +16,8 @@ Describe the observed behavior and the expected behavior. For numerical comparis
 - Operating system, CPU and Python version:
 - Command or launcher selections:
 - Preset and target:
-- VI setting and SCS step rule:
-- Seed batch and worker count:
+- Comparison/backend and recorded map settings:
+- Seed 1–Seed 8 choice (or exact custom seed) and worker count:
 - Run manifest status:
 
 ## Evidence

@@ -1,8 +1,10 @@
-"""Independent diagnostics of the published stored map fits; no MCMC is run.
+"""Independent geometry checks of fixed numerical-regression fixtures.
 
-Run with the repository's pinned Python environment. Both projection families
-are assessed on 100,000 fresh common base draws per family. Parameter ablations
-are evaluations of already saved maps, not fits or choices based on chain MSE.
+These fixtures are test inputs, not the fitted maps of the current published
+comparison. Run with the repository's pinned Python environment. Both projection
+families are assessed on 100,000 fresh common base draws per family. Parameter
+ablations evaluate saved fixture maps; no fitting, MCMC or production-MSE
+selection is performed.
 
 Example: python scripts/check_map_geometry.py --output-file results/map_geometry.json
 """
@@ -161,14 +163,14 @@ def main(argv=None):
     saved = json.loads(inputs.read_text())
     spec = {'kind': 'skew_t', 'dimension': 100, 'nu': 3, 'alpha': {'0': 100, '1': -100}}
     if saved['config']['targets'] != [spec]:
-        raise ValueError('The published maps must describe the declared 100D nu=3 skew-t target.')
+        raise ValueError('The regression fixture maps must describe the declared 100D nu=3 skew-t target.')
     input_sha256 = sha256_file(inputs)
     paths = [Path(__file__), ROOT / 'dcs_bench/targets.py', ROOT / 'dcs_bench/transforms.py',
              ROOT / 'dcs_bench/tuning.py']
     hashes = {str(path.relative_to(ROOT)): sha256_file(path) for path in paths}
     target = Target(spec)
     axis = target.alpha / np.linalg.norm(target.alpha)
-    output = {'purpose': 'Independent map-objective and radial-geometry diagnostics; no MCMC comparison or production-MSE tuning.',
+    output = {'purpose': 'Independent map-objective and radial-geometry checks of numerical-regression fixtures, not current comparison fits; no MCMC or production-MSE tuning.',
               'target': spec, 'input_file': inputs.relative_to(ROOT).as_posix(), 'input_sha256': input_sha256,
               'source_sha256': hashes,
               'environment': {'python': sys.version, 'platform': platform.platform(), 'numpy': np.__version__, 'scipy': scipy.__version__},

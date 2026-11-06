@@ -30,7 +30,16 @@ Original SCS keeps author VI and h=0.1. Calibrated zero-SCS keeps R/h selected b
 
 Equal VI evaluation and pilot-transition counts do not establish equal elapsed preparation cost, identical choices or optimal parameters. The pilot uses exact target starts, analytic radial information and a lag-eight movement proxy rather than production MSE or ESS.
 
+Sampling from the frozen inputs is self-contained. Replaying their complete
+preparation is not: the public assets include pilot selections and hashes,
+but not a standalone pilot/centre-selection reproducer or its seed. This is a
+remaining preparation-reproducibility limitation, not a sampling dependency.
+
 The common target is normal-CDF-skewed t(3), not the SCS paper's skew family. JAX provides a common execution framework; the Numba extension changes DCS implementation while retaining author JAX SCS.
+
+A common framework does not establish equal engineering effort or equally
+optimized kernels. Production timing also excludes preparation. Order rotates
+between waves only; a single-wave run has no counterbalancing.
 
 Radial measurements do not establish coordinate or general superiority. The t(3) norm has no fourth moment, complicating empirical MSE uncertainty. ESS is not proof of convergence.
 

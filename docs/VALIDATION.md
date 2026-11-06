@@ -20,4 +20,9 @@ Coverage includes target densities, Jacobians, inverse maps, boundary behavior, 
 
 CI uses Linux and Windows with Python 3.12. Consult [Actions](https://github.com/MihaBresar/DiffeomorphicMonteCarlo/actions) for actual results at a commit; configuration alone does not mean full experiments ran on every platform.
 
+Numerical tests and execution checks are mandatory. Uploading compact reports
+is an optional final step with seven-day retention; an upload/storage failure
+does not hide an earlier test failure. Raw chain/reference archives are not
+uploaded by CI. Check the workflow log if report artifacts are unavailable.
+
 For scientific changes, check the affected complete Quick comparison and report, then choose independent production runs if performance assessment is needed. Documentation-only changes require link and configuration checks, not new simulations.

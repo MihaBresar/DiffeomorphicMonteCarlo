@@ -1,4 +1,8 @@
-"""Current comparisons with author SCS VI and shared fixed DCS move scales."""
+"""Internal configuration helpers and saved-protocol compatibility.
+
+The published experiment defaults are defined in dcs_bench.reported_study.
+Direct execution of this module delegates to that current experiment's CLI.
+"""
 import argparse
 from datetime import datetime, timezone
 import json

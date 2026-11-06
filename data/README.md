@@ -8,4 +8,4 @@ Eight Schools and GARCH use the snapshot of [stan-dev/posteriordb](https://githu
 - GARCH posterior/reference: `garch-garch11`; physical order μ,α₀,α₁,β₁. This is simulated time-series data, as the bundled metadata states.
 - Both reference archives contain 10 chains of 1,000 retained draws. These are Monte Carlo references with finite uncertainty; the summary estimates functional MCSE from the saved chains.
 
-The models specify BSD3 licensing. The upstream BSD license is retained in `posteriordb/LICENCE.md`; see [THIRD_PARTY.md](../THIRD_PARTY.md). The old `raw/garch11.json` is a legacy data copy retained for provenance and is not used by the corrected engine.
+The models specify BSD3 licensing. The upstream BSD license is retained in `posteriordb/LICENCE.md`; see [THIRD_PARTY.md](../THIRD_PARTY.md).

@@ -1,4 +1,8 @@
-"""Separate equal-time test of direct rejection versus reflected-chord BW."""
+"""Internal boundary-configuration helpers and saved-protocol compatibility.
+
+The published experiment defaults are defined in dcs_bench.reported_study.
+Direct execution of this module delegates to that current experiment's CLI.
+"""
 from pathlib import Path
 import os
 import sys

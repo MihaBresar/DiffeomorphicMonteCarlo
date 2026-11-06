@@ -1,7 +1,9 @@
-"""One 100D skewed Student-t(3) comparison with recorded fitting and CPU kernels.
+"""Internal comparison execution and saved-protocol configuration helpers.
 
-Fresh runs only. Exact radial estimates use every post-burn-in iteration, including
-rejections. The first third of each timed sampling run is discarded. Each method runs alone in synchronized waves at the same concurrency.
+The published 100D/500D defaults are defined in dcs_bench.reported_study.
+Direct execution of this module delegates to that current experiment's CLI.
+The shared runner uses all post-burn-in iterations, including rejection repeats,
+and executes one method at a time in synchronized groups at equal concurrency.
 """
 import argparse
 import concurrent.futures

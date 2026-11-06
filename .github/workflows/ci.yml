@@ -47,19 +47,21 @@ jobs:
       - run: python scripts/benchmark_result_processing.py --input results/ci-eight-schools --repeat 1 --diagnostic-workers ${{ env.BENCH_WORKERS }} --output results/ci-processing.json
       - run: python run_experiment.py garch11 --preset quick --workers ${{ env.BENCH_WORKERS }} --output-dir results/ci-garch11
       - run: python run_experiment.py logistic-regression --preset quick --workers ${{ env.BENCH_WORKERS }} --reference-dir results/ci-reference --output-dir results/ci-logistic
-      - uses: actions/upload-artifact@v4
+      - name: Save compact check reports (optional)
+        uses: actions/upload-artifact@v4
         if: always()
+        # Storage availability must not change the result of numerical checks.
+        # All preceding validation steps remain mandatory.
+        continue-on-error: true
         with:
           name: smoke-results-${{ matrix.os }}
+          retention-days: 7
           path: |
-            results/ci
-            results/ci-reference
-            results/ci-superheavy-counts
-            results/ci-baselines
-            results/ci-eight-schools
+            results/**/configuration.json
+            results/**/manifest.json
+            results/**/summary.json
+            results/**/paper_values.csv
+            results/**/functional_ess.csv
+            results/**/paper_values.html
             results/ci-processing*.json
             results/ci-draw-storage.json
-            results/ci-garch11
-            results/ci-logistic
-            results/ci-reported-100d-jax
-            results/ci-reported-500d-numba

@@ -66,3 +66,9 @@ Results concern the specified target, preparations, functions and budgets. Diffe
 The pilot score uses one lag and bounded radial functions, not integrated autocorrelation, wall-clock MSE or raw norm directly. For ν=3, norm fourth moments do not exist; a few chains can dominate empirical MSE. Retain complete method sets and all chains.
 
 This common normal-CDF-skewed target is not the SCS paper's Student-t-CDF target or a reproduction of its figures. See [source attribution](../third_party/scs_paper/README.md).
+
+The supplied inputs make fresh sampling reproducible; complete preparation
+replay is not yet packaged. The pilot source and centre diagnostic are
+identified by hashes rather than standalone public executables. See the
+[reproducibility scope](REPRODUCIBILITY.md) for this limitation and the
+implementation and method-order qualifications on timing comparisons.
