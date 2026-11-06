@@ -56,10 +56,6 @@ class ReportedStudyUiTests(unittest.TestCase):
                     self.assertEqual(command[command.index('--seed-batch')+1],str(batch))
                 with self.assertRaisesRegex(ValueError,'start from scratch'):
                     launcher.commands_for_run('paper',experiment,Path('unused'),resume=True)
-        for experiment in launcher.COMPARISONS:
-            command,=launcher.commands_for_run('quick',experiment,Path('unused'))
-            self.assertEqual(command[2],str(launcher.ROOT/'scripts/reproduce_comparison.py'))
-            self.assertNotIn('--seed-batch',command)
 
     def test_default_controller_and_http_record_loaded_maps_and_seed_22(self):
         with tempfile.TemporaryDirectory() as directory,patch.object(launcher,'RUNS',Path(directory)), \
@@ -93,6 +89,36 @@ class ReportedStudyUiTests(unittest.TestCase):
                 handler.do_POST()
                 self.assertEqual(handler.respond.call_args.args[1],400)
                 controller.run.assert_not_called()
+
+    def test_public_http_accepts_all_current_experiment_seeds_and_rejects_retired_choices(self):
+        controller=Mock()
+        for experiment in launcher.EXPERIMENTS:
+            base=22 if experiment in launcher.REPORTED_COMPARISONS+('all',) else 0
+            for index in range(8):
+                handler=handler_for(controller,'/run',dict(experiment=experiment,seed_batch=base+index))
+                handler.do_POST()
+                handler.respond.assert_called_once_with({'ok':True})
+                self.assertEqual(controller.run.call_args.kwargs['seed_batch'],base+index)
+        controller.reset_mock()
+        for experiment in launcher.COMPARISONS+launcher.LEGACY_SCS_COMPARISONS:
+            handler=handler_for(controller,'/run',dict(experiment=experiment))
+            handler.do_POST()
+            self.assertEqual(handler.respond.call_args.args[1],400)
+        controller.run.assert_not_called()
+
+    def test_seed_choice_is_recorded_for_every_current_experiment(self):
+        with tempfile.TemporaryDirectory() as directory,patch.object(launcher,'RUNS',Path(directory)), \
+                patch.object(launcher,'environment_ready',return_value=True):
+            controller=launcher.Controller()
+            for experiment in launcher.EXPERIMENTS:
+                batch=29 if experiment in launcher.REPORTED_COMPARISONS+('all',) else 7
+                with patch.object(controller,'run_command'), \
+                        patch.object(controller,'start_job',side_effect=lambda work,status:work()):
+                    controller.run(experiment=experiment,seed_batch=batch)
+                request=json.loads((Path(directory)/controller.current_run/'launcher_request.json').read_text())
+                self.assertEqual(request['seed_choice'],8)
+                self.assertEqual(request['seed_batch'],batch)
+                if experiment=='all':self.assertEqual(request['generic_seed_batch'],7)
 
     def test_reported_cli_routes_only_recorded_inputs(self):
         module=ModuleType('scripts.reproduce_reported_study')
@@ -167,19 +193,12 @@ class ReportedStudyUiTests(unittest.TestCase):
             self.assertNotIn('--seed-batch',command)
             for name in ('launcher-run.json','launcher_request.json'):self.assertEqual((folder/name).read_bytes(),saved)
 
-    def test_bundled_results_route_is_read_only_and_rejects_traversal(self):
-        with tempfile.TemporaryDirectory() as directory,patch.object(launcher,'ROOT',Path(directory)):
-            root=Path(directory);folder=root/'studies/zero_centre/results';folder.mkdir(parents=True)
-            (folder/'index.html').write_text('<p>Reported results</p>')
-            (folder/'summary.json').write_text('{}')
-            (folder.parent/'secret.json').write_text('{"outside":true}')
-            for name in ('index.html','summary.json'):
-                handler=handler_for(Mock(),'/study-results/'+name)
-                handler.do_GET()
-                self.assertEqual(handler.respond.call_args.args[0],(folder/name).read_bytes())
-            for path in ('/study-results/../secret.json','/study-results/%2e%2e/secret.json','/study-results/missing.html'):
-                handler=handler_for(Mock(),path);handler.do_GET()
-                self.assertEqual(handler.respond.call_args.args[1],404)
+    def test_retired_results_route_is_not_publicly_served(self):
+        for path in ('/study-results/index.html','/study-results/summary.json',
+                     '/study-results/../secret.json','/study-results/%2e%2e/secret.json'):
+            handler=handler_for(Mock(),path)
+            handler.do_GET()
+            self.assertEqual(handler.respond.call_args.args[1],404)
 
 
 if __name__=='__main__':unittest.main()

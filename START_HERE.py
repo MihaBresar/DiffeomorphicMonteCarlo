@@ -28,8 +28,8 @@ EXPERIMENTS = ('all', 'skew-t-200d-nuts', 'skew-t-200d-baselines',
 COMPARISONS = ('sampler-comparison', 'sampler-comparison-numba')
 REPORTED_COMPARISONS = ('reported-zero-centre', 'reported-zero-centre-numba')
 LEGACY_SCS_COMPARISONS = ('skew-t-100d-fixed', 'skew-t-100d-boundary')
-SCS_COMPARISONS = REPORTED_COMPARISONS + COMPARISONS + LEGACY_SCS_COMPARISONS
-SEED_BATCH_EXPERIMENTS = SCS_COMPARISONS + ('all',)
+SCS_COMPARISONS = REPORTED_COMPARISONS
+SEED_BATCH_EXPERIMENTS = EXPERIMENTS
 COMPARISON_TARGETS = ('skew-t-100d', 'skew-t-500d')
 STEP_PRESET_MESSAGE = 'New launcher runs use the protocol preset step sizes; manual DCS move or step-rule overrides are not available.'
 _DEFAULT_SEED_BATCH = object()
@@ -85,14 +85,12 @@ def environment_ready():
 
 
 def commands_for_run(preset, experiment, directory, resume=False, plot_only=False, workers=1, ball_map_policy='mobius', seed_batch=_DEFAULT_SEED_BATCH, comparison_target='skew-t-100d', vi='on', dcs_fixed_move=None, dcs_step_rule=None):
-    if preset not in PRESETS or experiment not in EXPERIMENTS + COMPARISONS + LEGACY_SCS_COMPARISONS:
+    if preset not in PRESETS or (experiment not in EXPERIMENTS and not (plot_only and experiment in COMPARISONS)):
         raise ValueError('Choose a listed preset and experiment')
     if seed_batch is _DEFAULT_SEED_BATCH:
         seed_batch = default_seed_batch(experiment)
     if type(seed_batch) is not int or not 0 <= seed_batch <= 999:
         raise ValueError('Seed batch must be an integer from 0 to 999')
-    if seed_batch and experiment not in SEED_BATCH_EXPERIMENTS:
-        raise ValueError('Seed batches are available only for the sampler comparisons')
     if not plot_only:
         if dcs_fixed_move is not None or dcs_step_rule is not None:
             raise ValueError(STEP_PRESET_MESSAGE)
@@ -114,29 +112,6 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
                  '--comparison', 'numba' if experiment.endswith('-numba') else 'jax',
                  '--target', comparison_target, '--preset', preset, '--workers', str(workers),
                  '--seed-batch', str(seed_batch), '--output-dir', str(directory/experiment)]]
-    if experiment in COMPARISONS:
-        if comparison_target not in COMPARISON_TARGETS:
-            raise ValueError('Choose a listed comparison target')
-        if plot_only:
-            return [[py, '-u', str(ROOT/'run_experiment.py'), '--plot-only', str(directory/experiment)]]
-        if resume:
-            raise ValueError('Sampler comparisons start from scratch in a new results folder.')
-        command = [py, '-u', str(ROOT/'scripts/reproduce_comparison.py'),
-                   '--comparison', 'numba' if experiment.endswith('-numba') else 'jax',
-                   '--target', comparison_target, '--vi', vi, '--preset', preset,
-                   '--workers', str(workers), '--output-dir', str(directory/experiment)]
-        if seed_batch:
-            command += ['--seed-batch', str(seed_batch)]
-        return [command]
-    if experiment in LEGACY_SCS_COMPARISONS:
-        if resume or plot_only:
-            raise ValueError('The 100D SCS comparison starts from scratch in a new results folder.')
-        script = 'reproduce_boundary_100d.py' if experiment == 'skew-t-100d-boundary' else 'reproduce_scs_100d.py'
-        command = [py, '-u', str(ROOT/'scripts'/script), '--preset', preset,
-                   '--workers', str(workers), '--output-dir', str(directory/experiment)]
-        if seed_batch:
-            command += ['--seed-batch', str(seed_batch)]
-        return [command]
     if experiment == 'all':
         if comparison_target not in COMPARISON_TARGETS:
             raise ValueError('Choose a listed comparison target')
@@ -149,7 +124,8 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
             command.append('--resume')
         if not plot_only:
             command += ['--workers', str(workers), '--ball-map-policy', ball_map_policy, '--vi', vi,
-                        '--target', comparison_target, '--seed-batch', str(seed_batch)]
+                        '--target', comparison_target, '--seed-batch', str(seed_batch),
+                        '--generic-seed-batch', str(seed_batch-22 if 22 <= seed_batch <= 29 else 0)]
         return [command]
     result = directory/experiment
     if plot_only:
@@ -164,6 +140,8 @@ def commands_for_run(preset, experiment, directory, resume=False, plot_only=Fals
     command = [py, '-u', str(ROOT/'run_experiment.py'), experiment, '--preset', preset,
                '--output-dir', str(result), '--reference-dir', str(reference), '--workers', str(workers),
                '--ball-map-policy', ball_map_policy]
+    if seed_batch:
+        command += ['--seed-batch', str(seed_batch)]
     if resume and (result/'manifest.json').exists():
         command.append('--resume')
     commands.append(command)
@@ -314,6 +292,11 @@ class Controller:
             request = {'preset': preset, 'experiment': experiment,
                 'workers': workers, 'ball_map_policy': ball_map_policy, 'seed_batch': seed_batch,
                 'comparison_target': comparison_target, 'vi': vi}
+            seed_index = seed_batch-22 if experiment in REPORTED_COMPARISONS + ('all',) else seed_batch
+            if 0 <= seed_index < 8:
+                request['seed_choice'] = seed_index+1
+            if experiment == 'all':
+                request['generic_seed_batch'] = seed_index if 0 <= seed_index < 8 else 0
             if experiment in REPORTED_COMPARISONS:
                 request.pop('ball_map_policy')
                 request.pop('vi')
@@ -373,12 +356,6 @@ def make_handler(controller, token):
             if path == '/':
                 page = (ROOT/'launcher/index.html').read_text(encoding='utf-8').replace('__TOKEN__', json.dumps(token))
                 return self.respond(page.encode(), content_type='text/html; charset=utf-8')
-            if path.startswith('/study-results/'):
-                folder = (ROOT/'studies/zero_centre/results').resolve()
-                artifact = (folder/path[len('/study-results/'):]).resolve()
-                if not artifact.is_relative_to(folder) or artifact.suffix not in ('.html', '.json', '.csv', '.png', '.pdf', '.svg') or not artifact.is_file():
-                    return self.respond({'error': 'File not available'}, 404)
-                return self.respond(artifact.read_bytes(), content_type=mimetypes.guess_type(str(artifact))[0] or 'application/octet-stream')
             if path == '/state':
                 if not self.authorized(): return self.respond({'error': 'Unauthorized'}, 403)
                 return self.respond(controller.snapshot())
@@ -413,6 +390,8 @@ def make_handler(controller, token):
                     if {'dcs_fixed_move', 'dcs_step_rule'} & data.keys():
                         raise ValueError(STEP_PRESET_MESSAGE)
                     experiment = data.get('experiment', 'reported-zero-centre')
+                    if experiment not in EXPERIMENTS:
+                        raise ValueError('Choose one of the current launcher experiments')
                     if experiment in REPORTED_COMPARISONS and data.keys()-{'preset', 'experiment', 'workers', 'seed_batch', 'comparison_target'}:
                         raise ValueError('The reported study loads fixed recorded maps and preset budgets; additional parameter choices are not available.')
                     controller.run(data.get('preset', 'quick'), experiment,

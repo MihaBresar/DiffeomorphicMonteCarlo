@@ -8,7 +8,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import numpy as np
-from dcs_bench.engine import load_config, save_chain, write_json
+from dcs_bench.engine import save_chain, write_json
+from tests.configuration_fixtures import load_config
 from dcs_bench.references import make_reference, functional_draws
 from dcs_bench.targets import Target
 from dcs_bench.plotting import rebuild, render_saved_summary, burnin_counts, number, method_labels, ball_map_description

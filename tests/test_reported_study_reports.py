@@ -57,6 +57,8 @@ class ReportedStudyReportTests(unittest.TestCase):
                 result = render_report(root, summary)
                 self.assertEqual(len(result['figures']), 5)
                 page = (root/'paper_values.html').read_text(encoding='utf-8')
+                self.assertIn('<p>Seed 1;', page)
+                self.assertNotIn('Seed batch:', page)
                 self.assertIn('Reported zero-centre study', page)
                 self.assertIn('equal total development effort', page)
                 self.assertIn('maps reused without refitting', page)

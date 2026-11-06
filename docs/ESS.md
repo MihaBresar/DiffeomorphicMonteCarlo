@@ -17,7 +17,7 @@ and [Stan's analysis reference](https://mc-stan.org/docs/reference-manual/analys
 
 ## Which iterations are used
 
-The current sampler comparisons (version 7 onward) capture every scalar radius during
+The current sampler comparisons capture every scalar radius during
 production, including repeated states after rejection, then discard exactly
 the first third. ESS uses that **unthinned post-burn-in** history. The configured
 `thin` still controls the small saved trace, but does not change ESS, estimates
@@ -27,7 +27,7 @@ not duplicated into the saved chain archive.
 For the other experiments, ESS describes the actual retained draws used by
 their estimators. Their saved stride is reported explicitly. A thinned-chain
 ESS is never multiplied by its stride to fabricate an unthinned result.
-An old archive cannot reconstruct transitions that were not saved. The
+A saved archive cannot reconstruct transitions that were not retained. The
 first/last half split drops at most one draw when the history length is odd;
 `draws` and `estimator_draws` record this.
 

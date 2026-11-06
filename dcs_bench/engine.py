@@ -18,6 +18,7 @@ from .tuning import fit_map, validate_ball_map_policy
 from .references import make_reference
 from .cpu import CPU_THREAD_POLICY, THREAD_VARIABLES, cpu_info, execution_plan, validate_workers
 from .parallel import launch_chains, compilation_summary
+from .backend_policy import validate_backend_configuration
 
 ALIASES = {'skew-t-100d-baselines': 'skew-t-200d-baselines'}
 
@@ -29,6 +30,7 @@ def experiment_names():
 def load_config(name, preset='quick', overrides=None):
     name = ALIASES.get(name, name)
     config = json.loads((ROOT/'configs'/f'{name}.json').read_text())
+    original_seed = config['seed']
     if preset in ('quick', 'reproduce'):
         config.update(json.loads((ROOT/'configs/presets.json').read_text())[preset])
     elif preset != 'paper':
@@ -54,6 +56,25 @@ def load_config(name, preset='quick', overrides=None):
     if unused:
         raise ValueError(f'Overrides not used by {name}: {unused}')
     config.update({k: v for k, v in (overrides or {}).items() if v is not None})
+    # A repeat changes production streams only. Seed 1 (batch 0) retains the
+    # published streams; VI and independent references remain fixed.
+    if overrides.get('seed') is not None and overrides.get('seed_batch') is not None:
+        raise ValueError('Choose either seed or seed_batch, not both')
+    batch = config.get('seed_batch', 0)
+    if type(batch) is not int or not 0 <= batch <= 999:
+        raise ValueError('seed_batch must be an integer from 0 to 999')
+    config['seed_batch'] = None if overrides.get('seed') is not None else batch
+    config['seed'] = overrides['seed'] if overrides.get('seed') is not None else original_seed + 1_000_000 * batch
+    if overrides.get('fit_seed') not in (None, original_seed + 811):
+        raise ValueError('Repeat controls keep the original fitting seed fixed')
+    config['fit_seed'] = original_seed + 811
+    if type(config['seed']) is not int or not 0 <= config['seed'] < 2**32:
+        raise ValueError('seed must be an integer in [0, 2**32)')
+    config['seed_policy'] = 'Production seed batches change chains only; VI fitting and independent reference seeds remain fixed.'
+    config.setdefault('metropolis_backend', 'numba')
+    if config['metropolis_backend'] != 'numba':
+        raise ValueError('Standard experiments require the Numba Metropolis backend')
+    config['sampling_backends'] = validate_backend_configuration(config)
     if 'SCS' in config['algorithms']:
         from .scs_paper import author_vi_budget
         # Both fitted families use equal work and fixed base clouds. Explicit
@@ -304,6 +325,7 @@ def read_chain(path, expected=None):
 
 
 def run(config, output, resume=False, reference_dir=None):
+    validate_backend_configuration(config)
     output = Path(output).resolve()
     plan = execution_plan(config['workers'], config['runs'])
     hashes = source_hashes()
@@ -359,7 +381,7 @@ def run(config, output, resume=False, reference_dir=None):
                                        ('sphere', 'SCS' in config['algorithms'])]:
                     if needed:
                         print(f'Preparing {family} map for scenario {s}', flush=True)
-                        mapping, meta = fit_map(target, config, family, config['seed']+s+811)
+                        mapping, meta = fit_map(target, config, family, config.get('fit_seed', config['seed']+811)+s)
                         setup[family] = {'parameters': mapping.parameters(), 'optimization': meta}
                 write_json(setup_path, setup)
             maps = {k: v['parameters'] for k, v in setup.items()}

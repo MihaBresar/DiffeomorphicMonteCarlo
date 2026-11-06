@@ -12,10 +12,7 @@ from scipy.special import gammaln
 
 from .fast_dcs import _evaluate as _skew_ball_density, _log_ndtr
 from .transforms import BallMap, SphereMap
-
-
-KINDS = {'skew_t': 0, 'logistic': 1, 'eight_schools': 2, 'garch': 3}
-ALGORITHMS = {'DCS-RWM': 0, 'DCS-BW': 1, 'DCS-HnR': 2, 'RWM-Gaussian': 0, 'RWM-stable': 3, 'SCS': 4}
+from .backend_policy import NUMBA_TARGETS as KINDS, NUMBA_ALGORITHMS as ALGORITHMS
 
 
 @njit(nogil=True, error_model='numpy')
@@ -368,6 +365,8 @@ class CompiledRunner:
         return draws, {
             'algorithm': self.algorithm, 'seed': int(seed), 'iterations': iterations,
             'implementation': 'Numba CPU; canonical density; fastmath=False',
+            'sampling_backend': 'numba',
+            'requested_metropolis_backend': self.config.get('metropolis_backend', 'auto'),
             'retained_draws': len(draws), 'thin': self.thin,
             'warmup_iterations': self.warmup, 'warmup_seconds': warmup_seconds,
             'sampling_seconds': elapsed, 'compile_seconds': self.compile_seconds,

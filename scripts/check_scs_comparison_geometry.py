@@ -3,7 +3,7 @@
 Run with the repository Python environment:
     python scripts/check_scs_comparison_geometry.py
 
-Uses the compact, fixed fitted-map fixture validation/scs_geometry_fits.json.
+Uses the compact, fixed fitted-map fixture tests/fixtures/scs_geometry_fits.json.
 Checks the production-map Jacobians and common physical initialization, then
 compares SCS cap step-out with independently iterated first-return and reverse
 geodesic paths. These calculations do not measure performance or rank samplers.
@@ -31,7 +31,7 @@ import jax.numpy as jnp
 
 core = scs_paper._author()
 rng = np.random.default_rng(147829)
-s = json.loads((ROOT / 'validation/scs_geometry_fits.json').read_text())
+s = json.loads((ROOT / 'tests/fixtures/scs_geometry_fits.json').read_text())
 target = Target(s['config']['target'])
 errors = {}
 for method, family in [('DCS-BW', 'ball'), ('SCS', 'sphere')]:

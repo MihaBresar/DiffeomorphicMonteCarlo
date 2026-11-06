@@ -1,0 +1,39 @@
+{
+  "paper": {
+    "description": "Exact settings are in each named configuration JSON; no module defaults."
+  },
+  "quick": {
+    "runs": 2,
+    "warmup": 100,
+    "thin": 1,
+    "iterations": 500,
+    "time_budget": 1.0,
+    "nuts_samples": 128,
+    "nuts_batch_size": 8,
+    "optimizer_steps": 20,
+    "optimizer_samples": 128,
+    "reference_samples": 10000,
+    "reference_batch_size": 1000,
+    "scs_vi": {
+      "optimizer_steps": 20,
+      "optimizer_samples": 128
+    }
+  },
+  "reproduce": {
+    "runs": 8,
+    "warmup": 1000,
+    "thin": 10,
+    "iterations": 25000,
+    "time_budget": 5.0,
+    "nuts_samples": 5000,
+    "nuts_batch_size": 16,
+    "optimizer_steps": 400,
+    "optimizer_samples": 500,
+    "reference_samples": 100000,
+    "reference_batch_size": 5000,
+    "scs_vi": {
+      "optimizer_steps": 400,
+      "optimizer_samples": 500
+    }
+  }
+}

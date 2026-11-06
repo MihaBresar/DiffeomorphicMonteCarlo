@@ -16,7 +16,8 @@ from dcs_bench.references import skew_t_iid, radial_truth, mcmc_diagnostics, pos
 from dcs_bench.samplers import MetropolisKernel
 from dcs_bench.tuning import uniform_ball, uniform_cap
 from dcs_bench.plotting import mse_summary
-from dcs_bench.engine import load_config, save_chain, read_chain, experiment_names
+from dcs_bench.engine import save_chain, read_chain, experiment_names
+from tests.configuration_fixtures import load_config
 from dcs_bench.api import sample
 jax.config.update('jax_enable_x64', True)
 

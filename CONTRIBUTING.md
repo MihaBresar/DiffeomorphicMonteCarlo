@@ -18,12 +18,12 @@ For a sampler or experiment change, also run the affected quick experiment and i
 
 Changes to targets, transforms, proposals, acceptance rules, fitting, adaptation, seeds, budgets, retained samples, timing boundaries, estimators or diagnostics can change the scientific experiment. Identify them explicitly. Update protocol/configuration documentation and add a focused regression or numerical check. Keep a result tied to its original source revision and settings; never relabel it as evidence for a changed protocol.
 
-Keep shared implementation in `dcs_bench/`; `experiments/` and compatibility entry points should call that implementation. Preserve pinned third-party source and licenses. A proposed vendor update must identify its upstream revision and explain any resulting experiment changes.
+Keep shared implementation in `dcs_bench/`; `experiments/` and experiment entry points should call that implementation. Preserve pinned third-party source and licenses. A proposed vendor update must identify its upstream revision and explain any resulting experiment changes.
 
 For performance claims, compare the complete affected method set under the same target, environment, worker allocation, clock scope and diagnostic policy. Report preparation costs separately when they are outside production time. Retain unfavorable outcomes and disclose development-based choices. Freeze comparison settings before assessing a new independent sampling batch.
 
 ## Reporting reproduction problems
 
-Include the source commit, operating system, Python version, exact command or launcher selections, preset, target, VI setting, SCS step rule, seed batch and worker count. Attach the relevant error and small configuration/manifest/summary files. Remove private paths, credentials or unrelated data before posting. Large chain archives can be shared separately when needed; do not paste them into an issue.
+Include the source commit, operating system, Python version, exact command or launcher selections, preset, target, seed choice and worker count. Attach the relevant error and small configuration/manifest/summary files. Remove private paths, credentials or unrelated data before posting. Large chain archives can be shared separately when needed; do not paste them into an issue.
 
 Keep environments, temporary results and profiling files out of normal commits. Intentional publication archives should include the exact source snapshot, resolved inputs and complete successful runs, with execution checks and development evidence clearly distinguished. See the [reviewer guide](docs/REVIEW_GUIDE.md) and [security policy](SECURITY.md).

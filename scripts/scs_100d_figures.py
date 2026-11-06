@@ -1392,15 +1392,17 @@ def render_report(root, summary):
             fit_description = 'frozen VI provenance with recorded DCS and calibrated-SCS map overrides; no refitting'
         page += '<p>Target: '+html.escape(target_title)+'; '+html.escape(fit_description)+'; DCS β = '+number(config.get('beta', 2.))+'.</p>'
     if reported_study:
-        page += '<p><strong>Reported study protocol.</strong> This uses the bundled zero-centre DCS settings, not the previous fitted-centre h=0.07 comparison. Full parameters and preparation provenance are saved with this run.</p>'
+        page += '<p><strong>Comparison protocol.</strong> This uses the bundled zero-centre DCS settings. Full parameters and preparation provenance are saved with this run.</p>'
     if config.get('protocol'):
         page += '<p>Recorded protocol: <code>'+html.escape(config['protocol'])+'</code>.</p>'
     if config.get('implementation_revision'):
         page += '<p>Implementation revision: <code>'+html.escape(config['implementation_revision'])+'</code>.</p>'
     if 'seed' in config:
-        seed_label = ('unrecorded' if 'seed_batch' not in config else
-                      'custom' if config['seed_batch'] is None else str(config['seed_batch']))
-        page += '<p>Seed batch: '+html.escape(seed_label)+'; first chain seed: '+str(config['seed'])+'; map-fitting seed: '+str(config.get('fit_seed', 'unrecorded'))+'. Repeating a batch reuses its random streams; timed sample counts may still differ.</p>'
+        seed_batch = config.get('seed_batch')
+        seed_index = seed_batch-22 if reported_study and isinstance(seed_batch, int) else seed_batch
+        seed_label = ('Seed '+str(seed_index+1) if isinstance(seed_index, int) and 0 <= seed_index < 8
+                      else 'Custom seed' if seed_batch is not None else 'Unrecorded seed choice')
+        page += '<p>'+html.escape(seed_label)+'; first chain seed: '+str(config['seed'])+'; map-fitting seed: '+str(config.get('fit_seed', 'unrecorded'))+'. Repeating a seed choice reuses its random streams; timed sample counts may still differ.</p>'
     page += '<p>'+' · '.join('<a href="'+filename+'">'+html.escape(filename)+'</a>' for filename in csvs)+'</p>'
     for filename in figure_names:
         page += '<figure><a href="figures/'+filename+'.pdf"><img src="figures/'+filename+'.png" alt="'+html.escape(filename.replace('_', ' '))+'"></a><figcaption>Click the figure to open its PDF.</figcaption></figure>'

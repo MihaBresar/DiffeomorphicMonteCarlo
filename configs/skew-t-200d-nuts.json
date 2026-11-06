@@ -51,5 +51,6 @@
   "figure": "NUTS_PBW_vs",
   "experiment": "skew-t-200d-nuts",
   "preset": "paper",
-  "map_scale_initialization": "radial_median"
+  "map_scale_initialization": "radial_median",
+  "metropolis_backend": "numba"
 }

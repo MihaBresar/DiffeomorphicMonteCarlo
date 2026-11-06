@@ -24,6 +24,8 @@ def main():
                         help='Target for the DCS versus original SCS comparison')
     parser.add_argument('--seed-batch', type=int, choices=range(1000), default=22,
                         metavar='0..999', help='Sampling batch for the DCS versus original SCS comparison')
+    parser.add_argument('--generic-seed-batch', type=int, choices=range(1000), default=0,
+                        metavar='0..999', help='Sampling batch for the other six experiments; 0 preserves their original sampling seeds, 1..7 give Seed 2..8. Fitting and reference seeds stay fixed.')
     parser.add_argument('--ball-map-policy', choices=['mobius'], default='mobius', help=argparse.SUPPRESS)
     parser.add_argument('--vi', choices=['on'], default='on', help=argparse.SUPPRESS)
     args = parser.parse_args()
@@ -54,6 +56,8 @@ def main():
                         '--workers', str(args.workers)]
             if name != 'reported-zero-centre':
                 command += ['--reference-dir', str(reference), '--ball-map-policy', args.ball_map_policy]
+                if args.generic_seed_batch:
+                    command += ['--seed-batch', str(args.generic_seed_batch)]
             else:
                 command += ['--target', args.target, '--seed-batch', str(args.seed_batch)]
             if args.resume and (directory/'manifest.json').exists():

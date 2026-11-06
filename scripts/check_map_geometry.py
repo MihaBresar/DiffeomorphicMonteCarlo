@@ -157,7 +157,7 @@ def main(argv=None):
     destination = args.output_file.resolve()
     if destination.exists():
         parser.error(f'Use a new output file: {destination}')
-    inputs = ROOT / 'validation/fixed_step_maps.json'
+    inputs = ROOT / 'tests/fixtures/fixed_step_maps.json'
     saved = json.loads(inputs.read_text())
     spec = {'kind': 'skew_t', 'dimension': 100, 'nu': 3, 'alpha': {'0': 100, '1': -100}}
     if saved['config']['targets'] != [spec]:

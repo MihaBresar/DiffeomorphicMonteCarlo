@@ -1,85 +1,19 @@
 # Optimized billiard sampler
 
-`DCS-Billiard` is available in both current five-method comparisons alongside
-DCS-RWM, DCS-BW, DCS-BW-reflect and author SCS. Choose JAX for a common-framework comparison,
-or optimized Numba DCS versus the author JAX SCS implementation. Both offer
-100D and 500D skewed Student-t(3). The default [reported study](REPORTED_STUDY.md)
-loads its exact frozen VI artifacts and sets all DCS centres/deformations to zero.
-The older fitted-map recipes described below fit maps anew. This is an experimental
-geometric proposal, not a claim of universal dominance.
+DCS-Billiard is one of the six methods in the current [comparison](REPORTED_STUDY.md). Both 100D and 500D targets are available in JAX and the Numba extension. No universal performance ranking is assumed.
 
-## Running the full comparison
+All DCS methods share a zero-centre, zero-deformation ball map, β=2, and the dimension-specific R/h in the protocol. The source fit and production overrides remain separately recorded. Billiard warmup uses its own kernel for 1,500 discarded transitions; its preset step stays fixed.
 
-Extract the latest repository ZIP and open **Start.bat** on Windows. Choose:
+Numba production starts from the corresponding JAX warmup state and uses an independent PCG64 stream. It follows the same invariant-chord rule, without fast-math or a collision loop. Author SCS remains in JAX.
 
-1. **Five samplers: DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard (JAX)** or **Five samplers: optimized Numba DCS versus SCS**.
-2. **100D** or **500D** under Target distribution.
-3. **Full paper settings**, a **Repeat run** choice, and CPU workers.
-4. **Start run**. VI fitting is automatic for both map families.
+## Active coordinates
 
-Full settings use 50 chains per method, 20.00 production seconds per chain,
-and 1,500 separate discarded warmup transitions. The first third of production is discarded.
-Reports show mean norm, radial-tail probability, MSE, sample counts, timing,
-functional ESS and ESS per second. They omit coordinate statistics. See
-[the comparison protocol](COMPARISONS.md) and [ESS definitions](ESS.md).
+The move operates after the Möbius transformation, in ball coordinates w, with
 
-Both implementations use the same own-kernel JAX warmup state and fixed step. Numba
-production uses an independent PCG64 stream and fused density/radius summaries;
-it is not a bitwise replay of JAX. Its endpoint follows the same invariant-chord
-rule below, without fast-math approximations. The author SCS code stays in JAX.
+$$F(w)=\mu+\frac{Rw}{(1-\|w\|^\beta)^{1/\beta}},\qquad
+g_w(w)=\pi(F(w))R^d(1-\|w\|^\beta)^{-1-d/\beta}.$$
 
-## Active coordinates and VI
-
-Write the fitted ball transformation as
-
-$$w=M_\delta(z),\qquad
-F(w)=\mu+\frac{R w}{(1-\|w\|^\beta)^{1/\beta}}.$$
-
-The billiard move runs directly in **w**, after Möbius. The effective production
-map retains the jointly fitted μ, R and β and has δ=0. The fitted δ influenced
-the joint optimization of μ and R, but it has no direct production effect.
-This is not a new VI fit constrained to δ=0. Reports retain both the original
-fit and the effective method map so this difference is visible. New comparison
-runs require VI; saved untuned-map reports retain their original parameters.
-
-The density in these active coordinates is
-
-$$g_w(w)=\pi(F(w))\,R^d(1-\|w\|^\beta)^{-1-d/\beta}.$$
-
-A symmetric w proposal therefore uses the ordinary ratio
-`min(1, g_w(w') / g_w(w))`. Equivalently, expressing it in z coordinates
-introduces a reverse/forward proposal ratio
-`J_M(z) / J_M(z')`, which cancels the Möbius determinants in the transformed
-target ratio. No additional Möbius correction is applied when running in w.
-
-Warmup starts afresh at the w coordinate corresponding to the common
-physical all-ones point. Versions 8–10 calibrated **billiard moves themselves**,
-using exactly the preset's warmup budget. Those pilots scored bounded changes in
-physical log(1 + norm), with rejections contributing zero, then froze the
-selected scale before production from the last pilot state. No production
-MSE or known reference value entered that per-chain calibration. The current
-fixed-step default instead uses its own billiard kernel without a selection pilot.
-
-Version 8 gave SCS the same radial-pilot policy and transition budget. Versions
-9–11 used the authors' SCS VI with fixed h=0.1 as the default, alongside an
-explicit acceptance-target 0.234 sensitivity control. Current new five-method
-comparisons retain only the original author VI/transition and fixed h=0.1,
-with the same discarded warmup-transition budget as DCS. Historical policies
-and outcomes remain in the [development study](AUTHOR_SCS_CALIBRATION.md);
-they are not additional active SCS baselines. See [the full protocol](COMPARISONS.md).
-
-Version 11 uses one shared DCS move: BW, reflected BW and billiard all draw
-uniform-ball increments with radius h=0.07; Gaussian RWM uses coordinate
-standard deviation h/√(d+2). All four use their own kernel during discarded
-equilibration without separate step optimization. SCS h=0.1 and the
-version-10 fixed-cloud VI maps are unchanged. Public entry points select
-these steps automatically, without a manual choice. The preset is not claimed
-optimal. Historical mixed-policy studies retain the billiard radial pilot
-described above and remain separate from the current protocol.
-
-The version-6/7 runs instead calibrated reflected BW in the active coordinates
-and transferred its step to billiards. Their saved reports retain that rule.
-Changing calibration does not change the proposal or invariance argument below.
+Current comparison maps have μ=0 and δ=0. A symmetric w proposal uses the target-only Metropolis ratio. No extra Möbius correction is applied in these coordinates.
 
 ## Proposal and invariants
 

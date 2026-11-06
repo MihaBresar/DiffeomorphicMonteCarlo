@@ -157,29 +157,6 @@ class AuthorViReportTests(unittest.TestCase):
             self.assertIn('fixed h = 0.1', rows['SCS']['production_step_policy'])
             self.assertIn('Own-production-kernel radial', rows['DCS-Billiard']['production_step_policy'])
 
-    def test_scs_fixed_alias_is_forwarded_only_for_earlier_fitted_comparisons(self):
-        for experiment in ('sampler-comparison', 'sampler-comparison-numba'):
-            with self.subTest(experiment=experiment), \
-                    patch('scripts.reproduce_comparison.main', return_value=71) as comparison:
-                self.assertEqual(run_experiment.main([experiment, '--scs-step-rule', 'fixed', '--dry-run']), 71)
-                command = comparison.call_args.args[0]
-                self.assertEqual(command[command.index('--scs-step-rule')+1], 'fixed')
-            with self.subTest(experiment=experiment, rejected='acceptance'), \
-                    patch('scripts.reproduce_comparison.main') as comparison, \
-                    redirect_stderr(StringIO()), self.assertRaises(SystemExit) as error:
-                run_experiment.main([experiment, '--scs-step-rule', 'acceptance', '--dry-run'])
-            self.assertEqual(error.exception.code, 2)
-            comparison.assert_not_called()
-        for experiment in ('reported-zero-centre', 'reported-zero-centre-numba',
-                           'skew-t-100d-fixed', 'eight-schools'):
-            with self.subTest(experiment=experiment), \
-                    patch('scripts.reproduce_reported_study.main') as reported, \
-                    patch('scripts.reproduce_comparison.main') as comparison, \
-                    redirect_stderr(StringIO()), self.assertRaises(SystemExit) as error:
-                run_experiment.main([experiment, '--scs-step-rule', 'fixed', '--dry-run'])
-            self.assertEqual(error.exception.code, 2)
-            reported.assert_not_called()
-            comparison.assert_not_called()
 
     def test_v9_replot_routes_without_sampling_for_both_backends(self):
         for backend in ('jax', 'numba'):

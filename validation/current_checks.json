@@ -1,0 +1,59 @@
+{
+  "date": "2026-11-06",
+  "scope": "Current public experiments, required Numba backends for standard benchmarks, eight repeat labels and current-only documentation",
+  "unit_tests": {
+    "command": "python -m unittest discover -s tests -q",
+    "passed": 382,
+    "failures": 0,
+    "errors": 0
+  },
+  "launcher_checks": {
+    "actual_javascript_experiment_seed_combinations": 72,
+    "seed_labels": [
+      "Seed 1",
+      "Seed 2",
+      "Seed 3",
+      "Seed 4",
+      "Seed 5",
+      "Seed 6",
+      "Seed 7",
+      "Seed 8"
+    ],
+    "default_streams_preserved": true,
+    "repeat_changes_sampling_only": true
+  },
+  "standard_quick_checks": {
+    "experiments": [
+      "skew-t-200d-nuts",
+      "skew-t-200d-baselines",
+      "skew-t-50d-nu-0.5",
+      "eight-schools",
+      "garch11",
+      "logistic-regression"
+    ],
+    "completed_production_chains": 34,
+    "numba_backend_verified_for_applicable_samplers": true,
+    "nuts_native_jax_backend_verified": true,
+    "production_adaptation_off": true
+  },
+  "unchanged_scientific_files": [
+    "dcs_bench/reported_study.py",
+    "dcs_bench/timed_radial.py",
+    "dcs_bench/scs_paper.py",
+    "dcs_bench/numba_radial.py",
+    "dcs_bench/numba_billiard.py",
+    "dcs_bench/numba_rwm.py",
+    "dcs_bench/transforms.py",
+    "studies/zero_centre/maps/full_budget_100d.json",
+    "studies/zero_centre/maps/full_budget_500d.json",
+    "studies/zero_centre/maps/joint_calibration.json",
+    "studies/zero_centre/maps/manifest.json",
+    "third_party/scs_paper/src/scp_core.py",
+    "third_party/scs_paper/src/train.py"
+  ],
+  "limitations": [
+    "These checks establish execution and numerical/interface consistency, not convergence or sampler rankings.",
+    "The standard experiments already used optimized Numba kernels; this release makes that requirement explicit rather than claiming a new speedup.",
+    "Local validation does not substitute for the exact commit Linux/Windows CI results."
+  ]
+}

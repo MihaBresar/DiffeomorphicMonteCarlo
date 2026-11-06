@@ -518,4 +518,5 @@ if __name__ == '__main__':
         for stream in (sys.stdout, sys.stderr):
             if hasattr(stream, 'reconfigure'):
                 stream.reconfigure(encoding='utf-8', errors='backslashreplace')
-    raise SystemExit(main())
+    from scripts.reproduce_reported_study import main as current_main
+    raise SystemExit(current_main())

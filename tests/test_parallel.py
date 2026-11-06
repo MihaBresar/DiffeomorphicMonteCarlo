@@ -12,7 +12,8 @@ from unittest.mock import patch
 
 import numpy as np
 from dcs_bench.cpu import CPU_THREAD_POLICY, THREAD_VARIABLES, cpu_info, execution_plan, validate_workers, worker_environment, _ordered_slots
-from dcs_bench.engine import chain_seed, environment, load_config, read_chain
+from dcs_bench.engine import chain_seed, environment, read_chain
+from tests.configuration_fixtures import load_config
 from dcs_bench.parallel import launch_chains
 from dcs_bench.samplers import run_metropolis
 from dcs_bench.targets import Target

@@ -19,14 +19,14 @@ class LauncherMoveTests(unittest.TestCase):
             return launcher.Controller()
 
     def test_new_commands_use_protocol_presets(self):
-        for experiment in launcher.EXPERIMENTS+launcher.LEGACY_SCS_COMPARISONS:
+        for experiment in launcher.EXPERIMENTS:
             with self.subTest(experiment=experiment):
                 commands = launcher.commands_for_run('quick', experiment, Path('unused'))
                 self.assertTrue(all('--dcs-fixed-move' not in command for command in commands))
                 self.assertTrue(all('--dcs-step-rule' not in command for command in commands))
 
     def test_all_new_commands_reject_explicit_move_and_step_rule(self):
-        for experiment in launcher.EXPERIMENTS+launcher.LEGACY_SCS_COMPARISONS:
+        for experiment in launcher.EXPERIMENTS:
             for extra in ({'dcs_fixed_move': .07}, {'dcs_fixed_move': .15},
                           {'dcs_step_rule': 'fixed'}, {'dcs_step_rule': 'acceptance'}):
                 with self.subTest(experiment=experiment, extra=extra), \
@@ -49,7 +49,7 @@ class LauncherMoveTests(unittest.TestCase):
     def test_new_requests_execute_without_step_overrides(self):
         with tempfile.TemporaryDirectory() as temp, patch.object(launcher, 'RUNS', Path(temp)):
             controller = self.controller()
-            for experiment in launcher.COMPARISONS+('all',):
+            for experiment in launcher.REPORTED_COMPARISONS+('all',):
                 with self.subTest(experiment=experiment), patch.object(controller, 'run_command') as execute, \
                         patch.object(controller, 'start_job', side_effect=lambda work, status: work()):
                     controller.run(experiment=experiment)
@@ -128,6 +128,24 @@ class LauncherMoveTests(unittest.TestCase):
             self.assertEqual(comparison[comparison.index('--seed-batch')+1], '23')
             self.assertEqual(comparison[comparison.index('--target')+1], 'skew-t-500d')
             self.assertTrue(all('--seed-batch' not in command for command in commands if command is not comparison))
+
+    def test_all_seven_seed_choices_reach_every_experiment_but_not_reference(self):
+        for index in range(8):
+            with self.subTest(seed=index+1), tempfile.TemporaryDirectory() as temp, \
+                    patch.object(reproduce_all.subprocess,'run') as execute, \
+                    patch('sys.argv',['reproduce_all.py','--output-root',temp,
+                        '--seed-batch',str(22+index),'--generic-seed-batch',str(index)]):
+                reproduce_all.main()
+                commands=[call.args[0] for call in execute.call_args_list]
+                self.assertNotIn('--seed-batch',commands[0])
+                for name in reproduce_all.EXPERIMENTS:
+                    command,=[command for command in commands if name in command]
+                    if name=='reported-zero-centre' or index:
+                        expected=22+index if name=='reported-zero-centre' else index
+                        self.assertEqual(command[command.index('--seed-batch')+1],str(expected))
+                    else:
+                        self.assertNotIn('--seed-batch',command)
+                    self.assertNotIn('--fit-seed',command)
 
     def test_all_seven_replots_current_and_historical_comparisons_without_sampling(self):
         for comparison in ('reported-zero-centre', 'sampler-comparison', 'skew-t-100d-fixed'):

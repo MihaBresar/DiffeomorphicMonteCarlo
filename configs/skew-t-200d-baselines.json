@@ -54,5 +54,6 @@
   "experiment": "skew-t-200d-baselines",
   "reporting": "radial",
   "preset": "paper",
-  "map_scale_initialization": "radial_median"
+  "map_scale_initialization": "radial_median",
+  "metropolis_backend": "numba"
 }

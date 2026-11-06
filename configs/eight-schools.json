@@ -47,5 +47,6 @@
   "figure": "eight_schools",
   "experiment": "eight-schools",
   "preset": "paper",
-  "map_scale_initialization": "unit"
+  "map_scale_initialization": "unit",
+  "metropolis_backend": "numba"
 }

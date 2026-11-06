@@ -12,21 +12,18 @@ from dcs_bench.cpu import cpu_info
 
 
 class LauncherTests(unittest.TestCase):
-    def test_single_scs_comparison_runs_fresh_pipeline(self):
-        workers = min(2, cpu_info()['capacity'])
-        for preset in ('quick', 'reproduce', 'paper'):
-            with self.subTest(preset=preset):
-                command, = launcher.commands_for_run(preset, 'skew-t-100d-fixed', Path('results/test'),
-                                                      workers=workers, ball_map_policy='mobius')
-                self.assertIn(str(launcher.ROOT/'scripts/reproduce_scs_100d.py'), command)
-                self.assertEqual(command[command.index('--preset')+1], preset)
-                self.assertEqual(command[command.index('--workers')+1], str(workers))
-                self.assertEqual(command[command.index('--output-dir')+1],
-                                 str(Path('results/test')/'skew-t-100d-fixed'))
-                self.assertNotIn('--ball-map-policy', command)
-        for options in ({'resume': True}, {'plot_only': True}):
-            with self.subTest(options=options), self.assertRaises(ValueError):
-                launcher.commands_for_run('quick', 'skew-t-100d-fixed', Path('results/test'), **options)
+    def test_current_scs_comparison_runs_fresh_pipeline(self):
+        workers=min(2,cpu_info()['capacity'])
+        for preset in ('quick','reproduce','paper'):
+            command,=launcher.commands_for_run(preset,'reported-zero-centre',Path('results/test'),workers=workers)
+            self.assertIn(str(launcher.ROOT/'scripts/reproduce_reported_study.py'),command)
+            self.assertEqual(command[command.index('--preset')+1],preset)
+            self.assertEqual(command[command.index('--workers')+1],str(workers))
+            self.assertEqual(command[command.index('--output-dir')+1],str(Path('results/test')/'reported-zero-centre'))
+            self.assertNotIn('--ball-map-policy',command)
+        for experiment in launcher.COMPARISONS+launcher.LEGACY_SCS_COMPARISONS:
+            with self.subTest(experiment=experiment),self.assertRaises(ValueError):
+                launcher.commands_for_run('quick',experiment,Path('results/test'))
 
     def test_diagnostic_audits_are_archived_from_launcher(self):
         for experiment in ('fixed-step-audit', 'symmetric-t-audit', 'skew-t-timed-audit', 'joint-r-step-audit'):
@@ -70,8 +67,14 @@ class LauncherTests(unittest.TestCase):
         seed_menu = ExperimentMenu()
         seed_menu.feed((launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8')
                        .replace('id="experiment"', 'id="other-menu"').replace('id="seed-batch"', 'id="experiment"'))
-        self.assertEqual([x['value'] for x in seed_menu.options], [str(x) for x in range(22,31)]+['20','21'])
+        self.assertEqual([x['value'] for x in seed_menu.options], [str(x) for x in range(22,30)])
         self.assertEqual([x['value'] for x in seed_menu.options if 'selected' in x], ['22'])
+        self.assertEqual(seed_menu.labels, ['Seed '+str(i) for i in range(1,9)])
+        page=(launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8')
+        for removed in ('sampler-comparison', 'reported-results', 'vi-options', 'Repeat reported batch'):
+            self.assertNotIn(removed, page)
+        self.assertNotIn("document.getElementById('seed-batch').disabled=s.active||!isScsComparison()",page)
+        self.assertNotIn('seedSelect.disabled=!scsComparison',page)
 
     def test_seed_batches_route_without_changing_fitting_inputs(self):
         for experiment in launcher.SCS_COMPARISONS:
@@ -84,12 +87,23 @@ class LauncherTests(unittest.TestCase):
                         self.assertNotIn('--seed-batch', command)
                     self.assertNotIn('--seed', command)
                     self.assertNotIn('--fit-seed', command)
-        for experiment in set(launcher.EXPERIMENTS)-set(launcher.SEED_BATCH_EXPERIMENTS):
-            with self.subTest(experiment=experiment):
-                commands = launcher.commands_for_run('quick', experiment, Path('results/test'))
-                self.assertTrue(all('--seed-batch' not in command for command in commands))
-                with self.assertRaisesRegex(ValueError, 'only for the sampler comparisons'):
-                    launcher.commands_for_run('quick', experiment, Path('results/test'), seed_batch=1)
+        generic=set(launcher.EXPERIMENTS)-set(launcher.REPORTED_COMPARISONS)-{'all'}
+        for experiment in generic:
+            for batch in range(8):
+                with self.subTest(experiment=experiment,batch=batch):
+                    commands=launcher.commands_for_run('quick',experiment,Path('results/test'),seed_batch=batch)
+                    sample=commands[-1]
+                    if batch:
+                        self.assertEqual(sample[sample.index('--seed-batch')+1],str(batch))
+                    else:
+                        self.assertNotIn('--seed-batch',sample)
+                    self.assertTrue(all('--seed-batch' not in command for command in commands[:-1]))
+                    self.assertNotIn('--seed',sample)
+                    self.assertNotIn('--fit-seed',sample)
+        for index in range(8):
+            command,=launcher.commands_for_run('quick','all',Path('results/test'),seed_batch=22+index)
+            self.assertEqual(command[command.index('--seed-batch')+1],str(22+index))
+            self.assertEqual(command[command.index('--generic-seed-batch')+1],str(index))
 
     def test_invalid_seed_batches_fail_before_any_job_starts(self):
         with patch.object(launcher, 'environment_ready', return_value=True):
@@ -133,7 +147,7 @@ class LauncherTests(unittest.TestCase):
             (Path(tmp)/'same-clock-quick-occupied').mkdir()
             controller = launcher.Controller()
             folders = []
-            for experiment, batch in [('sampler-comparison', 6), ('skew-t-100d-boundary', 0)]:
+            for experiment, batch in [('reported-zero-centre', 28), ('skew-t-200d-baselines', 0)]:
                 with patch.object(controller, 'run_command') as execute, \
                         patch.object(controller, 'start_job', side_effect=lambda work, status: work()):
                     controller.run(experiment=experiment, seed_batch=batch)
@@ -207,6 +221,7 @@ class LauncherTests(unittest.TestCase):
         self.assertIn(str(launcher.ROOT/'scripts/reproduce_all.py'), command)
         self.assertNotIn('--resume', command)
         self.assertEqual(command[command.index('--seed-batch')+1], '22')
+        self.assertEqual(command[command.index('--generic-seed-batch')+1], '0')
         self.assertEqual(command[command.index('--target')+1], 'skew-t-500d')
         self.assertEqual(command[command.index('--preset')+1], 'paper')
         with self.assertRaisesRegex(ValueError, 'starts from scratch'):

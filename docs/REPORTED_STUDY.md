@@ -1,30 +1,12 @@
-# Reported zero-centre study
+# DCS versus original SCS
 
-This comparison extends the reported **zero-centre DCS versus original SCS**
-experiment with a second SCS variant using a previously selected radius/step
-and a zero-centre/observer map. Its six methods are DCS-RWM, DCS-BW,
-DCS-BW-reflect, DCS-Billiard, original author SCS, and **SCS calibrated (zero)**.
-The original five-method results
-used JAX on 100D and 500D skewed Student-t targets with ν=3. Current runs keep
-those five methods' parameters. The added SCS control retains its independent
-pilot-selected radius/step, then sets physical centre and observer displacement
-to zero. This post-pilot intervention is not a recalibration on the final map.
-The launcher selects this comparison by default.
+Six methods are compared on 100D and 500D normal-CDF-skewed Student-t targets with ν=3: DCS-RWM, DCS-BW, original SCS, SCS calibrated (zero), DCS-BW-reflect and DCS-Billiard.
 
-The previous fitted-centre comparison remains available through compatibility commands.
-It uses different DCS maps and h=0.07; its results are not replications of this study.
+The launcher offers **DCS vs original SCS** and **Numba extension**. Their command identifiers are `reported-zero-centre` and `reported-zero-centre-numba`. Scientific protocol identifiers remain `timed-reported-zero-centre-v3` and `timed-reported-zero-centre-numba-v3`.
 
-## Run without commands
+## Running
 
-1. Download and extract the updated repository. Open **Start.bat** on Windows,
-   **Start.command** on macOS, or open **START_HERE.py** in IDLE and choose
-   **Run → Run Module**.
-2. Choose **DCS vs original SCS**, then select
-   **100D** or **500D**. There are no map, radius or step-size choices to make.
-3. Run **Quick check** first. Then choose **Smaller reproduction** or
-   **Full paper settings**, select the worker count, and click **Start run**.
-4. Open the generated **paper_values.html** for figures, MSE, exact counts,
-   measured time and functional ESS. CSV and JSON retain full precision.
+Open `Start.bat` on Windows, `Start.command` on macOS, or `START_HERE.py` in IDLE. Set up the environment, choose comparison, target, preset, seed and workers, then start.
 
 | Preset | Chains per method | Production seconds per chain | Separate warmup |
 |---|---:|---:|---:|
@@ -32,182 +14,55 @@ It uses different DCS maps and h=0.07; its results are not replications of this 
 | Smaller reproduction | 20 | 3.00 | 1,500 |
 | Full paper settings | 50 | 20.00 | 1,500 |
 
-Every preset loads the same frozen full-budget maps. Quick check tests execution
-only. Smaller reproduction matches one reported batch's sampling budget; the
-reported pooled result combined two such batches. Full paper settings extends
-the sampling budget while retaining the study's maps and proposal parameters.
-All runs discard the first third of production iterations after the separate warmup.
+Quick checks verify execution only. Every preset loads the same full-budget fits and production overrides; none refits VI or chooses a new step. Seed choices change sampling streams only. Exact seeds are saved.
 
-## Exact frozen settings
+```sh
+python run_experiment.py reported-zero-centre --target skew-t-100d --preset reproduce --workers 2 --output-dir results/dcs-scs-100d
+python run_experiment.py reported-zero-centre --target skew-t-500d --preset paper --workers 2 --output-dir results/dcs-scs-500d
+python run_experiment.py reported-zero-centre-numba --target skew-t-100d --preset reproduce --workers 2 --output-dir results/numba-100d
+```
+
+## Target and parameters
+
+The skew vector is α=(100,−100,0,…). Radial thresholds are 50 in 100D and 50√5 in 500D. The skew preserves the Student-t radial law, giving analytic mean-norm and radial-tail references. See [targets](TARGETS.md).
 
 | Parameter | 100D | 500D |
 |---|---:|---:|
-| DCS physical centre μ | zero vector | zero vector |
-| DCS deformation δ | zero vector | zero vector |
-| DCS β | 2 | 2 |
-| DCS radius R | 0.6941299233184104 | 1.3882232419648068 |
+| Shared DCS R | 0.6941299233184104 | 1.3882232419648068 |
 | Shared DCS h | 0.025 | 0.044721359549995794 |
-| SCS h | 0.1 | 0.1 |
-| SCS latitude | 1.1 | 1.1 |
-| SCS fitted radius | 1.1048295589441204 | 2.2313627251649697 |
-| SCS calibrated h | 0.05 | 0.025 |
-| SCS calibrated radius | 0.5524147794720602 | 1.1156813625824848 |
-| SCS calibrated physical centre | zero vector | zero vector |
-| SCS calibrated observer displacement | zero vector | zero vector |
+| Original SCS R | 1.1048295589441204 | 2.2313627251649697 |
+| Original SCS h | 0.1 | 0.1 |
+| SCS calibrated (zero) R | 0.5524147794720602 | 1.1156813625824848 |
+| SCS calibrated (zero) h | 0.05 | 0.025 |
 
-BW, reflected BW and billiard use uniform-ball increments of radius h.
-Gaussian RWM uses coordinate standard deviation h/√(d+2). All four DCS
-variants use the same production map. Original SCS retains its original fitted
-centre, observer and radius with h=0.1. SCS calibrated (zero) sets its physical
-centre and observer displacement to zero and retains its prior radius/step
-choices. SCS has no literal DCS Möbius parameter: observer displacement is its
-directional projection parameter. The sphere's geometric centre remains
-(0,…,0,1), and latitude remains 1.1. Neither is set to zero.
-Both SCS variants execute the unchanged author transition in JAX, including
-in the Numba extension. Neither adapts during warmup or production.
+All DCS methods use β=2, centre μ=0 and Möbius deformation δ=0. BW, reflected BW and billiard use uniform-ball increments of radius h. RWM uses Gaussian coordinate standard deviation h/√(d+2), matching the increment's coordinate variance.
 
-The map assets and checksums are in [studies/zero_centre/maps](../studies/zero_centre/maps).
-They preserve the original VI maps and fitting histories separately from the
-actual production-map overrides. Each original fit used 1,000 updates and a
-fixed reference cloud of 2,000 points. New runs load these assets and do not
-refit VI or repeat parameter selection. The SCS fit came from the pinned authors'
-original optimizer. The separate calibration asset records the selected SCS
-parameters and shared pilot resources on the preceding fitted maps. The zero
-centre/observer intervention is recorded separately in the current configuration
-and provenance; it does not rewrite those historical assets or VI losses.
-Missing or modified assets fail validation.
+Original SCS retains its exact author-VI centre and observer. The additional control sets both to zero. Its latitude remains 1.1 and geometric sphere centre remains (0,…,0,1); its observer is not a DCS Möbius parameter. Both SCS variants use unchanged author projection and step-out transitions.
 
-## Which preparation budgets match?
+## Preparation provenance
 
-| Preparation | DCS | SCS calibrated |
-|---|---:|---:|
-| Original VI updates | 1,000 | 1,000 |
-| Fixed reference-cloud points | 2,000 | 2,000 |
-| VI objective/gradient point evaluations | 2,000,000 | 2,000,000 |
-| Radius/step candidates | 16 | 16 |
-| Exact target starts shared across candidates | 4,096 | 4,096 |
-| Transitions per start and candidate | 8 | 8 |
-| Pilot transitions per dimension | 524,288 | 524,288 |
-| New VI or pilot work in a frozen-map run | none | none |
+Immutable assets in `studies/zero_centre/maps/` preserve fits, loss histories, checksums and parameter-selection records. Each family used 1,000 VI updates on its own fixed 2,000-point cloud: 2,000,000 objective-point evaluations. SCS uses the original author optimizer; DCS retains its own parameterization and gradient clipping. Equal counts do not make the fitting procedures identical.
 
-The joint pilot used the same radial movement objective and equal transition
-counts, with method-specific radius and step grids. Original SCS remains a
-separate author-default baseline; its production parameters do not use the
-joint pilot's selected R and h. The later centre diagnostic examined both DCS
-and SCS variants. DCS adopts a zero-centre/zero-deformation production map.
-The current calibrated SCS control also sets centre and observer to zero after
-the pilot, retaining its previous R/h without retuning. The recorded pilot
-scores describe the earlier fitted map, not this final zero map. Equal historical
-budgets do not mean identical fitting objectives or transformations, and do not
-establish optimality after a subsequent map change.
+R/h selection used 16 candidates × 4,096 common exact target starts × 8 transitions: **524,288 selection transitions per family and dimension**. Radius factors were (0.5,1,2,4) times the fitted radius. DCS tested h=(0.25,0.5,1,2)/√d; SCS tested h=(0.025,0.05,0.1,0.2). Selection maximized the smaller normalized lag-eight squared movement of radial CDF and tail indicator. Rejections remained included. Candidate records and tie rules are in `joint_calibration.json`.
 
-Equal evaluation and transition counts also do not mean equal elapsed time.
-The archived pilot timing measures batched transition evaluation and excludes
-compilation, inverse mapping and scoring; it is not full preparation time.
-Current runs record map-loading and warmup costs separately and reuse the
-previous fits and calibration. Production-time MSE and ESS/s measure sampling
-after preparation, not total time from an unprepared target. Excluding
-preparation consistently is not itself evidence of a bias towards DCS.
+These selections preceded production zero-centre choices. In particular, SCS R/h were selected with the **author-fitted centre and observer**, then retained after both were zeroed. There has been no constrained VI refit or R/h recalibration for that zero map. Original loss histories describe the source fits, not the overridden maps. Preset values are not claimed optimal.
 
-## Recorded results and replication seeds
+Exact target draws and analytic radial information are available for this synthetic example. Selection-transition counts exclude VI, holdout assessment and other preparation. Equal counts do not imply equal elapsed cost or identical complete procedures. Original SCS is a separate author-default baseline without the selected R/h.
 
-The [reported results](../studies/zero_centre/results/index.html) include both
-20-chain batches and their predeclared 40-chain pooled analysis, with full-precision
-chain estimates, counts, timing and functional ESS. All chains for the five
-displayed methods are retained. The archive also contains the **SCS jointly
-calibrated** control used by the previous v2 comparison. It retains the author
-centre/observer and is distinct from the current **SCS calibrated (zero)**.
-Archived controls called **SCS zero centre** also retained a fitted observer;
-they are not the current zero-centre/zero-observer variant. Historical v1/v2
-reports retain their original settings and labels. Assessing v3 requires a
-fresh complete comparison, not relabelling or appending unrelated timed results.
+## Sampling and timing
 
-The original JAX runs used **two workers**, 1,500 warmup transitions and
-3.00 seconds per chain. Batch 20 used seeds 20,901,001–20,901,020; batch 21
-used 21,901,001–21,901,020. Fresh study runs default to batch 22. Recorded
-batches are explicitly labelled in the launcher. A stronger computer can
-generate more iterations under the same time budget, so matching the seeds
-does not promise identical sample counts or MSE.
+Every method starts from the physical all-ones point and receives 1,500 discarded nonadaptive warmup transitions. Steps remain fixed. Exactly the first third of generated production iterations is excluded from estimation; rejected repeats remain observations.
 
-Command-line equivalents, from the repository root:
+Methods run in synchronized groups with the same worker allocation; method order rotates. Compilation, warmup, synchronization waits, ESS calculation and reporting are outside production time. Transitions, all-state radial recording and scalar capture for ESS are inside. Final 300-transition blocks can slightly exceed requested time; actual seconds and counts are exported.
 
-```sh
-# Fresh sampling with the reported maps and one reported batch's budget.
-python run_experiment.py reported-zero-centre --target skew-t-100d --preset reproduce --workers 2 --output-dir results/reported-100d
+JAX uses a common scan/recording framework. The Numba extension uses the same JAX warmup state and DCS step followed by fused Numba production. Both SCS variants remain author JAX implementations. Separate generators mean cross-backend trajectories need not match bitwise.
 
-# Match the first reported batch's seed inputs and sampling budget.
-python run_experiment.py reported-zero-centre --target skew-t-100d --preset reproduce --workers 2 --seed-batch 20 --output-dir results/reported-100d-batch20
+Reports contain estimates, MSE, bias/variance, counts, time, acceptance and functional ESS. Every post-burn-in scalar observation enters estimates and ESS; thinning controls only saved traces. See [ESS](ESS.md), [figures](FIGURES.md) and [timing](REPRODUCIBILITY.md).
 
-# Longer assessment on the same frozen 500D study configuration.
-python run_experiment.py reported-zero-centre --target skew-t-500d --preset paper --workers 2 --output-dir results/reported-500d-paper
-```
+## Interpretation
 
-The separately labelled **Numba extension** uses the same maps and steps with
-optimized DCS production and original JAX SCS. It is an implementation extension,
-not the implementation that produced the reported JAX results.
+Results concern the specified target, preparations, functions and budgets. Different map preparation means the comparison does not isolate proposal geometry. Radial performance does not establish angular or coordinate-marginal mixing.
 
-## What this comparison establishes
+The pilot score uses one lag and bounded radial functions, not integrated autocorrelation, wall-clock MSE or raw norm directly. For ν=3, norm fourth moments do not exist; a few chains can dominate empirical MSE. Retain complete method sets and all chains.
 
-Target, initial physical point, production budgets, concurrency, burn-in and
-radial estimators follow common rules. Every rejected state remains in the
-estimates and unthinned ESS. Compilation, asset loading, warmup, ESS computation
-and file/report generation are outside the production clock and recorded separately.
-Original fitting costs are retained as provenance; they are not charged again
-when frozen maps are loaded.
-
-DCS and SCS calibrated retain R/h settings selected under equal VI evaluation
-counts and equal joint-pilot transition budgets. Those R/h settings were frozen
-before the original assessment batches; no assessment-MSE reselection is used.
-The current zero-centre/zero-observer SCS map is a later intervention, and its
-performance has not been established by the original reported batches.
-Original SCS provides a separate baseline with the authors' fixed h=0.1. The
-compared maps and preparation rules differ, so this is not a change of sampling
-kernel alone or a claim of identical total development effort. The bundled fit
-and calibration provenance records these distinctions. There is no guarantee
-that DCS wins on another run.
-
-Both reported statistics are radial: mean norm and radial-tail probability.
-Their MSE and ESS do not establish angular or marginal mixing. The 40-chain
-results repeat sampling conditional on one frozen fit per family and dimension;
-they do not assess variation across independently fitted maps. Small observed
-MSE differences should not be described as decisive, especially with ν=3 norm errors.
-
-## Calibration sensitivity and remaining limitations
-
-The original-SCS-only comparison uses calibrated DCS against the authors'
-original SCS settings. The added SCS control retains an equally budgeted R/h
-selection, then applies the declared centre/observer intervention without
-recalibration. Exact target starts are available for this synthetic
-example; neither method's oracle-assisted pilot is a general-purpose tuning
-assumption for targets without exact draws.
-
-The archive contains an **SCS jointly calibrated** control that used the same
-524,288-transition pilot budget and retained its author-fitted centre and
-observer while selecting R and h. Its settings were frozen before assessment.
-In the recorded pooled 100D results below, calibrated SCS retains the fitted
-centre/observer. These are not results for the current zero variant:
-
-| Method | Radial-tail MSE | Mean-norm MSE |
-|---|---:|---:|
-| Original SCS | 2.27e-7 | 5.21e-3 |
-| SCS jointly calibrated | 1.60e-7 | 2.80e-3 |
-| Ordinary DCS-BW | 2.03e-7 | 1.59e-3 |
-
-The calibrated SCS control has 29.84% lower tail MSE and 46.14% lower norm MSE
-than original SCS. Its tail-MSE ordering against ordinary BW reverses, while
-BW retains lower norm MSE. These are recorded sensitivity results, not new
-confirmatory runs or a claim that this is the best possible SCS tuning. The
-[complete calibration archive](../studies/zero_centre/results/historical_calibration_archive.json)
-retains both batches, all controls and full precision. Current runs include
-original SCS and the declared zero-centre/zero-observer calibrated variant;
-there is no run-time selection of a baseline by its resulting MSE.
-
-The pilot's radial objective is aligned with the reported radial functions.
-For this sign-skewed target, radial functions have the same distribution as
-under symmetric Student-t; these measurements do not expose asymmetric
-marginal or angular mixing. They therefore support radial-efficiency claims
-on this target, not overall dominance. Production time also excludes
-preparation, so it is not total time to obtain a tuned sampler. Finally, the
-frozen maps assess conditional sampling variability, and the Numba extension
-includes framework differences relative to author JAX SCS. Neither establishes
-universal sampler superiority.
+This common normal-CDF-skewed target is not the SCS paper's Student-t-CDF target or a reproduction of its figures. See [source attribution](../third_party/scs_paper/README.md).

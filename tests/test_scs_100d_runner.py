@@ -166,27 +166,6 @@ class SCS100DRunnerTests(unittest.TestCase):
                 chains.assert_not_called()
             self.assertEqual(marker.read_text(encoding='utf-8'), 'keep this existing result')
 
-    def test_public_cli_routes_to_single_runner_with_overrides(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            output = Path(temporary) / 'path with spaces'
-            with patch.object(experiment, 'main', return_value=73) as single, patch.object(run_experiment, 'run') as old:
-                status = run_experiment.main(['skew-t-100d-fixed', '--preset', 'paper', '--workers', '1',
-                    '--runs', '4', '--time-budget', '1.25', '--warmup', '1000', '--thin', '10',
-                    '--seed', '91', '--optimizer-steps', '17', '--optimizer-samples', '42',
-                    '--output-dir', str(output), '--dry-run'])
-            self.assertEqual(status, 73)
-            old.assert_not_called()
-            self.assertEqual(single.call_args.args[0], [
-                '--preset', 'paper', '--workers', '1', '--output-dir', str(output), '--dry-run',
-                '--runs', '4', '--time-budget', '1.25', '--warmup', '1000', '--thin', '10',
-                '--optimizer-steps', '17', '--optimizer-samples', '42', '--seed', '91'])
-        for options in (['--resume'], ['--ball-map-policy', 'vanilla'], ['--iterations', '1000'],
-                        ['--nuts-samples', '500'], ['--reference-samples', '500']):
-            with self.subTest(options=options), redirect_stderr(StringIO()), patch.object(experiment, 'main') as single:
-                with self.assertRaises(SystemExit) as caught:
-                    run_experiment.main(['skew-t-100d-fixed'] + options)
-                self.assertEqual(caught.exception.code, 2)
-                single.assert_not_called()
 
     def test_user_configuration_cannot_skip_step_tuning(self):
         with self.assertRaisesRegex(ValueError, 'warmup must be a positive integer'):

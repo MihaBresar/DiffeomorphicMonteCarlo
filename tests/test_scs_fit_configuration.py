@@ -1,7 +1,8 @@
 """Author fitting budgets and provenance across the generic entry points."""
 import unittest
 
-from dcs_bench.engine import load_config, source_hashes
+from dcs_bench.engine import source_hashes
+from tests.configuration_fixtures import load_config
 
 
 class SCSFitConfigurationTests(unittest.TestCase):

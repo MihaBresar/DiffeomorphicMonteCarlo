@@ -22,7 +22,7 @@ def main(argv=None):
     parser.add_argument('--target', choices=TARGETS, default='skew-t-100d')
     parser.add_argument('--workers', type=int, default=1)
     parser.add_argument('--seed-batch', type=int, default=22,
-                        help='22 is a fresh batch; 20/21 reuse the reported random-stream inputs')
+                        help='22..29 correspond to Seed 1..8; default 22 keeps the current sampling streams')
     parser.add_argument('--output-dir', type=Path)
     parser.add_argument('--dry-run', action='store_true')
     args = parser.parse_args(argv)

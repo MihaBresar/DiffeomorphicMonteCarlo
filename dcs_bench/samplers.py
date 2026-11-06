@@ -156,9 +156,14 @@ def run_numpy_metropolis(target, algorithm, mapping, config, seed, seconds=None,
 
 def make_metropolis_runner(target, algorithm, mapping, config):
     """Select the native backend before a worker enters the start barrier."""
+    requested = config.get('metropolis_backend', 'auto')
+    if requested not in ('auto', 'numba'):
+        raise ValueError('metropolis_backend must be auto or numba')
     from .compiled_sampling import ALGORITHMS, KINDS, CompiledRunner
     if target.kind in KINDS and algorithm in ALGORITHMS:
         return CompiledRunner(target, algorithm, mapping, config)
+    if requested == 'numba':
+        raise ValueError(f'Required Numba backend has no implementation for {target.kind}/{algorithm}')
     return None
 
 
@@ -290,7 +295,7 @@ class BlackJAXRunner:
             elapsed = time.perf_counter()-start
             draws = _finish_physical(chunks, collector, self.target.d)
             acc, div, work, depth = metrics.finalize()
-            record = {'algorithm': 'NUTS', 'implementation': 'BlackJAX', 'seed': seed,
+            record = {'algorithm': 'NUTS', 'implementation': 'BlackJAX', 'sampling_backend': 'jax', 'seed': seed,
                 'iterations': used_count, 'computed_iterations': count, 'retained_draws': len(draws), 'thin': c['thin'],
                 'warmup_iterations': c['warmup'], 'warmup_seconds': warmup_seconds,
                 'sampling_seconds': elapsed, 'requested_seconds': seconds,
@@ -370,7 +375,7 @@ class NumPyroRunner:
                 raise RuntimeError('NUTS adapted during production')
             draws = _finish_physical(chunks, collector, self.target.d)
             acc, div, work = metrics.finalize()
-            record = {'algorithm': 'NUTS', 'implementation': 'NumPyro', 'seed': seed,
+            record = {'algorithm': 'NUTS', 'implementation': 'NumPyro', 'sampling_backend': 'jax', 'seed': seed,
                 'iterations': count, 'retained_draws': len(draws), 'thin': c['thin'],
                 'warmup_iterations': c['warmup'], 'warmup_seconds': warmup_seconds,
                 'sampling_seconds': elapsed, 'acceptance_rate': float(acc.mean()),

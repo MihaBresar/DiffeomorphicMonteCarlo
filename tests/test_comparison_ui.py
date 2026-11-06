@@ -37,142 +37,14 @@ def comparison_summary(optimized=False, vi='on'):
 
 
 class ComparisonUiTests(unittest.TestCase):
-    def test_public_cli_resolves_protocol_steps_without_manual_choices(self):
-        from scripts import reproduce_comparison as suite
-        for backend in ('jax', 'numba'):
-            experiment = 'sampler-comparison'+('-numba' if backend=='numba' else '')
-            for preset in ('quick', 'reproduce', 'paper'):
-                commands = ((suite.main, ['--comparison', backend]),
-                            (run_experiment.main, [experiment]))
-                for entrypoint, arguments in commands:
-                    with self.subTest(backend=backend, preset=preset, entrypoint=entrypoint.__module__), \
-                            patch.object(suite.runner, 'run') as sampling, redirect_stdout(StringIO()) as stream:
-                        self.assertEqual(entrypoint([*arguments, '--preset', preset, '--dry-run']), 0)
-                    sampling.assert_not_called()
-                    config=json.loads(stream.getvalue())['configuration']
-                    self.assertEqual(config['dcs_step_rule'], 'fixed')
-                    self.assertEqual(config['dcs_fixed_move'], .07)
-                    self.assertEqual(config['sphere_map_policy'], 'author-paper-vi')
-                    self.assertEqual(config['initial_scale'], .1)
-                    for method in config['algorithms']:
-                        self.assertEqual(config['step_tuning_policies'][method],
-                                         'author_scs_fixed_01' if method=='SCS' else 'fixed_dcs_move_v1')
 
-    def test_current_cli_rejects_alternative_scs_before_sampling(self):
-        from scripts import reproduce_comparison as suite
-        for experiment in launcher.COMPARISONS:
-            with patch.object(suite.runner, 'run') as sampling, \
-                    redirect_stderr(StringIO()), self.assertRaises(SystemExit) as error:
-                run_experiment.main([experiment, '--scs-step-rule', 'acceptance'])
-            self.assertEqual(error.exception.code, 2)
-            sampling.assert_not_called()
-        with patch.object(suite.runner, 'run') as sampling, \
-                redirect_stderr(StringIO()), self.assertRaises(SystemExit):
-            suite.main(['--scs-step-rule', 'acceptance'])
-        sampling.assert_not_called()
-        self.assertNotIn('--scs-step-rule', run_experiment.parser().format_help())
-        with patch.object(suite.runner, 'run', return_value='unchanged-author-baseline') as sampling:
-            self.assertEqual(suite.main(['--scs-step-rule', 'fixed']), 0)
-        config = sampling.call_args.args[0]
-        self.assertEqual(config['sphere_map_policy'], 'author-paper-vi')
-        self.assertEqual(config['step_tuning_policies']['SCS'], 'author_scs_fixed_01')
-        self.assertEqual(config['initial_scale'], .1)
 
-    def test_removed_options_fail_before_sampling_or_directory_creation(self):
-        from scripts import reproduce_comparison as suite
-        from scripts import reproduce_scs_100d as runner
-        for backend in ('jax', 'numba'):
-            with self.subTest(backend=backend), self.assertRaisesRegex(ValueError, 'require VI'):
-                suite.configuration('quick', comparison=backend, vi='off')
-            config = suite.configuration('quick', comparison=backend)
-            config['vi'] = 'off'
-            with tempfile.TemporaryDirectory() as directory, patch.object(runner, 'prepare') as fit:
-                output = Path(directory)/'forged-run'
-                with self.assertRaisesRegex(ValueError, 'require VI'):
-                    runner.run(config, output)
-                fit.assert_not_called()
-                self.assertFalse(output.exists())
-        for experiment in (*launcher.COMPARISONS, 'all', 'logistic-regression'):
-            with self.subTest(experiment=experiment), self.assertRaisesRegex(ValueError, 'VI-off'):
-                launcher.commands_for_run('quick', experiment, Path('unused'), vi='off')
-            with self.subTest(experiment=experiment), self.assertRaisesRegex(ValueError, 'vanilla'):
-                launcher.commands_for_run('quick', experiment, Path('unused'), ball_map_policy='vanilla')
 
-    def test_cli_and_launcher_no_longer_advertise_untuned_choices(self):
-        from scripts import reproduce_all
-        for arguments in (['logistic-regression', '--ball-map-policy', 'vanilla'],
-                          ['skew-t-50d-nu-0.5', '--ball-map-policy', 'vanilla']):
-            with self.subTest(arguments=arguments), redirect_stderr(StringIO()), self.assertRaises(SystemExit):
-                run_experiment.main(arguments)
-        for arguments in (['--vi', 'off'], ['--ball-map-policy', 'vanilla']):
-            with patch.object(sys, 'argv', ['reproduce_all.py', *arguments]), \
-                    patch.object(reproduce_all.subprocess, 'run') as run, \
-                    redirect_stderr(StringIO()), self.assertRaises(SystemExit):
-                reproduce_all.main()
-            run.assert_not_called()
-        help_text = run_experiment.parser().format_help()
-        self.assertNotIn('--vi', help_text)
-        self.assertNotIn('--ball-map-policy', help_text)
-        page = (launcher.ROOT/'launcher/index.html').read_text(encoding='utf-8')
-        self.assertNotIn('<select id="vi"', page)
-        self.assertNotIn('<select id="ball-map-policy"', page)
-        self.assertNotIn('Without VI', page)
         # Earlier comparisons still enforce VI through their command route;
         # the reported study loads fixed maps and sends no fitting choice.
 
-    def test_launcher_forwards_every_mode_target_with_vi_enabled(self):
-        for experiment in launcher.COMPARISONS:
-            for target in launcher.COMPARISON_TARGETS:
-                for vi in ('on',):
-                    with self.subTest(experiment=experiment, target=target, vi=vi):
-                        command, = launcher.commands_for_run('paper', experiment, Path('results/new'),
-                            comparison_target=target, vi=vi, seed_batch=3)
-                        self.assertEqual(command[2], str(launcher.ROOT/'scripts/reproduce_comparison.py'))
-                        self.assertEqual(command[command.index('--target')+1], target)
-                        self.assertEqual(command[command.index('--vi')+1], vi)
-                        self.assertEqual(command[command.index('--comparison')+1],
-                                         'numba' if experiment.endswith('-numba') else 'jax')
-                        self.assertEqual(command[command.index('--seed-batch')+1], '3')
-                        self.assertNotIn('--ball-map-policy', command)
-        for extra in ({'comparison_target': 'unknown'}, {'vi': False}, {'vi': 'unknown'}, {'vi': 'off'}):
-            with self.subTest(extra=extra), self.assertRaises(ValueError):
-                launcher.commands_for_run('quick', 'sampler-comparison', Path('unused'), **extra)
 
-    def test_controller_records_target_and_mandatory_vi_in_saved_invocation(self):
-        with tempfile.TemporaryDirectory() as directory, patch.object(launcher, 'RUNS', Path(directory)), \
-                patch.object(launcher, 'environment_ready', return_value=True):
-            controller = launcher.Controller()
-            with patch.object(controller, 'start_job', side_effect=lambda work, status: work()), \
-                    patch.object(controller, 'run_command') as execute:
-                controller.run(experiment='sampler-comparison-numba', comparison_target='skew-t-500d', vi='on')
-                saved = json.loads((Path(directory)/controller.current_run/'launcher-run.json').read_text(encoding='utf-8'))
-                self.assertEqual(saved['comparison_target'], 'skew-t-500d')
-                self.assertEqual(saved['vi'], 'on')
-                command = execute.call_args.args[0]
-                self.assertEqual(command[command.index('--target')+1], 'skew-t-500d')
-                self.assertEqual(command[command.index('--vi')+1], 'on')
-        command, = launcher.commands_for_run('paper', 'all', Path('unused'), vi='on')
-        self.assertEqual(command[command.index('--vi')+1], 'on')
 
-    def test_cli_dispatches_comparison_options_and_rejects_unused_controls(self):
-        module = types.ModuleType('scripts.reproduce_comparison')
-        module.main = Mock(return_value=71)
-        for experiment in launcher.COMPARISONS:
-            with self.subTest(experiment=experiment), patch.dict(sys.modules, {'scripts.reproduce_comparison': module}):
-                self.assertEqual(run_experiment.main([experiment, '--target', 'skew-t-500d', '--vi', 'on',
-                    '--seed-batch', '2', '--workers', '1', '--warmup', '1500', '--dry-run']), 71)
-                command = module.main.call_args.args[0]
-                self.assertEqual(command[command.index('--target')+1], 'skew-t-500d')
-                self.assertEqual(command[command.index('--vi')+1], 'on')
-                self.assertEqual(command[command.index('--warmup')+1], '1500')
-                self.assertIn('--dry-run', command)
-        for arguments in (['sampler-comparison', '--vi', 'off'], ['sampler-comparison-numba', '--vi', 'off'],
-                          ['garch11', '--vi', 'off'], ['skew-t-100d-fixed', '--target', 'skew-t-500d'],
-                          ['sampler-comparison', '--iterations', '100'],
-                          ['sampler-comparison', '--beta', '1'],
-                          ['sampler-comparison', '--ball-map-policy', 'vanilla']):
-            with self.subTest(arguments=arguments), redirect_stderr(StringIO()), self.assertRaises(SystemExit):
-                run_experiment.main(arguments)
 
     def test_new_protocol_replot_does_not_sample(self):
         for optimized in (False, True):

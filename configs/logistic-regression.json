@@ -64,5 +64,6 @@
     "optimizer_steps": 1000,
     "optimizer_samples": 2000
   },
-  "vi_batch_policy": "fixed"
+  "vi_batch_policy": "fixed",
+  "metropolis_backend": "numba"
 }

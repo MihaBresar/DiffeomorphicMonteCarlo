@@ -19,8 +19,6 @@ import json
 import sys
 from dcs_bench.engine import ALIASES, experiment_names, load_config, run
 
-BOUNDARY_EXPERIMENT = 'skew-t-100d-boundary'
-COMPARISONS = ('sampler-comparison', 'sampler-comparison-numba')
 REPORTED_COMPARISONS = ('reported-zero-centre', 'reported-zero-centre-numba')
 REPORTED_PROTOCOLS = ('timed-reported-zero-centre-v1', 'timed-reported-zero-centre-numba-v1',
                       'timed-reported-zero-centre-v2', 'timed-reported-zero-centre-numba-v2',
@@ -28,7 +26,7 @@ REPORTED_PROTOCOLS = ('timed-reported-zero-centre-v1', 'timed-reported-zero-cent
 
 
 def named_experiments():
-    return sorted(set(experiment_names()) | {BOUNDARY_EXPERIMENT} | set(COMPARISONS) | set(REPORTED_COMPARISONS))
+    return sorted((set(experiment_names()) - {'skew-t-100d-fixed'}) | set(REPORTED_COMPARISONS))
 
 
 def seed_batch_number(value):
@@ -43,7 +41,7 @@ def seed_batch_number(value):
 
 def parser():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('experiment', nargs='?', choices=named_experiments()+list(ALIASES))
+    p.add_argument('experiment', nargs='?', choices=named_experiments())
     p.add_argument('--list', action='store_true')
     p.add_argument('--preset', choices=['quick', 'reproduce', 'paper'], default='quick')
     p.add_argument('--output-dir', type=Path)
@@ -58,11 +56,9 @@ def parser():
     seeds = p.add_mutually_exclusive_group()
     seeds.add_argument('--seed', type=int)
     seeds.add_argument('--seed-batch', type=seed_batch_number,
-                       help='Sampling seed batch (0–999); reported study defaults to fresh batch 22, while 20/21 repeat its recorded batches. Maps stay unchanged.')
+                       help='Sampling repeat batch (0–999): reported comparisons default to 22, other experiments to 0. Only production streams change; fitting and references stay fixed.')
     p.add_argument('--target', choices=('skew-t-100d', 'skew-t-500d'),
-                   help='Target for a reported-study or fitted-map sampler comparison')
-    p.add_argument('--vi', choices=('on',), help=argparse.SUPPRESS)
-    p.add_argument('--scs-step-rule', choices=('fixed',), help=argparse.SUPPRESS)
+                   help='Target for the current reported-study comparison')
     p.add_argument('--time-budget', type=float)
     p.add_argument('--nuts-target-accept', type=float)
     p.add_argument('--ball-map-policy', choices=['mobius'], help=argparse.SUPPRESS)
@@ -73,14 +69,10 @@ def parser():
 def main(argv=None):
     p = parser()
     args = p.parse_args(argv)
-    if args.seed_batch is not None and (args.plot_only or args.experiment not in ('skew-t-100d-fixed', BOUNDARY_EXPERIMENT) + COMPARISONS + REPORTED_COMPARISONS):
-        p.error('--seed-batch is available only when running a sampler comparison')
-    if args.target is not None and (args.plot_only or args.experiment not in COMPARISONS + REPORTED_COMPARISONS):
-        p.error('--target applies only to the sampler comparisons')
-    if args.vi is not None and (args.plot_only or args.experiment not in COMPARISONS):
-        p.error('--vi is not a choice for the reported study; it loads its recorded maps')
-    if args.scs_step_rule is not None and (args.plot_only or args.experiment not in COMPARISONS):
-        p.error('--scs-step-rule applies only to the new sampler comparisons')
+    if args.seed_batch is not None and args.plot_only:
+        p.error('--seed-batch applies to new runs, not saved reports')
+    if args.target is not None and (args.plot_only or args.experiment not in REPORTED_COMPARISONS):
+        p.error('--target applies only to the reported-study comparisons')
     if args.recompute_diagnostics and not args.plot_only:
         p.error('--recompute-diagnostics requires --plot-only SAVED_RUN')
     if args.list:
@@ -127,52 +119,9 @@ def main(argv=None):
         if args.dry_run:
             command.append('--dry-run')
         return reported_main(command)
-    if args.experiment in COMPARISONS:
-        if args.resume:
-            p.error('Sampler comparisons start from scratch; choose a fresh output folder.')
-        unused = [name for name in ('iterations', 'ball_map_policy', 'ball_scale_policy', 'nuts_samples',
-                    'nuts_max_depth', 'nuts_batch_size', 'nuts_target_accept', 'reference_samples',
-                    'reference_batch_size') if getattr(args, name) is not None]
-        if unused:
-            p.error('These options are not used by sampler comparisons: '+', '.join(unused))
-        from scripts.reproduce_comparison import main as comparison_main
-        command = ['--comparison', 'numba' if args.experiment.endswith('-numba') else 'jax',
-                   '--target', args.target or 'skew-t-100d', '--vi', args.vi or 'on',
-                   '--preset', args.preset, '--workers', str(args.workers or 1)]
-        if args.output_dir:
-            command += ['--output-dir', str(args.output_dir)]
-        if args.dry_run:
-            command.append('--dry-run')
-        for name in ('runs', 'time_budget', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples', 'seed', 'seed_batch', 'scs_step_rule'):
-            if getattr(args, name) is not None:
-                command += ['--'+name.replace('_', '-'), str(getattr(args, name))]
-        return comparison_main(command)
-    if args.experiment in ('skew-t-100d-fixed', BOUNDARY_EXPERIMENT):
-        if args.resume:
-            p.error('The single SCS comparison starts from scratch; choose a fresh output folder.')
-        if args.experiment == BOUNDARY_EXPERIMENT:
-            from scripts.reproduce_boundary_100d import main as single_main
-        else:
-            from scripts.reproduce_scs_100d import main as single_main
-        command = ['--preset', args.preset, '--workers', str(args.workers or 1)]
-        if args.output_dir:
-            command += ['--output-dir', str(args.output_dir)]
-        if args.dry_run:
-            command.append('--dry-run')
-        for name in ('runs', 'time_budget', 'warmup', 'thin', 'optimizer_steps', 'optimizer_samples', 'seed', 'seed_batch'):
-            value = getattr(args, name)
-            if value is not None:
-                command += ['--'+name.replace('_', '-'), str(value)]
-        if args.ball_map_policy == 'vanilla' or args.ball_scale_policy is not None or args.iterations is not None:
-            p.error('This comparison uses fitted maps and equal sampling time; map variants and fixed iteration counts are not supported.')
-        unused = [name for name in ('nuts_samples', 'nuts_max_depth', 'nuts_batch_size', 'nuts_target_accept',
-                                     'reference_samples', 'reference_batch_size') if getattr(args, name) is not None]
-        if unused:
-            p.error('These options are not used by the single SCS comparison: '+', '.join(unused))
-        return single_main(command)
     if args.experiment in ALIASES:
         print(f'Legacy name {args.experiment} now resolves to {ALIASES[args.experiment]} (d=200).', file=sys.stderr)
-    overrides = {k: v for k, v in vars(args).items() if k not in ('experiment', 'list', 'preset', 'output_dir', 'reference_dir', 'resume', 'plot_only', 'recompute_diagnostics', 'dry_run', 'seed_batch', 'target', 'vi', 'scs_step_rule')}
+    overrides = {k: v for k, v in vars(args).items() if k not in ('experiment', 'list', 'preset', 'output_dir', 'reference_dir', 'resume', 'plot_only', 'recompute_diagnostics', 'dry_run', 'target')}
     config = load_config(args.experiment, args.preset, overrides)
     output = args.output_dir or Path('results')/config['experiment']/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
     if args.dry_run:
