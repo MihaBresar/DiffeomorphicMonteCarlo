@@ -1,5 +1,7 @@
-"""Compare fixed and acceptance-tuned SCS using a completed author-VI run's exact maps.
+"""Archived step-policy control using a completed author-VI run's exact maps.
 
+This helper preserves historical sensitivity studies; it is not an active
+baseline selector for the current original-SCS-only five-method comparison.
 The primary configuration fixes the target, map fit, seeds, chain and pilot
 budgets, production clocks, ESS and CPU allocation. Only the SCS step policy changes; warmup retains the same transition budget. This script never refits a map or overwrites an existing output folder.
 """

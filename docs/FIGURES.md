@@ -36,8 +36,8 @@ longer generated. CSV/JSON preserve exact counts and full precision.
 
 All methods have equal production-time and discarded pilot transition budgets.
 All four DCS variants share the same fixed move parameter.
-SCS defaults to the authors' fixed h=0.1, with acceptance-target 0.234 tuning
-available as a sensitivity option. BW, reflected BW and billiard use fixed
+The single SCS baseline uses the authors' fixed h=0.1; new comparisons do not
+offer alternative SCS step tuning. BW, reflected BW and billiard use fixed
 increment radius h=0.07; RWM uses coordinate standard deviation h/√(d+2).
 Each uses its own kernel during discarded warmup without step adaptation. The recorded `--dcs-fixed-move`
 alternative or historical method-specific calibration control must be

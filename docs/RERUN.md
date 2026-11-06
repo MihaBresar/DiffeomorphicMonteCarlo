@@ -72,15 +72,14 @@ manifest and saved data with the report to identify the experiment.
 
 Billiards retain jointly fitted centre/R/β after Möbius with effective δ=0.
 All four DCS methods share fixed h=0.07, with Gaussian RWM converted to
-coordinate standard deviation h/√(d+2). SCS defaults to the authors' fixed h=0.1 and also
-supports acceptance-target 0.234 tuning, with a discarded pilot under either policy.
+coordinate standard deviation h/√(d+2). The single SCS baseline uses the authors' fixed h=0.1
+throughout discarded warmup and production; alternative SCS step tuning is not offered.
 BW, reflected BW and billiard use identical uniform-ball increment scales.
 Each DCS method uses its own production kernel during fixed-step discarded
 equilibration; reflection and billiard receive no separate step optimization. All steps freeze and the first third of production is discarded.
-Every method receives the same number of pilot transitions. Use
-`--scs-step-rule acceptance` or `--scs-step-rule fixed` to select the SCS
-policy explicitly; the [matched-map sensitivity helper](AUTHOR_SCS_CALIBRATION.md#reproduction)
-runs the opposite policy from a completed primary without refitting.
+Every method receives the same number of discarded warmup transitions.
+The [earlier SCS sensitivity study](AUTHOR_SCS_CALIBRATION.md#reproduction)
+remains reproducible through its archived source revision.
 Use fresh sampling batches to assess variability conditional on the fitted
 maps. Keep worker count and machine conditions consistent. See
 [protocol](COMPARISONS.md) and [ESS](ESS.md).

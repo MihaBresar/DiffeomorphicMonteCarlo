@@ -22,7 +22,14 @@ def write(path, value):
 
 def primary_fixture(root, backend='jax', vi='on', version=None):
     with patch.object(runner, 'cpu_info', return_value=HARDWARE):
-        config = suite.configuration('quick', workers=2, overrides={'scs_step_rule':'acceptance'}, comparison=backend, vi=vi)
+        config = suite.configuration('quick', workers=2, comparison=backend, vi=vi)
+    # Saved historical fixtures may contain acceptance tuning; current public
+    # configurations no longer offer this alternative for a new comparison.
+    config['scs_step_rule'] = 'acceptance'
+    config['step_tuning_policies']['SCS'] = 'indicator_dual_averaging_0234'
+    config['tuning_note'] = config['tuning_note'].replace(
+        'SCS uses the paper skew-t fixed h=0.1 with no step adaptation.',
+        'Historical SCS acceptance-target 0.234 calibration during discarded warmup.')
     if version in (9, 10):
         config['protocol'] = f'timed-{"sampler" if backend == "jax" else "numba"}-comparison-v{version}'
         config['dcs_step_rule'] = 'acceptance'

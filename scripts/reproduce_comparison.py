@@ -34,9 +34,12 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
     dcs_fixed_move = .07 if dcs_fixed_move is None else dcs_fixed_move
     if isinstance(dcs_fixed_move, bool) or not isinstance(dcs_fixed_move, (int, float)) or not math.isfinite(dcs_fixed_move) or dcs_fixed_move <= 0:
         raise ValueError('dcs_fixed_move must be finite and positive')
-    scs_step_rule = supplied.pop('scs_step_rule', None) or 'fixed'
-    if scs_step_rule not in ('acceptance', 'fixed'):
-        raise ValueError('scs_step_rule must be acceptance or fixed')
+    scs_step_rule = supplied.pop('scs_step_rule', None)
+    if scs_step_rule is None:
+        scs_step_rule = 'fixed'
+    if scs_step_rule != 'fixed':
+        raise ValueError('scs_step_rule must be fixed: current five-method comparisons use only '
+                         'the original author SCS VI and fixed h=0.1 baseline')
     reference_samples = supplied.pop('reference_samples', None)
     reference_seed = supplied.pop('reference_seed', None)
     config = runner.configuration(preset, workers, supplied)
@@ -67,7 +70,7 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
         step_policy='separate_method_specific_discarded_warmup_then_frozen',
         step_tuning_policies={'DCS-BW-reflect': 'ball_esjd_pilot_v1',
             'DCS-Billiard': 'own_kernel_radial_pilot_v1',
-            'SCS': 'indicator_dual_averaging_0234' if scs_step_rule == 'acceptance' else 'author_scs_fixed_01'},
+            'SCS': 'author_scs_fixed_01'},
         scs_step_rule=scs_step_rule, dcs_step_rule=dcs_step_rule, dcs_fixed_move=float(dcs_fixed_move),
         fitting_policy=(f'DCS: fixed-cloud reverse KL, seed {config["fit_seed"]}, gradient-norm cap 10, no coordinate/CDF clipping. '
                         'SCS: unchanged author VI, fixed base batch, seed 0, coordinate clip 1000, no gradient clipping. '
@@ -78,8 +81,7 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
             'DCS-BW use acceptance-target 0.234 dual averaging. Reflected BW retains its '
             'ball-movement pilots without a geometric step ceiling of 2. DCS-Billiard calibrates its own '
             'production kernel using bounded squared changes of physical log(1+norm), including zero after rejection. '
-            'SCS uses acceptance-target 0.234 dual averaging; this follows the paper\'s general acceptance guidance, '
-            'not the fixed h=0.1 used in its skew-t experiment. '
+            'SCS uses the paper skew-t fixed h=0.1, with the same discarded warmup budget and no step adaptation. '
             'The final pilot state and selected step initialize production; all steps freeze before sampling.')
     ordinary_policy = 'fixed_dcs_move_v1' if dcs_step_rule == 'fixed' else 'indicator_dual_averaging_0234'
     for method in ('DCS-RWM', 'DCS-BW'):
@@ -93,16 +95,9 @@ def configuration(preset='quick', workers=1, overrides=None, *, comparison='jax'
             'DCS-RWM uses Gaussian coordinate standard deviation h/sqrt(d+2). '
             'This matches unreflected proposal coordinate variances, not accepted movement or mixing. '
             'All four DCS methods use their actual production kernels during warmup without adaptation. '
-            + ('SCS uses the paper skew-t fixed h=0.1 with no step adaptation. '
-               if scs_step_rule == 'fixed' else
-               'SCS uses acceptance-target 0.234 dual averaging during its separate warmup. ')
+            + 'SCS uses the paper skew-t fixed h=0.1 with no step adaptation. '
             + 'The final warmup state initializes production; every production step stays frozen.')
     config['billiard_map_policy'] = 'post_mobius_retained_joint_fit_centre_scale_beta_delta_zero'
-    if scs_step_rule == 'fixed':
-        config['tuning_note'] = config['tuning_note'].replace(
-            'SCS uses acceptance-target 0.234 dual averaging; this follows the paper\'s general acceptance guidance, '
-            'not the fixed h=0.1 used in its skew-t experiment.',
-            'SCS uses the paper skew-t fixed h=0.1, with the same discarded warmup budget and no step adaptation.')
     config['time_scope'] = ('Equal per-chain sampling time includes first-third burn-in, every transition and '
         'all-state radial estimates and unthinned scalar capture for ESS. VI, separate step calibration, compilation, synchronization waits, ESS computation and '
         'file/report generation are excluded and recorded separately. ' +
@@ -119,7 +114,7 @@ def main(argv=None):
     parser.add_argument('--comparison', choices=COMPARISONS, default='jax')
     parser.add_argument('--target', choices=TARGET_IDS, default='skew-t-100d')
     parser.add_argument('--vi', choices=('on',), default='on', help=argparse.SUPPRESS)
-    parser.add_argument('--scs-step-rule', choices=('acceptance', 'fixed'))
+    parser.add_argument('--scs-step-rule', choices=('fixed',), help=argparse.SUPPRESS)
     parser.add_argument('--dcs-step-rule', choices=('fixed', 'acceptance'))
     parser.add_argument('--dcs-fixed-move', type=float)
     parser.add_argument('--preset', choices=runner.PRESETS, default='quick')

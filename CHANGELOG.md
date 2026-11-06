@@ -1,5 +1,11 @@
 # Changes
 
+## 2026-11-06 — original SCS baseline only in active comparisons
+
+- Keep only the original author VI/transition with fixed SCS h=0.1 in new five-method JAX and Numba comparisons. Reject acceptance-tuned SCS overrides at the current configuration and command-line entry points; retain the hidden fixed alias for compatible scripts.
+- Preserve low-level historical policies, saved results and archived sensitivity evidence. Other manuscript experiments retain their explicitly documented SCS implementation and calibration.
+- Clarify that current public DCS settings retain their fitted physical centres and default shared h=0.07. Separate zero-centre and post-VI calibration studies do not change those defaults or establish matched end-to-end tuning against original SCS.
+
 ## 2026-11-05 — identity-map optimization and explicit fixed SCS control
 
 - Remove identity Möbius calculations from the JAX ball transform when the supplied deformation is exactly zero. Keep the complete nonzero-deformation path, radial map and Jacobian, proposal draws, domain checks and all-state recording. This also applies to billiards in their existing post-Möbius coordinates; it does not alter fitted maps or coordinate policies.

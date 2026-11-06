@@ -31,11 +31,11 @@ retain their recorded unit scale and zero centre/deformation.
 SCS fitting keeps the author's initialization and parameterization; DCS-only
 radial-median initialization and exact symmetry constraints do not alter it.
 
-In the 100D/500D comparisons, SCS defaults to the authors' skew-t step h=0.1, with a discarded equilibration
-phase and no step adaptation. Acceptance adaptation toward 0.234 is an explicit
-sensitivity option. Both receive the same discarded transition budget and
-freeze their production step. This choice and all measured alternatives are
-reported in [the calibration study](../../docs/AUTHOR_SCS_CALIBRATION.md).
+The only active SCS baseline in new 100D/500D five-method comparisons uses the
+authors' skew-t step h=0.1, with discarded equilibration and no step adaptation.
+The original author VI and transition are unchanged. Historical alternative
+step policies and outcomes remain in [the calibration study](../../docs/AUTHOR_SCS_CALIBRATION.md);
+they are not active comparison options.
 Their SCS latitude is 1.1 and the physical pilot start is all ones. Generic
 logistic and ν=0.5 experiments retain the checked Numba SCS production kernel
 and acceptance-target 0.234 calibration; using author VI does not make those

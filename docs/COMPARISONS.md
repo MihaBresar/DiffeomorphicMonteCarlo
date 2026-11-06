@@ -36,8 +36,8 @@ of method, VI and pilot outcomes. CSV/JSON retain full precision.
 ## What is matched
 
 - Same physical target, two radial functionals, analytic references and start.
-- Same per-chain production-time budget, number of chains, total pilot
-  transition budget, 300-transition clock batches and first-third burn-in.
+- Same per-chain production-time budget, number of chains, separate discarded
+  warmup-transition budget, 300-transition clock batches and first-third burn-in.
 - Repeated states after rejection contribute to estimates and ESS.
 - Same ordered CPU allocation and simultaneous chains per wave, including
   partial waves. Method order rotates across waves. Runtime helper threads
@@ -79,6 +79,11 @@ See [the author baseline and sensitivity study](AUTHOR_SCS_CALIBRATION.md).
 
 Version 11 does not change these fitting settings or maps. Fresh-cloud VI for
 both families is a separate experimental study, not the public default.
+Zero-centre and post-VI radius/step studies are also separate: current public
+runs retain the fitted physical centre and the stated default radius/step
+policy. Their outcomes must not be labelled as results of these defaults.
+Such extra, target-informed DCS development is not matched end-to-end tuning
+against an unchanged author SCS baseline.
 
 ## Shared DCS move and separate warmup
 
@@ -103,21 +108,20 @@ adaptation toward 0.234, reflected-BW ball-movement pilots and billiard
 radial-movement pilots. Record the selected policy and report prespecified
 alternatives without selecting by which method wins.
 
-SCS defaults to the authors' skew-t **fixed h=0.1**, including during
-its discarded pilot. It is not an adaptively selected step. Acceptance
-adaptation toward 0.234 remains an explicit alternative; it uses the
-unchanged author transition and recorded sphere map. That adaptation is a
-benchmark modification, rather than the authors' fixed-step skew-t recipe.
+The only SCS baseline in new five-method comparisons uses the authors' skew-t
+**fixed h=0.1** throughout discarded warmup and production, with unchanged
+author VI and transition code. It is not an adaptively selected step.
+New acceptance-tuned SCS requests are rejected. The hidden
+`--scs-step-rule fixed` alias remains for compatible scripts; it selects the
+same single baseline.
 
-`--scs-step-rule acceptance` or `--scs-step-rule fixed` explicitly chooses
-the SCS policy for a new comparison. The [sensitivity runner](AUTHOR_SCS_CALIBRATION.md#reproduction)
-reuses a completed primary's exact maps and budgets and automatically runs
-the opposite policy. The earlier smaller study's pre-result rule retained acceptance
-as the global default only if its MSE improved both radial functions in a
-full-author-VI check and a no-VI check; otherwise it fell back globally
-to fixed h=0.1. Acceptance failed that rule, so the default is fixed h=0.1.
-Both historical checks used the small production budget. All results are reported, and
-a fresh full-paper batch evaluates that development choice.
+Historical SCS sensitivity results and their original source revision remain
+in the [development study](AUTHOR_SCS_CALIBRATION.md). They are archival
+evidence, not additional active baselines. The earlier study's rule retained
+acceptance adaptation only if it improved both radial functions in the
+full-author-VI and no-VI checks; it failed that rule. Keeping this author
+baseline does not establish that h=0.1 is optimal for the present target or
+for 500D.
 
 Under the historical adaptive control only, reflected BW tests rotating
 h/2, h and 2h trials by squared ball movement, and billiard tests its own
@@ -131,14 +135,14 @@ controls retain broad numerical guards and freeze before production. Equal
 counts do not establish equal warmup time or optimal settings.
 Gaussian RWM's recorded scale is a coordinate standard deviation;
 BW/reflected-BW/billiard scale is the initial proposal-ball radius.
-SCS uses the authors' fitting routine and defaults to their fixed h=0.1,
-with acceptance calibration available for sensitivity checks.
+SCS uses the authors' fitting routine and fixed h=0.1; the active comparison
+does not offer a separately calibrated or recentered SCS variant.
 
 Equal pilot transition counts do not establish equally optimal tuning, nor
 equal preparation time. Numerical step sizes have different geometric
 meanings across kernels, and optional historical controls use different selection
-criteria. Report the SCS acceptance and fixed-step sensitivity outcomes
-together. Freeze the main protocol before evaluating a fresh full-paper
+criteria. Preserve historical sensitivity outcomes separately from the
+active original-baseline comparison. Freeze the main protocol before evaluating a fresh full-paper
 seed batch; the smaller study is development evidence, not an independent
 validation of a choice informed by its results.
 

@@ -26,15 +26,22 @@ class ComparisonSuiteTests(unittest.TestCase):
         self.assertEqual(config['scs_vi'],dict(optimizer_steps=7,optimizer_samples=31))
         self.assertEqual(config['optimizer_steps'],7)
 
-    def test_explicit_scs_step_rules_keep_other_methods_unchanged(self):
-        tuned=suite.configuration('quick',overrides={'scs_step_rule':'acceptance'})
-        fixed=suite.configuration('quick',overrides={'scs_step_rule':'fixed'})
-        self.assertEqual(fixed['step_tuning_policies']['SCS'],'author_scs_fixed_01')
-        for method in ('DCS-Billiard','DCS-BW-reflect'):
-            self.assertEqual(fixed['step_tuning_policies'][method],tuned['step_tuning_policies'][method])
-        self.assertIn('no step adaptation',fixed['tuning_note'])
-        with self.assertRaisesRegex(ValueError,'scs_step_rule'):
-            suite.configuration('quick',overrides={'scs_step_rule':'best-MSE'})
+    def test_current_comparison_keeps_only_original_author_scs(self):
+        for backend in ('jax', 'numba'):
+            for target in ('skew-t-100d', 'skew-t-500d'):
+                for preset in ('quick', 'reproduce', 'paper'):
+                    default=suite.configuration(preset,comparison=backend,target=target)
+                    fixed=suite.configuration(preset,comparison=backend,target=target,
+                                              overrides={'scs_step_rule':'fixed'})
+                    self.assertEqual(default,fixed)
+                    self.assertEqual(fixed['sphere_map_policy'],'author-paper-vi')
+                    self.assertEqual(fixed['step_tuning_policies']['SCS'],'author_scs_fixed_01')
+                    self.assertEqual(fixed['initial_scale'],.1)
+                    self.assertIn('SCS uses the paper skew-t fixed h=0.1 with no step adaptation',fixed['tuning_note'])
+                    self.assertEqual(fixed['algorithms'].count('SCS'),1)
+        for policy in ('acceptance', 'best-MSE', 'fixed_scs_move_v1', '', False, .05):
+            with self.subTest(policy=policy), self.assertRaisesRegex(ValueError,'original author SCS'):
+                suite.configuration('quick',overrides={'scs_step_rule':policy})
 
     def test_fixed_dcs_controls_are_explicit_and_do_not_change_scs(self):
         default = suite.configuration('quick')

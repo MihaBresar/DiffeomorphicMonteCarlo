@@ -37,6 +37,26 @@ def comparison_summary(optimized=False, vi='on'):
 
 
 class ComparisonUiTests(unittest.TestCase):
+    def test_current_cli_rejects_alternative_scs_before_sampling(self):
+        from scripts import reproduce_comparison as suite
+        for experiment in launcher.COMPARISONS:
+            with patch.object(suite.runner, 'run') as sampling, \
+                    redirect_stderr(StringIO()), self.assertRaises(SystemExit) as error:
+                run_experiment.main([experiment, '--scs-step-rule', 'acceptance'])
+            self.assertEqual(error.exception.code, 2)
+            sampling.assert_not_called()
+        with patch.object(suite.runner, 'run') as sampling, \
+                redirect_stderr(StringIO()), self.assertRaises(SystemExit):
+            suite.main(['--scs-step-rule', 'acceptance'])
+        sampling.assert_not_called()
+        self.assertNotIn('--scs-step-rule', run_experiment.parser().format_help())
+        with patch.object(suite.runner, 'run', return_value='unchanged-author-baseline') as sampling:
+            self.assertEqual(suite.main(['--scs-step-rule', 'fixed']), 0)
+        config = sampling.call_args.args[0]
+        self.assertEqual(config['sphere_map_policy'], 'author-paper-vi')
+        self.assertEqual(config['step_tuning_policies']['SCS'], 'author_scs_fixed_01')
+        self.assertEqual(config['initial_scale'], .1)
+
     def test_removed_options_fail_before_sampling_or_directory_creation(self):
         from scripts import reproduce_comparison as suite
         from scripts import reproduce_scs_100d as runner

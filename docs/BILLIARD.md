@@ -59,12 +59,12 @@ MSE or known reference value entered that per-chain calibration. The current
 fixed-step default instead uses its own billiard kernel without a selection pilot.
 
 Version 8 gave SCS the same radial-pilot policy and transition budget. Versions
-9–11 instead use the authors' SCS VI and default to fixed h=0.1 during
-its discarded pilot and production. Acceptance-target 0.234 adaptation remains
-an explicit SCS sensitivity option. Both SCS policies keep the same number of
-discarded pilot transitions as DCS. Their global default was selected in the
-separately reported [development study](AUTHOR_SCS_CALIBRATION.md); it was not
-selected within any retained production chain. See [the full protocol](COMPARISONS.md).
+9–11 used the authors' SCS VI with fixed h=0.1 as the default, alongside an
+explicit acceptance-target 0.234 sensitivity control. Current new five-method
+comparisons retain only the original author VI/transition and fixed h=0.1,
+with the same discarded warmup-transition budget as DCS. Historical policies
+and outcomes remain in the [development study](AUTHOR_SCS_CALIBRATION.md);
+they are not additional active SCS baselines. See [the full protocol](COMPARISONS.md).
 
 Version 11 uses one shared DCS move: BW, reflected BW and billiard all draw
 uniform-ball increments with radius h=0.07; Gaussian RWM uses coordinate

@@ -58,8 +58,7 @@ def parser():
     p.add_argument('--target', choices=('skew-t-100d', 'skew-t-500d'),
                    help='Target for either sampler comparison')
     p.add_argument('--vi', choices=('on',), help=argparse.SUPPRESS)
-    p.add_argument('--scs-step-rule', choices=('acceptance', 'fixed'),
-                   help='Sampler comparisons only: author fixed h=0.1 (default) or acceptance calibration')
+    p.add_argument('--scs-step-rule', choices=('fixed',), help=argparse.SUPPRESS)
     p.add_argument('--dcs-step-rule', choices=('fixed', 'acceptance'),
                    help='Sampler comparisons only: fixed moves for all four DCS methods (default) or historical method-specific calibration')
     p.add_argument('--dcs-fixed-move', type=float,

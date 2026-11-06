@@ -9,18 +9,19 @@ fits and changes all four DCS variants to a shared fixed-move default. The versi
 retains its original fresh-draw DCS recipe and 1,500-update full DCS budget;
 its outcomes are not version-10 or version-11 performance results.
 
-Version 9 uses the SCS authors' unchanged VI implementation and production
+Version 9 used the SCS authors' unchanged VI implementation and production
 transition, applied to the same target as DCS. DCS fitting, proposals and
-calibration remain unchanged. SCS has two explicit step policies: adaptation
+calibration remained unchanged in that update. That revision offered two SCS step policies: adaptation
 toward acceptance 0.234 in a discarded pilot followed by a frozen production
 step, or the authors' skew-t h=0.1 throughout discarded pilot and production.
-The global default is **fixed h=0.1**, following the smaller development
+The version-9 global default was **fixed h=0.1**, following the smaller development
 study's fallback rule, which was fixed before inspecting its results.
-The rule does not choose by DCS ranking. Acceptance adaptation remains
-available explicitly for sensitivity checks.
+The rule did not choose by DCS ranking. Acceptance adaptation was available
+explicitly for sensitivity checks in that revision; it is not an option in
+current new five-method comparisons.
 
-Both step policies use exactly the same fitted maps. The control therefore
-isolates step choice within the original author fitting recipe; it does not
+Both historical step policies used exactly the same fitted maps. The control therefore
+isolated step choice within the original author fitting recipe; it does not
 measure the effect of changing VI.
 
 ## What comes from the authors
@@ -210,67 +211,30 @@ No confidence claim or universal ordering follows from these tables.
 
 ## Reproduction
 
-For a new fitted-map sensitivity check with the current entry points, run the
-primary comparison before its step-policy control:
+This page records a historical version-9 development study. Its numerical
+results and selection rule are retained. Current five-method entry points
+include only original author SCS VI with fixed h=0.1 and reject new
+acceptance-tuned SCS requests.
 
-```sh
-python run_experiment.py sampler-comparison --target skew-t-100d --preset reproduce --seed-batch 8 --workers 4 --scs-step-rule acceptance --output-dir results/author-scs-vi-on-new
-python scripts/reproduce_scs_step_control.py results/author-scs-vi-on-new --output-dir results/author-scs-fixed-step-vi-on-new
-```
-
-To rerun the earlier study including its no-VI cases, use the
+To rerun the historical step-policy study, including its no-VI cases, use the
 [last VI-optional release](https://github.com/MihaBresar/DiffeomorphicMonteCarlo/tree/6b40f4e609a1b49a460e00f649e3e3479b102c20)
 and its [study instructions](https://github.com/MihaBresar/DiffeomorphicMonteCarlo/blob/6b40f4e609a1b49a460e00f649e3e3479b102c20/docs/AUTHOR_SCS_CALIBRATION.md#reproduction).
-That release preserves the main comparison's fitting recipe. The saved
-source hashes identify the actual generating sources of the original study;
-a new timed run can have different counts and MSE even with the same seeds.
+The saved source hashes identify the actual generating sources. Follow the
+source and allocation checks for a stored primary; a new timed run can have
+different counts and MSE even with the same seeds. Low-level historical
+policies and the archived control helper remain available for reproducibility;
+they do not add active baselines to the current comparison.
 
-The explicit `--scs-step-rule acceptance` reproduces the study's SCS primary
-step policy despite the fixed-step global default. Current DCS fitting and
-DCS proposal-step settings differ from that historical study. Use `--scs-step-rule fixed`
-to run a five-method primary with SCS h=0.1. The control helper automatically
-runs the **opposite** SCS policy: fixed h=0.1 after an acceptance-tuned primary,
-or acceptance tuning after a fixed-step primary. Thus either primary policy
-can supply the same fitted maps and resources for its sensitivity check.
+For a new comparison with the original SCS baseline under current settings:
 
-Use fresh output folders. The current control accepts a complete version-11 primary
-and checks its scientific sources, maps and allocation before reuse. It
-records original fitting costs separately from zero new fitting work.
-These controls assess the step policy conditional on the primary fitted
-maps; they do not average over refitting uncertainty.
-
-To repeat the additional full-author-VI SCS check under the current protocol without running DCS
-production, save the following as `run_full_scs_vi_check.py` in the repository
-root, then run that file with the repository's configured Python environment.
-The main guard is required for Windows worker startup. It uses public
-repository modules and new result folders; no external review script or saved
-fit is needed. It fits the full-preset maps once, runs only SCS, then reuses
-those maps for its control.
-
-```python
-from pathlib import Path
-from scripts import reproduce_comparison as suite
-from scripts import reproduce_scs_100d as runner
-from scripts import reproduce_scs_step_control as control
-
-def main():
-    config = suite.configuration(
-        'paper', workers=4,
-        overrides=dict(runs=20, time_budget=2.0, warmup=1000, thin=10,
-                       seed_batch=7, scs_step_rule='acceptance'),
-        comparison='jax', target='skew-t-100d',
-    )
-    config['algorithms'] = ['SCS']
-    root = Path(__file__).resolve().parent
-    primary = root / 'results/full-author-vi-small-sampling'
-    alternative = root / 'results/full-author-vi-fixed-step'
-    runner.run(config, primary)
-    control.run(primary, alternative)
-
-
-if __name__ == '__main__':
-    main()
+```sh
+python run_experiment.py sampler-comparison --target skew-t-100d --preset reproduce --seed-batch 8 --workers 4 --output-dir results/original-scs-current-comparison
 ```
+
+This current command does not reproduce the old study's DCS fit or step
+settings. Use a fresh output folder and sampling seeds not previously
+inspected when assessing a newly frozen protocol. Results condition on the
+fitted maps and do not average over refitting uncertainty.
 
 The smaller study is development evidence. Report all its outcomes, and
 freeze the selected protocol before a fresh full-paper seed batch, such as

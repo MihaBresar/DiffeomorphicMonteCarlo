@@ -29,7 +29,7 @@ Confirm a complete manifest and open `paper_values.html`. A quick result checks 
 | Fitted and effective maps | `maps.json`, `method_maps.json`, `effective_maps.csv`. RWM/BW/reflected BW share the ball map; billiards retain its centre/R/β with zero effective deformation after Möbius. There is no constrained refit. Both map families are fitted in new comparisons. |
 | Author SCS implementation | Pinned files in `third_party/scs_paper`, their checksums, and `dcs_bench/scs_paper.py`. The author projection, VI routine and production transition are unchanged; adaptation/recording policies are disclosed separately. |
 | Fitting resources | SCS: seed 0, fixed cloud, Adam 0.01, ±1,000 physical-coordinate clipping inside VI, no gradient clipping. DCS: seed 42, fixed cloud, Adam 0.01, gradient-norm cap 10, no coordinate clipping. Full evaluation budgets match: 1,000×2,000 per family. Each reuses its own 2,000-point cloud from its reference distribution. Equal evaluation counts do not imply equal fitting time or identical optimizers. Production target densities are unclipped. |
-| Warmup budgets and step criteria | Same number of discarded transitions per chain, not necessarily equal seconds or optimal settings. BW, reflected BW and billiard share fixed increment radius h=0.07; RWM uses h/√(d+2) per coordinate. All four use their own kernel during discarded warmup without separate step optimization. SCS defaults to fixed h=0.1. Inspect final steps, selected controls, guard hits, candidate scores and warmup time. |
+| Warmup budgets and step criteria | Same number of discarded transitions per chain, not necessarily equal seconds or optimal settings. BW, reflected BW and billiard share fixed increment radius h=0.07; RWM uses h/√(d+2) per coordinate. All four use their own kernel during discarded warmup without separate step optimization. The single SCS baseline uses fixed h=0.1. Inspect final steps, selected controls, guard hits, candidate scores and warmup time. |
 | Frozen production and burn-in | Every scale freezes before production. The last pilot state starts production, then the first third of actual generated production iterations is discarded. Repeated rejection states remain in estimates and ESS. |
 | Timing boundary | Production includes sampling, projection/statistic work and scalar ESS capture/flush. It excludes fits, compilation, pilots, synchronization waits, diagnostic FFTs and report generation. Inspect actual seconds and final-batch overshoot. |
 | Implementation comparison | JAX uses common full-state scans and recording. Numba uses fused DCS loops against author JAX SCS; its rate includes framework/output differences and is not a pure geometry comparison. |
@@ -47,13 +47,20 @@ Version 10 changed the full DCS fitting budget from 1,500 to 1,000 updates and i
 
 Freeze the version-11 protocol before evaluating a fresh, previously uninspected full-paper sampling batch. Rerun all five methods together and report the new batch separately from the version-9 and later development studies. A changed protocol after inspecting results needs a new independent assessment and disclosure. This guide does not assert that a new full batch has completed.
 
-To inspect SCS sensitivity conditional on a primary's saved maps, use:
+The active comparison contains only author SCS VI and fixed h=0.1. Historical
+step-policy sensitivity results remain in the archived study; they are not
+active baseline choices. Retaining the original baseline does not establish
+equally optimal tuning or isolate the transition geometry.
 
-```sh
-python scripts/reproduce_scs_step_control.py results/reviewer-check --output-dir results/reviewer-step-control
-```
-
-The helper runs the opposite SCS step policy and validates saved source/configuration/map/allocation provenance. It performs no map refit. Original fit time and zero new fitting time are recorded separately; the latter is not an independent end-to-end fitting cost. Pilot RNG consumption differs between fixed and adaptive policies, so identical seed labels do not imply identical warmup proposals.
+Zero-centre DCS experiments are separate development studies. They change the
+production centre after VI and may also use pilot-selected radius/step values
+and post-Möbius coordinates for every DCS variant. The current public defaults
+retain fitted centres, use h=0.07, and use post-Möbius coordinates only for
+billiards. A comparison of a developed DCS variant against original SCS is a
+valid declared-baseline experiment, but its additional target-specific
+development resources are not matched preparation for the two methods.
+Report that scope, retain the development record and assess frozen choices
+on fresh sampling seeds; do not describe it as differing only in the sampler.
 
 ## Other six experiments
 

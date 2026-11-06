@@ -8,7 +8,7 @@ from the original ordinary BW proposal.
 
 The active version-11 settings, including shared BW/reflected-BW/billiard increment radius h=0.07,
 Gaussian RWM coordinate standard deviation h/√(d+2), SCS author VI, fixed
-SCS h=0.1 and sensitivity controls, are specified in [COMPARISONS.md](COMPARISONS.md).
+SCS h=0.1 and DCS sensitivity controls, are specified in [COMPARISONS.md](COMPARISONS.md).
 The `paper` preset means the recorded full benchmark budget. Figures and
 numerical claims for a publication must identify the exact source revision,
 configuration and saved results used to produce them.

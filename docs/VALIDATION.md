@@ -27,7 +27,9 @@ For controlled studies, low-level configurations may set
 and production using the unchanged author transition. Tests cover 0.025,
 0.05, 0.1 and 0.2 in both dimensions and verify that metadata does not label
 this policy as the author's fixed-0.1 experiment. This is an execution API,
-not a step-selection rule. The public SCS default remains 0.1.
+not a step-selection rule. It remains available for archived results and
+separate review studies; current five-method entry points allow only the
+original author SCS baseline at 0.1.
 
 A serial paired throughput check retained complete state projection and
 recording, with unchanged-path controls. It showed modest or negligible

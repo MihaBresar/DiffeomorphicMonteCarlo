@@ -105,10 +105,9 @@ centre/R/β and use zero production deformation, as explained in
 BW/reflected-BW/billiard use a uniform-ball increment of that radius and
 RWM uses coordinate standard deviation h/√(d+2). Each uses its own kernel
 during discarded equilibration, without separate step adaptation.
-SCS defaults to the authors' fixed h=0.1; acceptance tuning toward 0.234
-remains available as a sensitivity option.
-Both SCS step rules receive the same discarded warmup-transition budget; the fixed setting
-does not adapt. The [SCS study](AUTHOR_SCS_CALIBRATION.md) documents the
+The single SCS baseline uses the authors' fixed h=0.1 with no adaptation
+and the same discarded warmup-transition budget as DCS. New five-method
+comparisons do not offer alternative SCS tuning or recentering. The [SCS study](AUTHOR_SCS_CALIBRATION.md) documents the
 default-selection rule and sensitivity results. All production steps are
 frozen. Historical adaptive controls retain their recorded pilot histories.
 The first third of production is discarded in every case.
