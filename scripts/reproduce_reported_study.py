@@ -1,4 +1,4 @@
-"""Run the frozen zero-centre study against the original author SCS baseline."""
+"""Run frozen DCS settings against original SCS and equally pilot-calibrated SCS."""
 import argparse
 from datetime import datetime, timezone
 import json
@@ -13,7 +13,8 @@ from dcs_bench.reported_study import PRESETS, TARGETS, configuration, run
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, epilog='Maps and steps are bundled and frozen. '
-        'JAX reproduces the reported implementation; Numba is a separately labelled extension. '
+        'The current six-method comparison adds pilot-calibrated SCS to the original JAX study; '
+        'Numba is a separately labelled implementation extension. '
         'Timed counts and results depend on hardware. No manual fitting or step-size choice is required.')
     parser.add_argument('--preset', choices=PRESETS, default='quick')
     parser.add_argument('--comparison', choices=('jax', 'numba'), default='jax')

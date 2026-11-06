@@ -67,11 +67,13 @@ reliably between paths or computers. Keep the `results` folder to retain runs.
 
 ## Comparison settings
 
-The reported study contains DCS-RWM, DCS-BW, SCS, DCS-BW-reflect and
-DCS-Billiard. All four DCS methods use zero centre and zero deformation,
+The comparison contains DCS-RWM, DCS-BW, original SCS, **SCS calibrated**,
+DCS-BW-reflect and DCS-Billiard. All four DCS methods use zero centre and zero deformation,
 with frozen radius and step values from the reported experiment. Their common
 h is 0.025 in 100D and 1/√500 in 500D. Gaussian RWM uses coordinate standard
-deviation h/√(d+2). SCS retains the original author-fitted sphere map and h=0.1.
+deviation h/√(d+2). Original SCS retains the author-fitted sphere map and h=0.1.
+SCS calibrated retains the same centre and observer with pilot-selected R/h:
+100D R=0.5524147794720602, h=0.05; 500D R=1.1156813625824848, h=0.025.
 Every preset reuses the same full-budget maps without refitting or retuning.
 See [the exact protocol and preparation history](REPORTED_STUDY.md).
 
@@ -84,9 +86,11 @@ The separately labelled **Numba extension** keeps the same study maps and steps
 but changes DCS's production implementation; it is not the backend used for
 those reported results.
 
-The study uses additional DCS calibration from its development stage. It is
-not equal total tuning effort against original SCS, and its radial results
-are not a guarantee of overall mixing or a guaranteed ranking on another run.
+DCS and SCS calibrated used equal original VI evaluation budgets and equal
+radius/step pilot transition budgets. Original SCS remains a separate baseline
+without those R/h changes. Equal counts do not imply equal elapsed time or
+identical map choices. Current runs load the saved preparations; their radial
+results do not guarantee overall mixing or the ranking on another run.
 
 **All seven experiments + posterior table** runs the current JAX comparison
 at the selected 100D/500D target plus the other six experiments. The two earlier
@@ -107,7 +111,7 @@ can still change the number of samples and resulting errors. Other fresh
 batches keep the same maps and parameters. The same repeat selector applies
 to the comparison within All seven; the other six retain their recorded seeds.
 
-Run each target separately and compare all five methods together. Keep the
+Run each target separately and compare all six methods together. Keep the
 worker count and computer load comparable. Full paper runs extend sampling
 under the same reported-study maps; they do not refit those maps.
 

@@ -164,12 +164,36 @@ def prepare(config):
     return maps, fitting
 
 
+def method_mapping(maps, algorithm):
+    """Select a distinct prepared map for each SCS control."""
+    key = 'sphere_calibrated' if algorithm == 'SCS-calibrated' else 'sphere' if algorithm == 'SCS' else 'ball'
+    return maps[key]
+
+
+def method_execution_config(config, algorithm):
+    """Dispatch both controls through the unchanged author SCS kernel.
+
+    Public method identifiers remain distinct in saved outputs. The alias is
+    translated only at the execution boundary, where the existing fixed-scale
+    SCS policy supplies the frozen calibrated step.
+    """
+    result = dict(config, algorithm=algorithm)
+    if 'SCS-calibrated' in config.get('algorithms', []):
+        result['step_tuning_policies'] = {k: v for k, v in config['step_tuning_policies'].items()
+                                           if k != 'SCS-calibrated'}
+    if algorithm == 'SCS-calibrated':
+        result.update(algorithm='SCS', initial_scale=config['scs_calibrated_move'],
+                      scs_fixed_move=config['scs_calibrated_move'])
+        result['step_tuning_policies']['SCS'] = 'fixed_scs_move_v1'
+    return result
+
+
 def effective_method_maps(config, maps):
     """Record each production coordinate map separately from the shared fits."""
     if not maps:
         return {}
     from dcs_bench.timed_radial import effective_mapping
-    return {name: effective_mapping(maps['sphere' if name == 'SCS' else 'ball'], name)
+    return {name: effective_mapping(method_mapping(maps, name), 'SCS' if name == 'SCS-calibrated' else name)
             for name in config['algorithms']}
 
 
@@ -186,7 +210,8 @@ def chain_job(job):
         print(f'{algorithm}, chain {job["chain"]+1} starting', flush=True)
         diagnostics = ({'diagnostic_lock': job.get('diagnostic_lock')}
                        if job['config'].get('ess_enabled', False) else {})
-        traces, record = run_timed(job['mapping'], {**job['config'], 'algorithm': algorithm}, job['seed'],
+        execution_config = method_execution_config(job['config'], algorithm)
+        traces, record = run_timed(job['mapping'], execution_config, job['seed'],
                                    before_sampling=lambda: barrier.wait(timeout=900),
                                    after_sampling=lambda: barrier.wait(timeout=900), **diagnostics)
         # File compression by an earlier finisher must not compete with peers
@@ -197,6 +222,8 @@ def chain_job(job):
                       wave_cpu_ids=list(job['wave_cpu_ids']), execution_revision=EXECUTION_REVISION,
                       affinity_policy=job['config']['affinity_policy'],
                       worker={'pid': os.getpid(), **_ALLOCATION}, time_scope=job['config'].get('time_scope', TIME_SCOPE))
+        if algorithm == 'SCS-calibrated':
+            record['kernel_algorithm'] = 'SCS'
         if not np.all(np.isfinite(traces)) or not np.all(np.isfinite(record['mean_all_iterations'])):
             raise FloatingPointError('Nonfinite chain estimates')
         output = Path(job['output']); output.parent.mkdir(parents=True, exist_ok=True)
@@ -266,7 +293,7 @@ def run_chains(root, config, maps):
                     barrier = manager.Barrier(len(chains))
                     jobs = [dict(algorithm=algorithm, chain=chain, seed=config['seed']+chain,
                         wave=wave, wave_size=len(chains), wave_cpu_ids=wave_cpus[wave], barrier=barrier, config=config,
-                        mapping=maps['sphere' if algorithm == 'SCS' else 'ball'],
+                        mapping=method_mapping(maps, algorithm),
                         output=str(root/'chains'/algorithm/f'{chain:03d}.npz')) for chain in chains]
                     if diagnostic_lock is not None:
                         for job in jobs:
@@ -389,7 +416,8 @@ def run(config, output, *, prepared_inputs=None, prepared_input_load_seconds=Non
         if (prepared_inputs is None or isinstance(prepared_input_load_seconds, bool)
                 or not np.isfinite(prepared_input_load_seconds) or prepared_input_load_seconds < 0):
             raise ValueError('Prepared-input loading time must be finite and nonnegative')
-    if config.get('protocol') in ('timed-reported-zero-centre-v1', 'timed-reported-zero-centre-numba-v1'):
+    if config.get('protocol') in ('timed-reported-zero-centre-v1', 'timed-reported-zero-centre-numba-v1',
+                                  'timed-reported-zero-centre-v2', 'timed-reported-zero-centre-numba-v2'):
         from dcs_bench.reported_study import load_prepared
         if prepared_inputs != load_prepared(config):
             raise ValueError('Reported-study runs require the exact bundled prepared inputs')

@@ -15,13 +15,15 @@ from scripts import reproduce_scs_100d as runner
 from scripts.scs_100d_figures import render_report
 
 
-def reported_summary(dimension=100, backend='jax'):
-    config = study.configuration(target=f'skew-t-{dimension}d', comparison=backend)
+def reported_summary(dimension=100, backend='jax', legacy=False):
+    configure = study.legacy_configuration if legacy else study.configuration
+    config = configure(target=f'skew-t-{dimension}d', comparison=backend)
     prepared = study.load_prepared(config)
     _, truth, _ = radial_truth(Target(config['target']), config['threshold'])
     records = {}
     for method in config['algorithms']:
-        scale = _initial_proposal_scale(dict(config, algorithm=method))
+        method_config = runner.method_execution_config(config, method)
+        scale = _initial_proposal_scale(method_config)
         records[method] = []
         for chain in range(config['runs']):
             row = dict(chain=chain, seed=config['seed']+chain, iterations=1200,
@@ -35,7 +37,7 @@ def reported_summary(dimension=100, backend='jax'):
                 functional_ess={name: dict(ess=100., ess_per_sampling_second=1000.,
                     draws=800, draw_stride=1, unavailable_reason=None)
                     for name in ('tail_probability', 'mean_norm')})
-            if method != 'SCS':
+            if method.startswith('DCS-'):
                 row.update(fixed_move_radius=config['dcs_fixed_move'], fixed_step=scale,
                     proposal_coordinate_variance=config['dcs_fixed_move']**2/(dimension+2.))
             records[method].append(row)
@@ -55,7 +57,7 @@ class ReportedStudyReportTests(unittest.TestCase):
                 self.assertEqual(len(result['figures']), 5)
                 page = (root/'paper_values.html').read_text(encoding='utf-8')
                 self.assertIn('Reported zero-centre study', page)
-                self.assertIn('not equal total', page)
+                self.assertIn('equal total development effort', page)
                 self.assertIn('maps reused without refitting', page)
                 self.assertIn('All four DCS methods use the same frozen zero-centre', page)
                 self.assertNotIn('other DCS methods retain the fitted ball map', page)
@@ -66,13 +68,55 @@ class ReportedStudyReportTests(unittest.TestCase):
                 self.assertEqual(set(rows), set(study.METHODS))
                 self.assertEqual(float(rows['DCS-BW']['dcs_fixed_move']), study.FROZEN[dimension]['h'])
                 self.assertIn('fixed h = 0.1', rows['SCS']['production_step_policy'])
+                calibrated = summary['config']['reported_calibrated_scs_parameters']
+                self.assertIn('SCS calibrated', page)
+                self.assertIn('All six methods' if backend == 'jax' else 'Numba extension', page)
+                self.assertIn('Archived joint radius/step calibration', page)
+                self.assertIn('Equal pilot counts do not imply equal seconds', page)
+                self.assertIn('original author centre', rows['SCS-calibrated']['production_step_policy'])
+                self.assertEqual(float(rows['SCS-calibrated']['fixed_step']), calibrated['h'])
+                self.assertEqual(float(rows['SCS-calibrated']['sphere_radius']), calibrated['R'])
+                self.assertEqual(rows['SCS-calibrated']['execution_backend'], 'JAX')
+                self.assertEqual(float(rows['SCS']['fixed_step']), .1)
+                self.assertEqual(float(rows['SCS']['sphere_radius']), summary['maps']['sphere']['scale'])
+                for filename in ('sample_counts.csv', 'effective_maps.csv', 'functional_ess.csv'):
+                    with (root/filename).open(encoding='utf-8', newline='') as stream:
+                        method_rows = list(csv.DictReader(stream))
+                    self.assertEqual({r['method'] for r in method_rows}, set(study.METHODS))
+                with (root/'joint_calibration.csv').open(encoding='utf-8', newline='') as stream:
+                    pilot_rows = list(csv.DictReader(stream))
+                self.assertEqual(len(pilot_rows), 2)
+                self.assertEqual({int(r['total_pilot_transitions']) for r in pilot_rows}, {524288})
+                self.assertEqual({int(r['shared_exact_target_starts']) for r in pilot_rows}, {4096})
+                self.assertTrue(all(float(r['historical_transition_evaluation_seconds']) > 0 for r in pilot_rows))
                 self.assertEqual(summary, before)
+
+    def test_historical_five_method_reports_remain_readable_without_new_control(self):
+        summary = reported_summary(legacy=True)
+        before = deepcopy(summary)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            result = render_report(root, summary)
+            self.assertEqual(len(result['figures']), 5)
+            page = (root/'paper_values.html').read_text(encoding='utf-8')
+            self.assertIn('All five methods', page)
+            self.assertNotIn('SCS calibrated', page)
+            self.assertFalse((root/'joint_calibration.csv').exists())
+            self.assertEqual(summary, before)
+
+    def test_calibrated_step_records_cannot_silently_revert_to_original_scs(self):
+        summary = reported_summary()
+        summary['cases']['SCS-calibrated']['records'][0]['final_scale'] = .1
+        with tempfile.TemporaryDirectory() as temp, self.assertRaisesRegex(ValueError, 'Calibrated SCS step records'):
+            render_report(Path(temp), summary)
 
     def test_changed_maps_or_fit_history_cannot_be_labelled_reported_study(self):
         for mutate in (
             lambda d: d['maps']['ball']['mu'].__setitem__(0, .1),
             lambda d: d['maps']['sphere'].__setitem__('scale', 1.),
+            lambda d: d['maps']['sphere_calibrated'].__setitem__('scale', 1.),
             lambda d: d['fitting']['ball']['loss'].__setitem__(0, 0.),
+            lambda d: d['prepared_input_provenance']['joint_calibration']['budget_per_family_per_dimension'].__setitem__('transitions_total', 1),
         ):
             summary = reported_summary()
             mutate(summary)

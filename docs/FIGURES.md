@@ -60,7 +60,7 @@ rejections. Any unavailable chain makes that method aggregate unavailable.
 See [ESS definitions and limits](ESS.md). Replotting uses recorded measurements;
 it cannot reconstruct unrecorded transitions.
 
-The All seven sequence uses the current five-method JAX comparison on the selected
+The All seven sequence uses the current six-method JAX comparison on the selected
 100D/500D skewed t, loading its bundled maps without refitting. The other six
 experiments retain their specified fitted or identity-map policies.
 

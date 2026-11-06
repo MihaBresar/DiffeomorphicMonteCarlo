@@ -3,14 +3,18 @@
 The launcher now defaults to the [reported zero-centre study](REPORTED_STUDY.md),
 whose frozen maps, original results and calibration provenance are bundled in
 `studies/zero_centre`. It is distinct from the fitted-centre version-11 protocol
-discussed below. Its extra DCS development must not be described as equal total
-tuning effort against original SCS.
+discussed below. Current runs include both original SCS and SCS calibrated.
+DCS and the calibrated control used equal VI evaluation and R/h pilot transition
+budgets; original SCS retains its author defaults. This does not imply identical
+map choices or equal elapsed preparation time.
 
 This repository supports inspection and independent reruns of the corrected experiments and subsequent sampler extensions. Start with a small execution check, then inspect the recorded protocol before interpreting comparisons. The source commit and run manifest, rather than a figure filename, identify a result.
 
 ## Scope and evidence
 
-The default reported-study comparison loads bundled full-budget maps without refitting. All four DCS variants use the recorded zero-centre, zero-deformation maps and calibrated radius/step settings; SCS retains its original author-fitted map and h=0.1. Its JAX results and development record are bundled, while the Numba option is an implementation extension using those settings.
+The default reported-study comparison loads bundled full-budget maps without refitting. All four DCS variants use the recorded zero-centre, zero-deformation maps and calibrated radius/step settings; original SCS retains its author-fitted map and h=0.1. The added SCS calibrated
+control retains the same author centre/observer with pilot-selected radius and
+step under the same pilot budget as DCS. Its original JAX results and development record are bundled, while the Numba option is an implementation extension using those settings.
 
 The separately retained **earlier fitted-map** JAX and optimized-Numba comparisons use version 11. They compare DCS-RWM, DCS-BW, SCS, reflected BW and DCS-Billiard on 100D/500D normal-CDF-skewed t(3) targets, with VI fitted for both map families. Billiards and reflected BW are subsequent extensions. Both recipes measure radial-tail probability and mean norm for the recorded sampling procedures. They cannot separate proposal geometry from map preparation or establish coordinate, no-VI or general sampler superiority.
 
@@ -28,7 +32,9 @@ python run_experiment.py --plot-only results/reviewer-check
 
 Confirm a complete manifest and open `paper_values.html`. A quick result checks execution only. The reported-study smaller preset uses 20 chains × 3 seconds; full settings use 50 chains × 20 seconds. Every preset loads the same bundled maps without refitting. The default fresh sampling batch is 22; batches 20 and 21 repeat the reported streams, with hardware-dependent timed counts. Use a fresh output directory each time. To examine the dimensional extension, select `--target skew-t-500d`.
 
-For this default study, verify the bundled map hashes, effective zero-centre DCS maps, recorded radius/step choices and calibration provenance against [the reported-study protocol](REPORTED_STUDY.md). Equal sampling time and discarded warmup do not match the additional DCS preparation effort.
+For this default study, verify the bundled map hashes, effective zero-centre DCS maps, recorded radius/step choices and calibration provenance against [the reported-study protocol](REPORTED_STUDY.md). The VI and R/h pilot counts match DCS against SCS calibrated. Distinguish these
+counts from elapsed preparation time and the distinct retained map policies;
+original SCS remains a separate author-default baseline.
 
 ## Review checklist for the earlier fitted-map version-11 recipe
 
@@ -59,7 +65,7 @@ Version 10 changed the full DCS fitting budget from 1,500 to 1,000 updates and i
 
 Freeze the version-11 protocol before evaluating a fresh, previously uninspected full-paper sampling batch. Rerun all five methods together and report the new batch separately from the version-9 and later development studies. A changed protocol after inspecting results needs a new independent assessment and disclosure. This guide does not assert that a new full batch has completed.
 
-Both public five-method recipes contain only author SCS VI and fixed h=0.1. Historical
+The earlier five-method compatibility recipes contain only author SCS VI and fixed h=0.1. Historical
 step-policy sensitivity results remain in the archived study; they are not
 active baseline choices. Retaining the original baseline does not establish
 equally optimal tuning or isolate the transition geometry.
@@ -101,7 +107,7 @@ families:
   for execution checking; Smaller and Full settings do not apply that floor.
   Quick runs are not performance comparisons.
 - Generic method order is fixed. Independent repeats and a controlled system
-  load are needed for timing conclusions; the five-method comparison instead
+  load are needed for timing conclusions; the synchronized comparison instead
   rotates method order across waves. With few waves, rotation does not fully
   balance every method's position.
 

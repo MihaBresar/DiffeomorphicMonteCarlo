@@ -22,7 +22,8 @@ from dcs_bench.engine import ALIASES, experiment_names, load_config, run
 BOUNDARY_EXPERIMENT = 'skew-t-100d-boundary'
 COMPARISONS = ('sampler-comparison', 'sampler-comparison-numba')
 REPORTED_COMPARISONS = ('reported-zero-centre', 'reported-zero-centre-numba')
-REPORTED_PROTOCOLS = ('timed-reported-zero-centre-v1', 'timed-reported-zero-centre-numba-v1')
+REPORTED_PROTOCOLS = ('timed-reported-zero-centre-v1', 'timed-reported-zero-centre-numba-v1',
+                      'timed-reported-zero-centre-v2', 'timed-reported-zero-centre-numba-v2')
 
 
 def named_experiments():

@@ -2,7 +2,7 @@
 
 Research software accompanying *Diffeomorphic Markov chain Monte Carlo: fast mixing for heavy-tailed distributions*, by Miha Brešar and Aleksandar Mijatović.
 
-The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. **The default launcher experiment now reproduces the reported zero-centre DCS study**, using its bundled maps and frozen parameters. The previous fitted-centre version-11 recipe remains available only through its compatibility commands and saved reports. Neither reproduces the original paper figures unchanged; billiards and reflected BW are later extensions.
+The repository provides sampling kernels, explicit experiment configurations, independent reference values, and scripts that generate figures and tables from saved runs. **The default launcher experiment now reproduces the reported zero-centre DCS study**, using its bundled maps and frozen parameters, with an additional equally pilot-calibrated SCS control. The previous fitted-centre version-11 recipe remains available only through its compatibility commands and saved reports. Neither reproduces the original paper figures unchanged; billiards and reflected BW are later extensions.
 
 Start with the [reported study instructions](docs/REPORTED_STUDY.md), [reviewer guide](docs/REVIEW_GUIDE.md), or [experiment catalogue](docs/EXPERIMENTS.md). No general performance ranking is assumed; comparisons must be assessed for the functions and budgets measured.
 
@@ -54,11 +54,18 @@ full-budget maps, 1,500 separate warmup transitions and first-third production
 discard. No manual radius, step or fitting choices are needed. Original SCS
 retains its author-fitted map and h=0.1. All four DCS variants use zero centre
 and deformation, with the study's fixed radius and step for each dimension.
+Current runs add **SCS calibrated**, which retains the author-fitted centre and
+observer while using the independently selected radius and step. Both SCS
+variants appear in the same six-method report; there is no extra control to select.
 
 The original results used JAX and two workers. The default new seed batch is 22;
 recorded batches 20 and 21 are available explicitly. The separately named Numba
-option is an implementation extension. DCS received extra calibration during
-development, so this is not an equal-total-tuning comparison.
+option is an implementation extension. DCS and SCS calibrated used equal VI
+evaluation budgets and equal radius/step pilot budgets: 524,288 transitions
+per dimension from the same 4,096 exact target starts. The original SCS baseline
+does not apply that pilot. Production timing excludes historical preparation
+for both; current runs reuse the frozen settings. Equal counts do not imply
+equal elapsed preparation time or identical map choices.
 
 See the [full protocol and run instructions](docs/REPORTED_STUDY.md) and
 [reported results and provenance](studies/zero_centre/results/index.html).
@@ -94,7 +101,7 @@ Displayed estimates use two decimals or scientific notation, while integer sampl
 
 The repository also includes 200D skew-t comparisons with NUTS and random-walk baselines, a fixed-iteration 50D t(0.5) experiment, logistic regression, Eight Schools and GARCH. Only the two posterior examples use PosteriorDB. Empirical targets need not satisfy the manuscript's sufficient theorem assumptions. See [target definitions](docs/TARGETS.md) and the [figure-by-figure rerun guide](docs/RERUN.md).
 
-Every VI-enabled SCS fit uses the same pinned author routine, including logistic regression and the 50D t(0.5) experiment. Their SCS production kernels remain the checked Numba implementation with acceptance-target 0.234 step tuning. SCS fitting has its own recorded budget: 1,000 updates on 2,000 fixed draws for Full paper settings, 400 on 500 for Smaller reproduction, and 20 on 128 for Quick check. Experiments containing SCS use fixed clouds and matching per-family evaluation budgets. Version 10 established that fitting policy, including the full logistic DCS budget of 1,000 updates; version 11 leaves it unchanged. The v11 shared fixed DCS move applies to the two five-method comparisons, not the other six experiments. Rerun all five compared methods together to measure the new step policy.
+Every VI-enabled SCS fit uses the same pinned author routine, including logistic regression and the 50D t(0.5) experiment. Their SCS production kernels remain the checked Numba implementation with acceptance-target 0.234 step tuning. SCS fitting has its own recorded budget: 1,000 updates on 2,000 fixed draws for Full paper settings, 400 on 500 for Smaller reproduction, and 20 on 128 for Quick check. Experiments containing SCS use fixed clouds and matching per-family evaluation budgets. Version 10 established that fitting policy, including the full logistic DCS budget of 1,000 updates; version 11 leaves it unchanged. The v11 shared fixed DCS move applies only to the earlier fitted-map compatibility comparisons, not the other six experiments. Current frozen-map comparisons use their separately documented parameters and include both SCS variants.
 
 The all-experiments runner includes the current JAX comparison (100D by default, or the selected 500D target) and those six experiments; it does not expand every target/backend combination. The [manuscript relationship](docs/MANUSCRIPT_CHANGES.md) explains the corrections and scope of current experiments. The current billiard variant is distinct from the original paper's BW sampler. New results cannot retrospectively validate the original figures.
 

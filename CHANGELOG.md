@@ -1,5 +1,12 @@
 # Changes
 
+## 2026-11-06 — equally pilot-calibrated SCS control
+
+- Add **SCS calibrated** alongside original SCS in current JAX and Numba comparisons, including All seven. Preserve original SCS at author VI and h=0.1, and preserve all four DCS settings.
+- Reuse the independently selected SCS radius and step from the matched joint pilot: 16 candidates × 4,096 common exact target starts × 8 transitions per dimension, equal to DCS. Keep the author-fitted SCS centre, observer and transition unchanged. No fresh-run MSE selects parameters.
+- Record the extra method under new reported-study v2 protocols; retain historical v1 five-method report reading and unchanged original map assets. Current six-method results require a fresh complete run.
+- Clarify equal VI and pilot counts versus elapsed preparation time. The centre diagnostic examined both methods; retained map policies differ. Frozen-map runs repeat neither VI nor the pilot for either family.
+
 ## 2026-11-06 — simpler comparison menu
 
 - Rename the current launcher choices to **DCS vs original SCS** and **Numba extension**. Remove both earlier fitted-map comparison options from the menu; preserve their compatibility commands and saved-report support.

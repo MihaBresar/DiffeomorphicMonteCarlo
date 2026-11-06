@@ -1,5 +1,26 @@
 # Validation
 
+## Calibrated SCS control
+
+The current six-method comparison adds **SCS calibrated** without changing
+original SCS or the four DCS methods' numerical settings. On 6 November 2026,
+the full local suite passed **437 tests**. Checks include exact warmup and
+production-trajectory agreement with the author SCS driver at the selected
+radius/step, original-map preservation, strict provenance validation and
+historical five-method v1 report compatibility.
+
+Independent review verified all 64 recorded pilot candidates, selected
+parameters and equal preparation counts against the original source. Twelve
+dimension/backend/preset combinations preserved the original five methods'
+configuration and prepared inputs. Complete Quick checks for 100D JAX and
+500D Numba covered **24 production chains**, with all six methods in the five
+figure families and exact-value tables. Both SCS variants use author JAX;
+the Numba option changes only DCS production. These runs overlapped with other
+validation and establish execution, not comparative performance.
+
+The [validation record](../validation/calibrated_scs_release.json) describes
+this release's scope. Inspect the exact revision's GitHub Actions separately.
+
 ## Reported zero-centre study
 
 On 6 November 2026, the complete local regression suite passed **426 tests**.

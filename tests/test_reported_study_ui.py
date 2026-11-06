@@ -1,5 +1,5 @@
 """Reported-study UI uses bundled settings and keeps earlier recipes separate."""
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from io import BytesIO, StringIO
 import json
 from pathlib import Path
@@ -110,6 +110,17 @@ class ReportedStudyUiTests(unittest.TestCase):
             with patch.dict(sys.modules,{'scripts.reproduce_reported_study':module}):
                 self.assertEqual(run_experiment.main([experiment,'--dry-run']),73)
             self.assertNotIn('--seed-batch',module.main.call_args.args[0])
+
+    def test_fresh_cli_includes_original_and_calibrated_scs_in_both_backends(self):
+        for experiment in launcher.REPORTED_COMPARISONS:
+            with redirect_stdout(StringIO()) as output:
+                self.assertEqual(run_experiment.main([experiment, '--dry-run']), 0)
+            config = json.loads(output.getvalue())['configuration']
+            self.assertIn(config['protocol'], (
+                'timed-reported-zero-centre-v2', 'timed-reported-zero-centre-numba-v2'))
+            self.assertEqual(config['algorithms'].count('SCS'), 1)
+            self.assertEqual(config['algorithms'].count('SCS-calibrated'), 1)
+            self.assertEqual(len(config['algorithms']), 6)
 
     def test_reported_cli_rejects_sampling_fitting_and_map_overrides(self):
         module=ModuleType('scripts.reproduce_reported_study')

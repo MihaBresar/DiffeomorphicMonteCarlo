@@ -45,7 +45,7 @@ class ReportedStudyTests(unittest.TestCase):
                     self.assertFalse(current['fit_constrained_mu_zero'])
                     self.assertFalse(current['fit_constrained_delta_zero'])
                 for method, mapping in runner.effective_method_maps(config, prepared['maps']).items():
-                    if method != 'SCS':
+                    if method not in ('SCS', 'SCS-calibrated'):
                         self.assertEqual(mapping, prepared['maps']['ball'])
                         self.assertEqual(mapping['scale'], study.FROZEN[d]['scale'])
                         self.assertEqual(mapping['beta'], 2.)
@@ -56,7 +56,7 @@ class ReportedStudyTests(unittest.TestCase):
     def test_asset_tampering_is_rejected_without_fitting(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
-            for name in ('manifest.json', 'full_budget_100d.json'):
+            for name in ('manifest.json', 'full_budget_100d.json', 'joint_calibration.json'):
                 (directory / name).write_bytes((study.ASSETS / name).read_bytes())
             with patch.object(study, 'ASSETS', directory):
                 study.configuration()
@@ -84,10 +84,12 @@ class ReportedStudyTests(unittest.TestCase):
                         self.assertTrue(config['ess_enabled'])
                         self.assertFalse(config['coordinate_metrics'])
                         for method in study.METHODS:
-                            settings = dict(config, algorithm=method)
-                            policy = 'author_scs_fixed_01' if method == 'SCS' else 'fixed_dcs_move_v1'
+                            settings = runner.method_execution_config(config, method)
+                            policy = ('author_scs_fixed_01' if method == 'SCS' else 'fixed_scs_move_v1'
+                                      if method == 'SCS-calibrated' else 'fixed_dcs_move_v1')
                             self.assertEqual(resolve_step_tuning(settings), policy)
-                            scale = (.1 if method == 'SCS' else study.FROZEN[dimension]['h'] /
+                            scale = (.1 if method == 'SCS' else study.CALIBRATED_SCS[dimension]['h']
+                                     if method == 'SCS-calibrated' else study.FROZEN[dimension]['h'] /
                                      (math.sqrt(dimension + 2) if method == 'DCS-RWM' else 1))
                             self.assertEqual(_initial_proposal_scale(settings), scale)
 
@@ -140,7 +142,7 @@ class ReportedStudyTests(unittest.TestCase):
         _, truth, _ = radial_truth(Target(config['target']), config['threshold'])
         records = {method: [dict(chain=i, seed=config['seed'] + i, iterations=300,
             discarded_iterations=100, estimation_iterations=200, seconds=.05, acceptance=.5,
-            final_scale=_initial_proposal_scale(dict(config, algorithm=method)),
+            final_scale=_initial_proposal_scale(runner.method_execution_config(config, method)),
             mean_all_iterations=(truth + np.array([.001, .1]) * (-1 if i else 1)).tolist())
             for i in range(2)] for method in config['algorithms']}
         with tempfile.TemporaryDirectory() as temp, patch.object(runner, 'prepare') as fit, \
